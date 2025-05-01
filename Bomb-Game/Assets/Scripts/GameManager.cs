@@ -3,23 +3,8 @@ using UnityEngine.InputSystem;
 
 public class GameManager : MonoBehaviour
 {
-    public static GameManager Instance; // Singleton
-    public GameObject bombPrefab; // Assign BombPrefab in Inspector
-    public GameObject bombInstance; // Tracks the single bomb
-
-    void Awake()
-    {
-        // Singleton setup
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
+    public GameObject bombPrefab;
+    private GameObject bombInstance;
 
     void Start()
     {
@@ -28,46 +13,27 @@ public class GameManager : MonoBehaviour
 
     void SpawnBomb()
     {
-        if (bombInstance != null)
-        {
-            Debug.LogWarning("Bomb already exists!");
-            return;
-        }
-
-        // Find all players
         GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-        if (players.Length == 0)
-        {
-            Debug.LogError("No players found to assign bomb!");
-            return;
-        }
+        if (players.Length == 0) return;
 
-        // Pick a random player
         GameObject randomPlayer = players[Random.Range(0, players.Length)];
-
-        // Spawn bomb
         bombInstance = Instantiate(bombPrefab, Vector3.zero, Quaternion.identity);
-        Bomb bombScript = bombInstance.GetComponent<Bomb>();
-        if (bombScript != null)
-        {
-            bombScript.AssignToPlayer(randomPlayer);
-            SetupPlayerInputs(players, bombScript);
-        }
-        else
-        {
-            Debug.LogError("Bomb script missing on instantiated bomb!");
-        }
+        bombInstance.GetComponent<Bomb>().AssignToPlayer(randomPlayer);
+        SetupPlayerInputs(players);
     }
 
-    void SetupPlayerInputs(GameObject[] players, Bomb bombScript)
+   void SetupPlayerInputs(GameObject[] players) // Adjust method signature as needed
     {
         foreach (GameObject player in players)
         {
             PlayerInput playerInput = player.GetComponent<PlayerInput>();
-            if (playerInput != null)
+            PlayerBombHandler handler = player.GetComponent<PlayerBombHandler>();
+            if (playerInput != null && handler != null)
             {
-                // Dynamically assign SwapBomb event
-                playerInput.actions.FindAction("SwapBomb").performed += ctx => bombScript.OnSwapBomb(ctx.ReadValueAsButton());
+                // Bind SwapBomb action
+                playerInput.actions.FindAction("SwapBomb").performed += ctx => handler.OnSwapBomb(ctx.ReadValueAsButton());
+                // Bind Throw action
+                playerInput.actions.FindAction("Throw").performed += ctx => handler.OnThrow(ctx.ReadValueAsButton());
             }
         }
     }
