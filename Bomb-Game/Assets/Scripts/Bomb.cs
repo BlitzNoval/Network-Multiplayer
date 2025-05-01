@@ -4,43 +4,38 @@ public class Bomb : MonoBehaviour
 {
     private Rigidbody rb;
     private Collider bombCollider;
-    public GameObject holder; // The player holding the bomb
-    private bool isOnRight = true; // True = right hand, false = left hand
-    private bool isHeld = true; // Is the bomb being held?
-    private float lastThrowTime; // Tracks last throw for cooldown
+    public GameObject holder;
+    private bool isOnRight = true;
+    private bool isHeld = true;
+    private float lastThrowTime;
+    private int currentBounces;
+    private float groundHitTime;
+    private bool waitingToExplode;
 
-    // Curve Throw (Right Hand) Parameters
-    [Header("Curve Throw (Right Hand)")]
-    [Tooltip("Forward speed of the curve throw (units/second)")]
-    public float curveSpeed = 15f;
-    [Tooltip("Sideways force for the curve arc (units/second)")]
-    public float curveSideForce = 5f;
-    [Tooltip("Angle offset for the throw direction (degrees, 0 = straight)")]
-    public float curveAngleOffset = 0f;
+    // Public getter for isOnRight
+    public bool IsOnRight => isOnRight;
 
-    // Lob Throw (Left Hand) Parameters
+    [Header("Normal Throw (Right Hand)")]
+    [Tooltip("Forward speed of the normal throw (units/second)")]
+    public float normalThrowSpeed = 20f;
+    [Tooltip("Upward force for the normal throw (units/second)")]
+    public float normalThrowUpward = 2f;
+
     [Header("Lob Throw (Left Hand)")]
     [Tooltip("Forward speed of the lob throw (units/second)")]
-    public float lobSpeed = 10f;
+    public float lobThrowSpeed = 10f;
     [Tooltip("Upward force for the lob arc (units/second)")]
-    public float lobUpwardForce = 5f;
-    [Tooltip("Angle offset for the throw direction (degrees, 0 = straight)")]
-    public float lobAngleOffset = 10f;
+    public float lobThrowUpward = 5f;
 
-    // General Throw Parameters
     [Header("General Throw Settings")]
-    [Tooltip("Number of bounces before exploding (0 = explode on first hit)")]
+    [Tooltip("Number of bounces before stopping (0 = no bounces)")]
     public int maxBounces = 1;
     [Tooltip("Cooldown between throws (seconds)")]
     public float throwCooldown = 0.5f;
     [Tooltip("Delay before exploding on ground (seconds)")]
     public float groundExplosionDelay = 1f;
-    [Tooltip("Rigidbody mass multiplier during flight (1 = default)")]
+    [Tooltip("Rigidbody mass multiplier during flight")]
     public float flightMassMultiplier = 1f;
-
-    private int currentBounces; // Tracks bounces
-    private float groundHitTime; // Time when bomb hits ground
-    private bool waitingToExplode; // Is bomb waiting to explode?
 
     void Awake()
     {
@@ -69,7 +64,7 @@ public class Bomb : MonoBehaviour
             bombCollider.enabled = false;
             waitingToExplode = false;
             currentBounces = 0;
-            rb.mass = 1f; // Reset mass
+            rb.mass = 1f;
             UpdateHoldPoint();
             PlayerBombHandler handler = holder.GetComponent<PlayerBombHandler>();
             if (handler != null)
@@ -128,16 +123,13 @@ public class Bomb : MonoBehaviour
         Vector3 forward = holder.transform.forward;
         Vector3 throwForce;
 
-        if (isOnRight) // Curve throw
+        if (isOnRight) // Normal throw
         {
-            Vector3 right = holder.transform.right;
-            forward = Quaternion.Euler(0, curveAngleOffset, 0) * forward;
-            throwForce = (forward * curveSpeed) + (right * curveSideForce);
+            throwForce = (forward * normalThrowSpeed) + (Vector3.up * normalThrowUpward);
         }
         else // Lob throw
         {
-            forward = Quaternion.Euler(0, lobAngleOffset, 0) * forward;
-            throwForce = (forward * lobSpeed) + (Vector3.up * lobUpwardForce);
+            throwForce = (forward * lobThrowSpeed) + (Vector3.up * lobThrowUpward);
         }
 
         rb.AddForce(throwForce, ForceMode.Impulse);
@@ -169,6 +161,6 @@ public class Bomb : MonoBehaviour
     void Explode()
     {
         Debug.Log("Bomb exploded!");
-        Destroy(gameObject); // Temporary
+        Destroy(gameObject);
     }
 }
