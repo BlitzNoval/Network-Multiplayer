@@ -28,6 +28,12 @@ public class GameManager : MonoBehaviour
         SpawnBomb();
     }
 
+    public void OnBombExploded()
+    {
+        bombInstance = null; // Clear the current bomb instance
+        SpawnBomb(); // Spawn a new bomb
+    }
+
     void SpawnBomb()
     {
         if (bombInstance != null)

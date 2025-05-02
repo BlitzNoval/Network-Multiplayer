@@ -1,57 +1,107 @@
 using UnityEngine;
+using TMPro;
 
 public class Bomb : MonoBehaviour
 {
     private Rigidbody rb;
     private Collider bombCollider;
+
+    [Header("Holder")]
     public GameObject holder;
     private bool isOnRight = true;
     private bool isHeld = true;
     private float lastThrowTime;
+    private GameObject lastThrower;
+
+    [Header("Timer")]
+    [Tooltip("How long the bomb lives (seconds)")]
+    public float initialTimer = 10f;
+    private float currentTimer;
+    public TextMeshProUGUI timerText;
+
+    [Tooltip("Pause duration (seconds) when returning to a player")]
+    public float returnPauseDuration = 0.5f;
+    private bool returnPause;
+    private float returnPauseStart;
+
+    [Header("Throw Settings")]
+    public float normalThrowSpeed = 20f;
+    public float normalThrowUpward = 2f;
+    public float lobThrowSpeed = 10f;
+    public float lobThrowUpward = 5f;
+    public int maxBounces = 1;
+    public float throwCooldown = 0.5f;
+    public float groundExplosionDelay = 1f;
+    public float flightMassMultiplier = 1f;
+
+    // bounce/explode state
     private int currentBounces;
     private float groundHitTime;
     private bool waitingToExplode;
 
-    // Public getter for isOnRight
+    // for world‑space canvas facing the camera
+    private Transform canvasTransform;
+
+    // Public getter
     public bool IsOnRight => isOnRight;
-
-    [Header("Normal Throw (Right Hand)")]
-    [Tooltip("Forward speed of the normal throw (units/second)")]
-    public float normalThrowSpeed = 20f;
-    [Tooltip("Upward force for the normal throw (units/second)")]
-    public float normalThrowUpward = 2f;
-
-    [Header("Lob Throw (Left Hand)")]
-    [Tooltip("Forward speed of the lob throw (units/second)")]
-    public float lobThrowSpeed = 10f;
-    [Tooltip("Upward force for the lob arc (units/second)")]
-    public float lobThrowUpward = 5f;
-
-    [Header("General Throw Settings")]
-    [Tooltip("Number of bounces before stopping (0 = no bounces)")]
-    public int maxBounces = 1;
-    [Tooltip("Cooldown between throws (seconds)")]
-    public float throwCooldown = 0.5f;
-    [Tooltip("Delay before exploding on ground (seconds)")]
-    public float groundExplosionDelay = 1f;
-    [Tooltip("Rigidbody mass multiplier during flight")]
-    public float flightMassMultiplier = 1f;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         bombCollider = GetComponent<Collider>();
+        timerText = GetComponentInChildren<TextMeshProUGUI>();
+
         if (rb == null || bombCollider == null)
-        {
             Debug.LogError("Rigidbody or Collider missing on Bomb!");
-        }
+        if (timerText == null)
+            Debug.LogWarning("TextMeshProUGUI component not found on Bomb child!");
+
+        // start timer immediately on spawn
+        currentTimer = initialTimer;
+
+        // cache the Canvas (parent of the text)
+        if (timerText != null)
+            canvasTransform = timerText.transform.parent;
     }
 
     void Update()
     {
-        if (waitingToExplode && Time.time >= groundHitTime + groundExplosionDelay)
+        // --- 1) COUNTDOWN (always) with optional return‑pause ---
+        if (currentTimer > 0f)
         {
+            if (returnPause)
+            {
+                // check if the pause window has expired
+                if (Time.time >= returnPauseStart + returnPauseDuration)
+                    returnPause = false;
+            }
+            else
+            {
+                currentTimer -= Time.deltaTime;
+                if (timerText != null)
+                    timerText.text = Mathf.Ceil(currentTimer).ToString();
+                if (currentTimer <= 0f)
+                {
+                    Explode();
+                    return;
+                }
+            }
+        }
+
+        // --- 2) GROUND‐EXPLOSION DELAY (unchanged) ---
+        if (waitingToExplode && Time.time >= groundHitTime + groundExplosionDelay)
             Explode();
+    }
+
+    void LateUpdate()
+    {
+        // --- 3) FACE MAIN CAMERA ---
+        if (canvasTransform != null && Camera.main != null)
+        {
+            // rotate so the canvas normal looks back at the camera
+            canvasTransform.rotation = Quaternion.LookRotation(
+                canvasTransform.position - Camera.main.transform.position
+            );
         }
     }
 
@@ -65,12 +115,12 @@ public class Bomb : MonoBehaviour
             waitingToExplode = false;
             currentBounces = 0;
             rb.mass = 1f;
+
             UpdateHoldPoint();
-            PlayerBombHandler handler = holder.GetComponent<PlayerBombHandler>();
+
+            var handler = holder.GetComponent<PlayerBombHandler>();
             if (handler != null)
-            {
                 handler.SetBomb(this);
-            }
         }
     }
 
@@ -78,11 +128,9 @@ public class Bomb : MonoBehaviour
     {
         if (holder != null)
         {
-            PlayerBombHandler handler = holder.GetComponent<PlayerBombHandler>();
+            var handler = holder.GetComponent<PlayerBombHandler>();
             if (handler != null)
-            {
                 handler.ClearBomb();
-            }
             holder = null;
         }
     }
@@ -112,8 +160,10 @@ public class Bomb : MonoBehaviour
 
     public void ThrowBomb()
     {
-        if (holder == null || Time.time < lastThrowTime + throwCooldown) return;
+        if (holder == null || Time.time < lastThrowTime + throwCooldown)
+            return;
 
+        lastThrower = holder;
         transform.SetParent(null);
         rb.isKinematic = false;
         bombCollider.enabled = true;
@@ -121,16 +171,9 @@ public class Bomb : MonoBehaviour
         rb.mass *= flightMassMultiplier;
 
         Vector3 forward = holder.transform.forward;
-        Vector3 throwForce;
-
-        if (isOnRight) // Normal throw
-        {
-            throwForce = (forward * normalThrowSpeed) + (Vector3.up * normalThrowUpward);
-        }
-        else // Lob throw
-        {
-            throwForce = (forward * lobThrowSpeed) + (Vector3.up * lobThrowUpward);
-        }
+        Vector3 throwForce = isOnRight
+            ? (forward * normalThrowSpeed) + Vector3.up * normalThrowUpward
+            : (forward * lobThrowSpeed)   + Vector3.up * lobThrowUpward;
 
         rb.AddForce(throwForce, ForceMode.Impulse);
         lastThrowTime = Time.time;
@@ -140,13 +183,22 @@ public class Bomb : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        if (!isHeld)
+        if (isHeld) return;
+
+        if (collision.gameObject.CompareTag("Player"))
         {
-            if (collision.gameObject.CompareTag("Player"))
+            AssignToPlayer(collision.gameObject);
+        }
+        else if (collision.gameObject.CompareTag("Map"))
+        {
+            if (lastThrower != null)
             {
-                AssignToPlayer(collision.gameObject);
+                // pause countdown briefly, then give it back
+                returnPause = true;
+                returnPauseStart = Time.time;
+                AssignToPlayer(lastThrower);
             }
-            else if (collision.gameObject.CompareTag("Map"))
+            else
             {
                 currentBounces++;
                 if (currentBounces >= maxBounces)
@@ -159,8 +211,37 @@ public class Bomb : MonoBehaviour
     }
 
     void Explode()
+{
+    Debug.Log("Bomb exploded!");
+
+    // Find all players
+    GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
+    if (players.Length > 0)
     {
-        Debug.Log("Bomb exploded!");
-        Destroy(gameObject);
+        // Select a random player
+        GameObject randomPlayer = players[Random.Range(0, players.Length)];
+
+        // Spawn a new bomb instance using the GameManager's bombPrefab
+        if (GameManager.Instance != null && GameManager.Instance.bombPrefab != null)
+        {
+            GameObject newBomb = Instantiate(GameManager.Instance.bombPrefab, Vector3.zero, Quaternion.identity);
+            Bomb bombScript = newBomb.GetComponent<Bomb>();
+            if (bombScript != null)
+            {
+                bombScript.AssignToPlayer(randomPlayer);
+                GameManager.Instance.bombInstance = newBomb; // Update the GameManager's bombInstance
+            }
+            else
+            {
+                Debug.LogError("Bomb script missing on instantiated bomb!");
+            }
+        }
     }
+    else
+    {
+        Debug.LogError("No players found to assign new bomb!");
+    }
+
+    Destroy(gameObject);
+}
 }
