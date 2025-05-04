@@ -346,7 +346,7 @@ SphereCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5032718245858861815}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: 0ca62f334230eef49af66ac6f8cc4d07, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -418,14 +418,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   holder: {fileID: 0}
-  initialTimer: 15
+  initialTimer: 10
   timerText: {fileID: 0}
   returnPauseDuration: 0.2
-  normalThrowSpeed: 25
+  normalThrowSpeed: 15
   normalThrowUpward: 2.5
   lobThrowSpeed: 15
-  lobThrowUpward: 8
-  maxBounces: 1
+  lobThrowUpward: 6
+  maxBounces: 2
   throwCooldown: 0.5
   groundExplosionDelay: 1
   flightMassMultiplier: 1
