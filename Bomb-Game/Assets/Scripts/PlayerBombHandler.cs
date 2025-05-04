@@ -1,19 +1,21 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections;
 using System.Collections.Generic;
 
+[RequireComponent(typeof(LineRenderer), typeof(PlayerInput))]
 public class PlayerBombHandler : MonoBehaviour
 {
     private Bomb currentBomb;
-    public LineRenderer trajectoryLine;
-    private bool isAiming = false;
-    private List<Vector3> trajectoryPoints = new List<Vector3>();
+    private LineRenderer trajectoryLine;
+    private bool isAiming;
+    private List<Vector3> trajectoryPoints = new();
 
-    // Tweak in Inspector if you want fewer/more points
-    private const int MAX_TRAJECTORY_POINTS = 100;
+    [Header("Trajectory Settings")]
+    [SerializeField, Range(10, 300)] private int maxPoints = 100;
+    [SerializeField] private LayerMask collisionMask;
+
     private float timeStep;
-
-    // Public getters for state syncing
     public bool IsAiming => isAiming;
     public Vector3[] TrajectoryPoints => trajectoryPoints.ToArray();
 
@@ -22,11 +24,37 @@ public class PlayerBombHandler : MonoBehaviour
         trajectoryLine = GetComponent<LineRenderer>();
         trajectoryLine.positionCount = 0;
         trajectoryLine.startWidth = 0.1f;
-        trajectoryLine.endWidth = 0.1f;
-        trajectoryLine.material = new Material(Shader.Find("Sprites/Default"));
+        trajectoryLine.endWidth   = 0.1f;
+        trajectoryLine.material   = new Material(Shader.Find("Sprites/Default"));
 
-        // We’ll step in fixed-delta intervals
         timeStep = Time.fixedDeltaTime;
+    }
+
+    void Start()
+    {
+        // --- Input setup ---
+        var input = GetComponent<PlayerInput>();
+        if (input != null)
+        {
+            var swapAction = input.actions.FindAction("SwapBomb");
+            if (swapAction != null)
+                swapAction.performed += ctx => OnSwapBomb(ctx.ReadValueAsButton());
+
+            var throwAction = input.actions.FindAction("Throw");
+            if (throwAction != null)
+            {
+                throwAction.started  += ctx => OnThrow(true);
+                throwAction.canceled += ctx => OnThrow(false);
+            }
+        }
+
+        // Register with GameManager
+        GameManager.Instance?.RegisterPlayer(gameObject);
+    }
+
+    void OnDestroy()
+    {
+        GameManager.Instance?.UnregisterPlayer(gameObject);
     }
 
     public void SetBomb(Bomb bomb)
@@ -41,139 +69,100 @@ public class PlayerBombHandler : MonoBehaviour
         HideTrajectory();
     }
 
-    // Input handling for swapping bomb hold point
     public void OnSwapBomb(bool isPressed)
     {
-        if (isPressed && currentBomb != null)
-        {
-            SwapBombHoldPoint();
-        }
+        if (isPressed)
+            currentBomb?.SwapHoldPoint();
     }
 
-    // Input handling for throwing bomb
     public void OnThrow(bool isPressed)
     {
-        if (isPressed)
+        if (isPressed) StartAiming();
+        else          ThrowBomb();
+    }
+
+    private void StartAiming()
+    {
+        if (currentBomb == null || isAiming) return;
+        isAiming = true;
+        StartCoroutine(AimLoop());
+    }
+
+    private IEnumerator AimLoop()
+    {
+        while (isAiming)
         {
-            StartAiming();
-        }
-        else
-        {
-            ThrowBomb();
+            SimulateTrajectory();
+            yield return new WaitForSeconds(timeStep);
         }
     }
 
-    // Start aiming the bomb (intended for local player input)
-    public void StartAiming()
+    private void ThrowBomb()
     {
-        if (currentBomb != null)
-        {
-            isAiming = true;
-        }
-    }
-
-    // Stop aiming the bomb (intended for local player input)
-    public void StopAiming()
-    {
+        if (!isAiming || currentBomb == null) return;
+        currentBomb.ThrowBomb();
         isAiming = false;
         HideTrajectory();
     }
 
-    // Swap the bomb's hold point (intended for server-side call when networked)
-    public void SwapBombHoldPoint()
-    {
-        if (currentBomb != null)
-        {
-            currentBomb.SwapHoldPoint();
-        }
-    }
-
-    // Throw the bomb (intended for server-side call when networked)
-    public void ThrowBomb()
-    {
-        if (isAiming && currentBomb != null)
-        {
-            currentBomb.ThrowBomb();
-            isAiming = false;
-            HideTrajectory();
-        }
-    }
-
     void Update()
     {
-        // If the bomb exploded mid-aim, clear the line
         if (currentBomb == null && isAiming)
         {
             isAiming = false;
             HideTrajectory();
-            return;
         }
-
-        if (isAiming)
-            SimulateTrajectory();
     }
 
     private void SimulateTrajectory()
     {
         trajectoryPoints.Clear();
-
-        // Find the correct hold-point
         if (currentBomb == null) return;
-        string holdName = currentBomb.IsOnRight ? "RightHoldPoint" : "LeftHoldPoint";
-        Transform holdPoint = transform.Find(holdName);
+
+        // Determine hold point
+        var holdName = currentBomb.IsOnRight ? "RightHoldPoint" : "LeftHoldPoint";
+        var holdPoint = transform.Find(holdName);
         if (holdPoint == null) return;
 
-        // Initial conditions
         Vector3 startPos = holdPoint.position;
-        bool isRight = currentBomb.IsOnRight;
-        float speed = isRight ? currentBomb.normalThrowSpeed : currentBomb.lobThrowSpeed;
-        float upward = isRight ? currentBomb.normalThrowUpward : currentBomb.lobThrowUpward;
+        float speed  = currentBomb.IsOnRight
+                     ? currentBomb.NormalThrowSpeed
+                     : currentBomb.LobThrowSpeed;
+        float upward = currentBomb.IsOnRight
+                     ? currentBomb.NormalThrowUpward
+                     : currentBomb.LobThrowUpward;
 
         Vector3 v0 = holdPoint.forward * speed + Vector3.up * upward;
-
-        // Color-code the line
-        Color c = isRight ? Color.blue : Color.yellow;
+        Color c    = currentBomb.IsOnRight ? Color.blue : Color.yellow;
         trajectoryLine.startColor = c;
-        trajectoryLine.endColor = c;
+        trajectoryLine.endColor   = c;
 
-        // Step through time, sample points
         Vector3 lastPos = startPos;
         trajectoryPoints.Add(lastPos);
         float t = 0f;
 
-        for (int i = 0; i < MAX_TRAJECTORY_POINTS; i++)
+        for (int i = 0; i < maxPoints; i++)
         {
             t += timeStep;
-            // Equation: p = p0 + v0*t + ½*g*t²
-            Vector3 newPos = startPos + v0 * t + 0.5f * Physics.gravity * (t * t);
+            Vector3 newPos = startPos + v0 * t + 0.5f * Physics.gravity * t * t;
+            Vector3 dir    = newPos - lastPos;
+            float   dist   = dir.magnitude;
 
-            Vector3 dir = newPos - lastPos;
-            float dist = dir.magnitude;
-
-            if (dist > 0f)
+            if (dist > 0f &&
+                Physics.Raycast(lastPos, dir.normalized, out var hit, dist, collisionMask) &&
+                hit.collider.CompareTag("Map"))
             {
-                // Raycast against real world colliders
-                if (Physics.Raycast(lastPos, dir.normalized, out RaycastHit hit, dist))
-                {
-                    // If we hit the floor/map, add the exact hit
-                    if (hit.collider.CompareTag("Map"))
-                    {
-                        trajectoryPoints.Add(hit.point);
-                        break;
-                    }
-                }
+                trajectoryPoints.Add(hit.point);
+                break;
             }
 
             trajectoryPoints.Add(newPos);
-
-            // Optional early-stop if it’s nearly stopped
-            Vector3 vel = v0 + Physics.gravity * t;
-            if (vel.magnitude < 0.1f) break;
+            if ((v0 + Physics.gravity * t).magnitude < 0.1f)
+                break;
 
             lastPos = newPos;
         }
 
-        // Push into the line renderer
         trajectoryLine.positionCount = trajectoryPoints.Count;
         trajectoryLine.SetPositions(trajectoryPoints.ToArray());
     }

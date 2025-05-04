@@ -858,7 +858,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fd780e421c6d00642841f2eaeb4cb97f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  trajectoryLine: {fileID: 4417834136593152937}
+  maxPoints: 100
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 8
 --- !u!114 &1681993517388132433
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -1,13 +1,18 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.InputSystem;
 
 public class GameManager : MonoBehaviour
 {
-    public static GameManager Instance;
-    public GameObject bombPrefab;
-    public GameObject bombInstance;
-    public Scene parallelScene;
+    public static GameManager Instance { get; private set; }
+
+    [Header("Bomb Settings")]
+    [SerializeField] private GameObject bombPrefab;
+    [SerializeField] private Transform bombSpawnPoint;
+
+    private GameObject bombInstance;
+    private Scene parallelScene;
+    private readonly List<GameObject> activePlayers = new();
 
     void Awake()
     {
@@ -24,60 +29,75 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        if (bombPrefab == null)
+        {
+            Debug.LogError("Bomb prefab not assigned in GameManager.");
+            return;
+        }
+
+        if (bombSpawnPoint == null)
+        {
+            Debug.LogWarning("No bomb spawn point set — using Vector3.zero as fallback.");
+            bombSpawnPoint = new GameObject("BombSpawnPoint").transform;
+            bombSpawnPoint.position = Vector3.zero;
+        }
+
         parallelScene = SceneManager.CreateScene("ParallelScene", new CreateSceneParameters(LocalPhysicsMode.Physics3D));
         SpawnBomb();
     }
 
-    // Handle bomb explosion event (intended for server-side call when networked)
-    public void OnBombExploded()
+    private void OnEnable()
     {
-        bombInstance = null; // Clear the current bomb instance
+        Bomb.OnBombExplodedGlobal += OnBombExploded;
+    }
+
+    private void OnDisable()
+    {
+        Bomb.OnBombExplodedGlobal -= OnBombExploded;
+    }
+
+    public void RegisterPlayer(GameObject player)
+    {
+        if (!activePlayers.Contains(player))
+            activePlayers.Add(player);
+    }
+
+    public void UnregisterPlayer(GameObject player)
+    {
+        activePlayers.Remove(player);
+    }
+
+    // Handle bomb explosion
+    private void OnBombExploded()
+    {
+        bombInstance = null;
         SpawnBomb();
     }
 
-    // Spawn a new bomb (intended for server-side call when networked)
     public void SpawnBomb()
     {
         if (bombInstance != null)
         {
-            Debug.LogWarning("Bomb already exists!");
+            Debug.LogWarning("Bomb already exists.");
             return;
         }
 
-        GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-        if (players.Length == 0)
+        if (activePlayers.Count == 0)
         {
-            Debug.LogError("No players found to assign bomb!");
+            Debug.LogError("No players available to assign the bomb.");
             return;
         }
 
-        GameObject randomPlayer = players[Random.Range(0, players.Length)];
-        bombInstance = Instantiate(bombPrefab, Vector3.zero, Quaternion.identity);
-        Bomb bombScript = bombInstance.GetComponent<Bomb>();
-        if (bombScript != null)
+        GameObject randomPlayer = activePlayers[Random.Range(0, activePlayers.Count)];
+        bombInstance = Instantiate(bombPrefab, bombSpawnPoint.position, bombSpawnPoint.rotation);
+
+        if (bombInstance.TryGetComponent(out Bomb bombScript))
         {
             bombScript.AssignToPlayer(randomPlayer);
-            SetupPlayerInputs(players);
         }
         else
         {
-            Debug.LogError("Bomb script missing on instantiated bomb!");
-        }
-    }
-
-    // Setup player inputs (intended for client-side setup when networked)
-    private void SetupPlayerInputs(GameObject[] players)
-    {
-        foreach (GameObject player in players)
-        {
-            PlayerInput playerInput = player.GetComponent<PlayerInput>();
-            PlayerBombHandler handler = player.GetComponent<PlayerBombHandler>();
-            if (playerInput != null && handler != null)
-            {
-                playerInput.actions.FindAction("SwapBomb").performed += ctx => handler.OnSwapBomb(ctx.ReadValueAsButton());
-                playerInput.actions.FindAction("Throw").started += ctx => handler.OnThrow(true); // Pressed
-                playerInput.actions.FindAction("Throw").canceled += ctx => handler.OnThrow(false); // Released
-            }
+            Debug.LogError("Spawned bomb is missing Bomb component.");
         }
     }
 }
