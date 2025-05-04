@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System;
 
 public class PlayerLifeManager : MonoBehaviour
 {
@@ -15,6 +16,10 @@ public class PlayerLifeManager : MonoBehaviour
 
     public int CurrentLives => currentLives;
     public bool IsDead { get; private set; }
+    public int PlayerID { get; private set; }
+
+    public event Action<int, int> OnLifeChanged; // playerID, newLives
+    public event Action<int> OnPlayerEliminated; // playerID
 
     void Awake()
     {
@@ -32,14 +37,24 @@ public class PlayerLifeManager : MonoBehaviour
         IsDead = false;
     }
 
+    public void SetPlayerID(int id)
+    {
+        PlayerID = id;
+    }
+
     public void HandleDeath()
     {
         if (IsDead) return;
 
         currentLives--;
-        
+        OnLifeChanged?.Invoke(PlayerID, currentLives);
+
+        // Play sound based on currentLives
+        AudioManager.Instance.PlayLifeLostSound(currentLives);
+
         if (currentLives <= 0)
         {
+            OnPlayerEliminated?.Invoke(PlayerID);
             HandleFinalDeath();
         }
         else

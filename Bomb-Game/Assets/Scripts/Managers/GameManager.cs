@@ -13,6 +13,8 @@ public class GameManager : MonoBehaviour
     private GameObject bombInstance;
     private Scene parallelScene;
     public readonly List<GameObject> activePlayers = new();
+    private int nextPlayerID = 1;
+    public Dictionary<GameObject, int> playerIDs = new Dictionary<GameObject, int>();
 
     void Awake()
     {
@@ -57,17 +59,27 @@ public class GameManager : MonoBehaviour
     }
 
     public void RegisterPlayer(GameObject player)
+{
+    if (!activePlayers.Contains(player))
     {
-        if (!activePlayers.Contains(player))
-            activePlayers.Add(player);
+        activePlayers.Add(player);
+        int id = nextPlayerID++;
+        playerIDs[player] = id;
+        var lifeManager = player.GetComponent<PlayerLifeManager>();
+        if (lifeManager != null)
+        {
+            lifeManager.SetPlayerID(id);
+        }
+        Debug.Log($"Registered player {id}, total players: {activePlayers.Count}");
     }
+}
 
     public void UnregisterPlayer(GameObject player)
     {
         activePlayers.Remove(player);
+        playerIDs.Remove(player);
     }
 
-    // Handle bomb explosion
     private void OnBombExploded()
     {
         bombInstance = null;
