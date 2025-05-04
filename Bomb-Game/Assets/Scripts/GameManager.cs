@@ -12,7 +12,7 @@ public class GameManager : MonoBehaviour
 
     private GameObject bombInstance;
     private Scene parallelScene;
-    private readonly List<GameObject> activePlayers = new();
+    public readonly List<GameObject> activePlayers = new();
 
     void Awake()
     {
@@ -99,5 +99,36 @@ public class GameManager : MonoBehaviour
         {
             Debug.LogError("Spawned bomb is missing Bomb component.");
         }
+    }
+
+    public void ReassignOrphanedBomb(Bomb bomb)
+    {
+        GameObject nearestPlayer = FindNearestPlayer(bomb.transform.position);
+        
+        if (nearestPlayer != null)
+        {
+            bomb.AssignToPlayer(nearestPlayer);
+        }
+        else
+        {
+            bomb.TriggerImmediateExplosion();
+        }
+    }
+
+    private GameObject FindNearestPlayer(Vector3 position)
+    {
+        GameObject nearest = null;
+        float minDistance = Mathf.Infinity;
+
+        foreach (var player in activePlayers)
+        {
+            float dist = Vector3.Distance(position, player.transform.position);
+            if (dist < minDistance)
+            {
+                minDistance = dist;
+                nearest = player;
+            }
+        }
+        return nearest;
     }
 }

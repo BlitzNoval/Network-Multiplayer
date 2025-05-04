@@ -695,6 +695,7 @@ GameObject:
   - component: {fileID: 5330392406717032027}
   - component: {fileID: 2696277399502751159}
   - component: {fileID: 7413425068661872747}
+  - component: {fileID: 403851285556576236}
   - component: {fileID: 5581323352735480486}
   - component: {fileID: 1681993517388132433}
   - component: {fileID: 4417834136593152937}
@@ -846,6 +847,20 @@ MonoBehaviour:
   acceleration: 100
   deceleration: 100
   rotationSpeed: 10
+--- !u!114 &403851285556576236
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8593366603179590309}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b37c6c9a672673940a85a50fd255aeb9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxLives: 3
+  respawnInvincibility: 0.5
 --- !u!114 &5581323352735480486
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -875,7 +890,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Actions: {fileID: -944628639613478452, guid: 01af8be426c6acc4c9d525fd33e6d30f, type: 3}
-  m_NotificationBehavior: 0
+  m_NotificationBehavior: 3
   m_UIInputModule: {fileID: 0}
   m_DeviceLostEvent:
     m_PersistentCalls:

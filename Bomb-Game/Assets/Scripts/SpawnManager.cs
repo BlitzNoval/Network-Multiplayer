@@ -46,20 +46,24 @@ public class SpawnManager : MonoBehaviour
     }
 
     // Handle player entering trigger (intended for server-side processing when networked)
-    public void OnTriggerEnter(Collider other)
+     // SpawnManager.cs (partial)
+   public void OnTriggerEnter(Collider other)
     {
-        // Only handle objects tagged "Player"
         if (!other.CompareTag("Player")) return;
 
-        // Pick a spawn index
-        int idx = ChooseSpawnIndex();
-        Transform pt = spawnPoints[idx];
-
-        // Mark cooldown
-        lastUsedTime[idx] = Time.time;
-
-        // Fire the event — local teleport by default
-        OnPlayerSpawn.Invoke(other.gameObject, pt);
+        PlayerLifeManager lifeManager = other.GetComponent<PlayerLifeManager>();
+        if (lifeManager != null && !lifeManager.IsDead)
+        {
+            lifeManager.HandleDeath();
+            
+            if (lifeManager.CurrentLives > 0)
+            {
+                int idx = ChooseSpawnIndex();
+                Transform pt = spawnPoints[idx];
+                OnPlayerSpawn.Invoke(other.gameObject, pt);
+                lastUsedTime[idx] = Time.time;
+            }
+        }
     }
 
     // Choose a spawn index (intended for server-side processing when networked)

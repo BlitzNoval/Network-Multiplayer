@@ -54,7 +54,7 @@ public class Bomb : MonoBehaviour
     public bool IsOnRight           => isOnRight;
     public bool IsHeld              => isHeld;
     public float CurrentTimer       => currentTimer;
-    public GameObject Holder        => holder;
+     public GameObject Holder { get; private set; }
     public float NormalThrowSpeed   => normalThrowSpeed;
     public float NormalThrowUpward  => normalThrowUpward;
     public float LobThrowSpeed      => lobThrowSpeed;
@@ -116,20 +116,20 @@ public class Bomb : MonoBehaviour
     }
 
     public void AssignToPlayer(GameObject player)
-    {
-        holder               = player;
-        isHeld               = true;
-        bombCollider.enabled = false;
-        waitingToExplode     = false;
-        currentBounces       = 0;
-        rb.mass              = 1f;
-        currentTimer         = initialTimer;
-        returnPause          = false;
+{
+    holder = player;
+    isHeld = true;
+    bombCollider.enabled = false;
+    waitingToExplode = false;
+    currentBounces = 0;
+    rb.mass = 1f;
+    // Removed: currentTimer = initialTimer;
+    returnPause = false;
 
-        UpdateHoldTransform();
-        if (holder.TryGetComponent<PlayerBombHandler>(out var handler))
-            handler.SetBomb(this);
-    }
+    UpdateHoldTransform();
+    if (holder.TryGetComponent<PlayerBombHandler>(out var handler))
+        handler.SetBomb(this);
+}
 
     public void ClearHolder()
     {
@@ -214,10 +214,34 @@ public class Bomb : MonoBehaviour
         }
     }
 
+     public void DetachFromPlayer()
+    {
+        if (Holder != null)
+        {
+            Holder.GetComponent<PlayerBombHandler>()?.ClearBomb();
+            Holder = null;
+        }
+        transform.SetParent(null);
+    }
+
+    public void TriggerImmediateExplosion()
+    {
+        StopAllCoroutines();
+        Explode();
+    }
+
+    // Modified existing Explode method
     private void Explode()
     {
+        // Existing explosion logic
         bombEffects?.PlayExplosionEffects();
         OnBombExplodedGlobal?.Invoke();
+        
+        // Security cleanup
+        if (Holder != null)
+        {
+            Holder.GetComponent<PlayerBombHandler>()?.ClearBomb();
+        }
         Destroy(gameObject);
     }
 }
