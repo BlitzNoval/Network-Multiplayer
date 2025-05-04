@@ -9,7 +9,11 @@ public class PlayerMovement : MonoBehaviour
     public float deceleration = 10f;   // How fast it slows down
     public float rotationSpeed = 10f;  // How fast it rotates to face direction
     private Vector2 moveInput;         // Stores input from keyboard/controller
-    private Vector3 horizontalVelocity; // Current movement velocity
+    private Vector3 horizontalVelocity;// Current movement velocity
+
+    // Public getters for state syncing
+    public Vector2 MoveInput => moveInput;
+    public Vector3 HorizontalVelocity => horizontalVelocity;
 
     void Start()
     {
@@ -20,13 +24,14 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    // Called by PlayerInput when "Move" action is triggered
+    // Called by PlayerInput when "Move" action is triggered (intended for local player input)
     public void OnMove(InputValue value)
     {
         moveInput = value.Get<Vector2>();
     }
 
-    void FixedUpdate()
+    // Apply movement based on input (intended for server-side processing when networked)
+    public void ApplyMovement()
     {
         // Normalize input if magnitude > 1 (e.g., diagonal movement)
         if (moveInput.magnitude > 1f)
@@ -56,5 +61,10 @@ public class PlayerMovement : MonoBehaviour
             Quaternion targetRotation = Quaternion.LookRotation(horizontalVelocity.normalized, Vector3.up);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.fixedDeltaTime);
         }
+    }
+
+    void FixedUpdate()
+    {
+        ApplyMovement();
     }
 }

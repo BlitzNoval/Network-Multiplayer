@@ -5,6 +5,7 @@ public class Bomb : MonoBehaviour
 {
     private Rigidbody rb;
     private Collider bombCollider;
+    private BombEffects bombEffects; // Reference to effects component
 
     [Header("Holder")]
     public GameObject holder;
@@ -34,44 +35,56 @@ public class Bomb : MonoBehaviour
     public float groundExplosionDelay = 1f;
     public float flightMassMultiplier = 1f;
 
-    // bounce/explode state
+    // Bounce/explode state
     private int currentBounces;
     private float groundHitTime;
     private bool waitingToExplode;
 
-    // for world‑space canvas facing the camera
+    // For world-space canvas facing the camera
     private Transform canvasTransform;
 
-    // Public getter
+    // Public getters for state syncing
     public bool IsOnRight => isOnRight;
+    public bool IsHeld => isHeld;
+    public float CurrentTimer => currentTimer;
+    public GameObject Holder => holder;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         bombCollider = GetComponent<Collider>();
+        bombEffects = GetComponent<BombEffects>(); // Get effects component
         timerText = GetComponentInChildren<TextMeshProUGUI>();
 
         if (rb == null || bombCollider == null)
             Debug.LogError("Rigidbody or Collider missing on Bomb!");
         if (timerText == null)
             Debug.LogWarning("TextMeshProUGUI component not found on Bomb child!");
+        if (bombEffects == null)
+            Debug.LogWarning("BombEffects component missing on Bomb!");
 
-        // start timer immediately on spawn
+        // Start timer immediately on spawn
         currentTimer = initialTimer;
 
-        // cache the Canvas (parent of the text)
+        // Cache the Canvas (parent of the text)
         if (timerText != null)
             canvasTransform = timerText.transform.parent;
     }
 
     void Update()
     {
-        // --- 1) COUNTDOWN (always) with optional return‑pause ---
+        UpdateTimer();
+    }
+
+    // Update bomb timer (intended for server-side processing when networked)
+    public void UpdateTimer()
+    {
+        // --- 1) COUNTDOWN (always) with optional return-pause ---
         if (currentTimer > 0f)
         {
             if (returnPause)
             {
-                // check if the pause window has expired
+                // Check if the pause window has expired
                 if (Time.time >= returnPauseStart + returnPauseDuration)
                     returnPause = false;
             }
@@ -88,7 +101,7 @@ public class Bomb : MonoBehaviour
             }
         }
 
-        // --- 2) GROUND‐EXPLOSION DELAY (unchanged) ---
+        // --- 2) GROUND-EXPLOSION DELAY ---
         if (waitingToExplode && Time.time >= groundHitTime + groundExplosionDelay)
             Explode();
     }
@@ -98,13 +111,14 @@ public class Bomb : MonoBehaviour
         // --- 3) FACE MAIN CAMERA ---
         if (canvasTransform != null && Camera.main != null)
         {
-            // rotate so the canvas normal looks back at the camera
+            // Rotate so the canvas normal looks back at the camera
             canvasTransform.rotation = Quaternion.LookRotation(
                 canvasTransform.position - Camera.main.transform.position
             );
         }
     }
 
+    // Assign bomb to a player (intended for server-side call when networked)
     public void AssignToPlayer(GameObject player)
     {
         holder = player;
@@ -124,6 +138,7 @@ public class Bomb : MonoBehaviour
         }
     }
 
+    // Clear the bomb's holder (intended for server-side call when networked)
     public void ClearHolder()
     {
         if (holder != null)
@@ -135,7 +150,7 @@ public class Bomb : MonoBehaviour
         }
     }
 
-    void UpdateHoldPoint()
+    private void UpdateHoldPoint()
     {
         if (holder == null || !isHeld) return;
 
@@ -149,6 +164,7 @@ public class Bomb : MonoBehaviour
         }
     }
 
+    // Swap the bomb's hold point (intended for server-side call when networked)
     public void SwapHoldPoint()
     {
         if (holder != null && isHeld)
@@ -158,6 +174,7 @@ public class Bomb : MonoBehaviour
         }
     }
 
+    // Throw the bomb (intended for server-side call when networked)
     public void ThrowBomb()
     {
         if (holder == null || Time.time < lastThrowTime + throwCooldown)
@@ -173,7 +190,7 @@ public class Bomb : MonoBehaviour
         Vector3 forward = holder.transform.forward;
         Vector3 throwForce = isOnRight
             ? (forward * normalThrowSpeed) + Vector3.up * normalThrowUpward
-            : (forward * lobThrowSpeed)   + Vector3.up * lobThrowUpward;
+            : (forward * lobThrowSpeed) + Vector3.up * lobThrowUpward;
 
         rb.AddForce(throwForce, ForceMode.Impulse);
         lastThrowTime = Time.time;
@@ -193,7 +210,7 @@ public class Bomb : MonoBehaviour
         {
             if (lastThrower != null)
             {
-                // pause countdown briefly, then give it back
+                // Pause countdown briefly, then give it back
                 returnPause = true;
                 returnPauseStart = Time.time;
                 AssignToPlayer(lastThrower);
@@ -210,38 +227,45 @@ public class Bomb : MonoBehaviour
         }
     }
 
-    void Explode()
-{
-    Debug.Log("Bomb exploded!");
-
-    // Find all players
-    GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-    if (players.Length > 0)
+    // Trigger bomb explosion (intended for server-side call when networked)
+    public void Explode()
     {
-        // Select a random player
-        GameObject randomPlayer = players[Random.Range(0, players.Length)];
+        Debug.Log("Bomb exploded!");
 
-        // Spawn a new bomb instance using the GameManager's bombPrefab
-        if (GameManager.Instance != null && GameManager.Instance.bombPrefab != null)
+        // Play explosion effects
+        if (bombEffects != null)
         {
-            GameObject newBomb = Instantiate(GameManager.Instance.bombPrefab, Vector3.zero, Quaternion.identity);
-            Bomb bombScript = newBomb.GetComponent<Bomb>();
-            if (bombScript != null)
+            bombEffects.PlayExplosionEffects();
+        }
+
+        // Find all players
+        GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
+        if (players.Length > 0)
+        {
+            // Select a random player
+            GameObject randomPlayer = players[Random.Range(0, players.Length)];
+
+            // Spawn a new bomb instance using the GameManager's bombPrefab
+            if (GameManager.Instance != null && GameManager.Instance.bombPrefab != null)
             {
-                bombScript.AssignToPlayer(randomPlayer);
-                GameManager.Instance.bombInstance = newBomb; // Update the GameManager's bombInstance
-            }
-            else
-            {
-                Debug.LogError("Bomb script missing on instantiated bomb!");
+                GameObject newBomb = Instantiate(GameManager.Instance.bombPrefab, Vector3.zero, Quaternion.identity);
+                Bomb bombScript = newBomb.GetComponent<Bomb>();
+                if (bombScript != null)
+                {
+                    bombScript.AssignToPlayer(randomPlayer);
+                    GameManager.Instance.bombInstance = newBomb; // Update the GameManager's bombInstance
+                }
+                else
+                {
+                    Debug.LogError("Bomb script missing on instantiated bomb!");
+                }
             }
         }
-    }
-    else
-    {
-        Debug.LogError("No players found to assign new bomb!");
-    }
+        else
+        {
+            Debug.LogError("No players found to assign new bomb!");
+        }
 
-    Destroy(gameObject);
-}
+        Destroy(gameObject);
+    }
 }

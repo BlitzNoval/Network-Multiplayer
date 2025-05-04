@@ -28,13 +28,15 @@ public class GameManager : MonoBehaviour
         SpawnBomb();
     }
 
+    // Handle bomb explosion event (intended for server-side call when networked)
     public void OnBombExploded()
     {
         bombInstance = null; // Clear the current bomb instance
-        SpawnBomb(); // Spawn a new bomb
+        SpawnBomb();
     }
 
-    void SpawnBomb()
+    // Spawn a new bomb (intended for server-side call when networked)
+    public void SpawnBomb()
     {
         if (bombInstance != null)
         {
@@ -63,7 +65,8 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void SetupPlayerInputs(GameObject[] players)
+    // Setup player inputs (intended for client-side setup when networked)
+    private void SetupPlayerInputs(GameObject[] players)
     {
         foreach (GameObject player in players)
         {
