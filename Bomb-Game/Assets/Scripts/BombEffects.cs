@@ -19,6 +19,10 @@ public class BombEffects : MonoBehaviour
     [Tooltip("Camera shake magnitude")]
     public float shakeMagnitude = 0.1f;
     
+    [Tooltip("Pre-load buffer time for audio (seconds)")]
+    [Range(0f, 0.1f)]
+    public float audioPreloadTime = 0.05f;
+    
     private bool isPlayingEffects = false;
     
     // Public getter for state syncing (intended for network synchronization)
@@ -29,8 +33,17 @@ public class BombEffects : MonoBehaviour
         // Ensure AudioSource exists
         if (audioSource == null) 
         {
-            audioSource = gameObject.AddComponent<AudioSource>();
-            audioSource.playOnAwake = false;
+            audioSource = GetComponentInChildren<AudioSource>();
+            
+            if (audioSource == null)
+            {
+                audioSource = gameObject.AddComponent<AudioSource>();
+            }
+        }
+        
+        if (audioSource != null)
+        {
+            audioSource.spatialBlend = 1.0f; // Full 3D sound
         }
     }
 
@@ -40,7 +53,33 @@ public class BombEffects : MonoBehaviour
         if (isPlayingEffects) return;
         isPlayingEffects = true;
         
-        // Play VFX
+        // Start audio playback immediately with priority
+        GameObject tempAudio = null;
+        if (explosionSound != null) 
+        {
+            tempAudio = new GameObject("TempExplosionAudio");
+            tempAudio.transform.position = transform.position;
+            AudioSource tempSource = tempAudio.AddComponent<AudioSource>();
+            
+            // Configure audio for minimal delay
+            tempSource.clip = explosionSound;
+            tempSource.spatialBlend = 1.0f;
+            tempSource.priority = 0; // Highest priority
+            tempSource.volume = 1.0f;
+            
+            // Set minimal buffer size for faster processing
+            tempSource.bypassEffects = true;
+            tempSource.bypassListenerEffects = true;
+            tempSource.bypassReverbZones = true;
+            
+            // Play immediately
+            tempSource.PlayScheduled(AudioSettings.dspTime + audioPreloadTime);
+            
+            float clipLength = explosionSound.length;
+            Destroy(tempAudio, clipLength + 0.2f);
+        }
+        
+        // Play VFX slightly delayed to match audio if needed
         if (explosionVFXPrefab != null) 
         {
             ParticleSystem vfx = Instantiate(explosionVFXPrefab, transform.position, Quaternion.identity);
@@ -48,27 +87,17 @@ public class BombEffects : MonoBehaviour
             Destroy(vfx.gameObject, vfx.main.duration);
         }
         
-        // Play sound
-        if (explosionSound != null && audioSource != null) 
-        {
-            audioSource.PlayOneShot(explosionSound);
-        }
-        
         // Activate camera shake
         if (Camera.main != null) 
         {
             CameraShake shaker = Camera.main.GetComponent<CameraShake>();
             
-            // Add CameraShake component if it doesn't exist
             if (shaker == null)
             {
                 shaker = Camera.main.gameObject.AddComponent<CameraShake>();
             }
             
-            // Configure shake magnitude (optional)
             shaker.SetShakeAmount(shakeMagnitude);
-            
-            // Start the shake
             shaker.StartShake(shakeDuration);
         }
         

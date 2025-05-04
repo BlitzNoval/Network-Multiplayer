@@ -401,9 +401,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   explosionVFXPrefab: {fileID: 198917022394846920, guid: e1b08032bec16ba4eb1ae23cbd572664, type: 3}
   explosionSound: {fileID: 8300000, guid: 72f389d6a64d55746b4dbffa98ce6a8f, type: 3}
-  audioSource: {fileID: 0}
+  audioSource: {fileID: 6085821998421801923}
   shakeDuration: 0.5
   shakeMagnitude: 0.1
+  audioPreloadTime: 0.05
 --- !u!114 &1722947946795985453
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -417,13 +418,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   holder: {fileID: 0}
-  initialTimer: 5
+  initialTimer: 15
   timerText: {fileID: 0}
   returnPauseDuration: 0.2
-  normalThrowSpeed: 20
+  normalThrowSpeed: 25
   normalThrowUpward: 2.5
-  lobThrowSpeed: 10
-  lobThrowUpward: 6
+  lobThrowSpeed: 15
+  lobThrowUpward: 8
   maxBounces: 1
   throwCooldown: 0.5
   groundExplosionDelay: 1
@@ -438,10 +439,10 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 8300000, guid: 72f389d6a64d55746b4dbffa98ce6a8f, type: 3}
-  m_Resource: {fileID: 8300000, guid: 72f389d6a64d55746b4dbffa98ce6a8f, type: 3}
-  m_PlayOnAwake: 1
-  m_Volume: 0.3
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
   m_Pitch: 1
   Loop: 0
   Mute: 0
