@@ -5,11 +5,12 @@ TagManager:
   serializedVersion: 3
   tags:
   - Map
+  - MapOut
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - MapOut
   - Water
   - UI
   - 
