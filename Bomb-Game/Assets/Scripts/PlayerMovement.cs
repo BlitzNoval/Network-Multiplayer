@@ -1,7 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Mirror;
 
-public class PlayerMovement : MonoBehaviour
+public class PlayerMovement : NetworkBehaviour
 {
     private Rigidbody rb;
     public float speed = 5f;           // Max movement speed
@@ -28,6 +29,8 @@ public class PlayerMovement : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (!isLocalPlayer) return;
+
         // Normalize input if magnitude > 1 (e.g., diagonal movement)
         if (moveInput.magnitude > 1f)
         {
