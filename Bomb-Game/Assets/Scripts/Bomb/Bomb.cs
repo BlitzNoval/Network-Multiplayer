@@ -269,7 +269,7 @@ public class Bomb : NetworkBehaviour
             ? forward * normalThrowSpeed + Vector3.up * normalThrowUpward
             : forward * lobThrowSpeed   + Vector3.up * lobThrowUpward;
 
-        rb.velocity = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
         rb.AddForce(force, ForceMode.Impulse);
 
         currentBounces  = 0;
