@@ -1,94 +1,155 @@
-using UnityEngine;
 using System.Collections;
+using Mirror;
+using UnityEngine;
 
-public class PlayerLifeManager : MonoBehaviour
+[RequireComponent(typeof(PlayerMovement), typeof(Collider), typeof(Rigidbody))]
+public class PlayerLifeManager : NetworkBehaviour
 {
-    [Header("Settings")]
-    [SerializeField] private int maxLives = 3;
-    [SerializeField] private float respawnDuration = 2f;
+    [Header("Lives")]
+    [SerializeField] int   maxLives          = 3;
+    [SerializeField] float respawnDelay      = 2f;
+    [SerializeField] float fallThreshold     = -10f;
+    [SerializeField] float absoluteFallLimit = -500f;
 
-    private int currentLives;
-    private PlayerBombHandler bombHandler;
-    private PlayerMovement movement;
-    private Collider playerCollider;
-    private Rigidbody rb;
+    [SyncVar] public int   currentLives;
+    [SyncVar] public bool  IsDead;
+    [SyncVar] public float knockbackMultiplier = 1f;
+    [SyncVar] public float totalHoldTime;
+    [SyncVar] public int   knockbackHitCount;
 
-    public int CurrentLives => currentLives;
-    public bool IsDead { get; private set; }
+    PlayerBombHandler bombHandler;
+    PlayerMovement    movement;
+    Collider          col;
+    Rigidbody         rb;
 
     void Awake()
     {
         bombHandler = GetComponent<PlayerBombHandler>();
-        movement = GetComponent<PlayerMovement>();
-        playerCollider = GetComponent<Collider>();
-        rb = GetComponent<Rigidbody>();
+        movement    = GetComponent<PlayerMovement>();
+        col         = GetComponent<Collider>();
+        rb          = GetComponent<Rigidbody>();
     }
 
-    void Start() => InitializeLives();
-
-    public void InitializeLives()
+    public override void OnStartServer()
     {
-        currentLives = maxLives;
-        IsDead = false;
+        currentLives        = maxLives;
+        IsDead              = false;
+        knockbackMultiplier = 1f;
+        totalHoldTime       = 0f;
+        knockbackHitCount   = 0;
     }
 
-    public void HandleDeath()
+    void FixedUpdate()
+    {
+        if (!isServer || IsDead) return;
+
+        float yPos = transform.position.y;
+
+        if (yPos < fallThreshold)
+        {
+            HandleDeath();
+        } 
+        else if (yPos < absoluteFallLimit)
+        {
+            HandleDeath();
+        }
+
+
+        if (bombHandler?.CurrentBomb != null &&
+            bombHandler.CurrentBomb.Holder == gameObject)
+        {
+            totalHoldTime += Time.deltaTime;
+            UpdateKnockbackMultiplier();
+        }
+    }
+
+    // ───────────── Knock-back multiplier ─────────────
+    [Server] void UpdateKnockbackMultiplier()
+    {
+        float baseMultiplier = 1f;
+        float holdTimeFactor = 0.1f;
+        float hitFactor      = 0.2f;
+        float multiplier     = baseMultiplier *
+                               (1 + holdTimeFactor * totalHoldTime) *
+                               Mathf.Pow(1 + hitFactor * knockbackHitCount, 2);
+        knockbackMultiplier  = Mathf.Min(multiplier, 4f);
+    }
+
+    // ───────────── Death / Respawn ─────────────
+    [Server] public void HandleDeath()
     {
         if (IsDead) return;
 
         currentLives--;
-        
         if (currentLives <= 0)
         {
-            HandleFinalDeath();
+            FinalDeath();
+            return;
         }
-        else
+        StartCoroutine(RespawnRoutine());
+    }
+
+    [Server] IEnumerator RespawnRoutine()
+    {
+        SetAliveState(false, true);
+        yield return new WaitForSeconds(respawnDelay);
+
+        while (true)
         {
-            StartCoroutine(RespawnSequence());
+            if (SpawnManager.Instance == null) { yield return new WaitForSeconds(0.1f); continue; }
+
+            Transform spawnPoint = SpawnManager.Instance.GetNextSpawnPoint();
+            if (spawnPoint == null)            { yield return new WaitForSeconds(0.1f); continue; }
+
+            transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+            knockbackMultiplier = 1f;
+            totalHoldTime       = 0f;
+            knockbackHitCount   = 0;
+            SetAliveState(true, false);
+            break;
         }
     }
 
-    private IEnumerator RespawnSequence()
+    [Server] void FinalDeath()
     {
-        IsDead = true;
-        ToggleComponents(false);
-        
-        yield return new WaitForSeconds(respawnDuration);
-        
-        ToggleComponents(true);
-        IsDead = false;
-        HandleBombOnRespawn();
+        if (bombHandler && bombHandler.CurrentBomb)
+            bombHandler.CurrentBomb.TriggerImmediateExplosion();
+
+        GameManager.Instance?.UnregisterPlayer(gameObject);
+        NetworkServer.Destroy(gameObject);
     }
 
-    private void HandleFinalDeath()
+    [Server] public void RegisterKnockbackHit()
     {
-        HandleBombOnDeath();
-        Destroy(gameObject);
+        knockbackHitCount++;
+        UpdateKnockbackMultiplier();
     }
 
-    private void HandleBombOnDeath()
+    // ───────────── Knock-back RPC ─────────────
+    [TargetRpc]
+    public void TargetApplyKnockback(NetworkConnectionToClient _, Vector3 force)
     {
-        if (bombHandler == null || bombHandler.CurrentBomb == null) return;
-        
-        Bomb bomb = bombHandler.CurrentBomb;
-        bomb.DetachFromPlayer();
-        bomb.TriggerImmediateExplosion();
+        movement.enabled = false;
+        StartCoroutine(ReEnableMovement(0.5f));
+
+        if (TryGetComponent<Rigidbody>(out var rb))
+            rb.AddForce(force, ForceMode.Impulse);
     }
 
-    private void HandleBombOnRespawn()
+    IEnumerator ReEnableMovement(float delay)
     {
-        if (bombHandler == null || bombHandler.CurrentBomb == null) return;
-        
-        Bomb bomb = bombHandler.CurrentBomb;
-        bomb.DetachFromPlayer();
-        GameManager.Instance?.ReassignOrphanedBomb(bomb);
+        yield return new WaitForSeconds(delay);
+        movement.enabled = true;
     }
 
-    private void ToggleComponents(bool state)
+    // ───────────── Helpers ─────────────
+    void SetAliveState(bool state, bool triggerMode)
     {
+        IsDead           = !state;
         movement.enabled = state;
-        playerCollider.enabled = state;
-        rb.isKinematic = !state;
-        rb.linearVelocity = Vector3.zero;
+        col.enabled      = true;
+        col.isTrigger    = triggerMode;
+        rb.isKinematic   = !state;
+        if (!rb.isKinematic) rb.linearVelocity = Vector3.zero;
     }
 }

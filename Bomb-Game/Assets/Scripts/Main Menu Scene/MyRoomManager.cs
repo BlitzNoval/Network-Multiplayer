@@ -3,40 +3,66 @@ using Mirror;
 
 public class MyRoomManager : NetworkRoomManager
 {
-    // Makes this easy to grab from anywhere
     public static MyRoomManager Singleton { get; private set; }
 
     [Header("Room Matching")]
-    // This is the name the host picks (shows up in the lobby)
     public string RoomName = "DefaultRoom";
-    // This is what a client types in when they want to join
-    [HideInInspector]
-    public string DesiredRoomName;
+    [HideInInspector] public string DesiredRoomName;
 
-    // Runs when the object wakes up (before anything else)
+    //-----------------------------------------------------------------------
+
     public override void Awake()
     {
-        base.Awake();        // Let Mirror set itself up
-        Singleton = this;    // Store our singleton reference
+        base.Awake();
+        Singleton = this;
     }
 
-    // Fired on the client if we ever get disconnected from the room scene
+    // ------------------ Room-scene (lobby) callbacks ----------------------
+
+    public override void OnServerAddPlayer(NetworkConnectionToClient conn)
+    {
+        // let base create the room-player prefab
+        base.OnServerAddPlayer(conn);
+    }
+
+    public override void OnServerDisconnect(NetworkConnectionToClient conn)
+    {
+        if (conn.identity != null && GameManager.Instance != null)
+            GameManager.Instance.UnregisterPlayer(conn.identity.gameObject);
+
+        base.OnServerDisconnect(conn);
+    }
+
+    // ------------------ Game-scene callback --------------------------------
+    // Called for *each* player as the game scene loads
+    public override bool OnRoomServerSceneLoadedForPlayer(NetworkConnectionToClient conn,
+                                                          GameObject roomPlayer,
+                                                          GameObject gamePlayer)
+    {
+        // place the avatar on a free spawn-point
+        if (SpawnManager.Instance != null && SpawnManager.Instance.spawnPoints.Count > 0)
+        {
+            int idx = SpawnManager.Instance.ChooseSpawnIndex();
+            Transform pt = SpawnManager.Instance.spawnPoints[idx];
+            gamePlayer.transform.SetPositionAndRotation(pt.position, pt.rotation);
+        }
+
+        // track on server
+        GameManager.Instance?.RegisterPlayer(gamePlayer);
+
+        return true;        // keep default behaviour
+    }
+
+    // ------------------ Client helper -------------------------------------
     public override void OnRoomClientDisconnect()
     {
-        base.OnRoomClientDisconnect();  // Mirror’s built-in clean up
-        Debug.Log("[MyRoomManager] Disconnected from room – showing error panel");
+        base.OnRoomClientDisconnect();
 
-        // Try to find our main menu UI in the scene so we can show the “bad room” message  (doesn't really work, but I rtried with some interesting code I found haha)
-        #if UNITY_2023_1_OR_NEWER //like bruh
-            var menuUI = Object.FindFirstObjectByType<MainMenuUI>();
-        #else 
-            var menuUI = Object.FindObjectOfType<MainMenuUI>();
-        #endif
-
-        // If we found it, pop up the error panel; otherwise, log an error (It literally never finds it, but I tried)
-        if (menuUI != null)
-            menuUI.ShowInvalidRoomPanel();
-        else
-            Debug.LogError("Couldn’t find MainMenuUI to display the invalid-room panel!");
+#if UNITY_2023_1_OR_NEWER
+        var menuUI = Object.FindFirstObjectByType<MainMenuUI>();
+#else
+        var menuUI = Object.FindObjectOfType<MainMenuUI>();
+#endif
+        if (menuUI != null) menuUI.ShowInvalidRoomPanel();
     }
 }

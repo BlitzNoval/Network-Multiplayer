@@ -1,83 +1,63 @@
+using Mirror;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Rigidbody))]
-public class PlayerMovement : MonoBehaviour
+public class PlayerMovement : NetworkBehaviour
 {
-    private Rigidbody rb;
-    private InputAction moveAction;
-    private Vector2 moveInput;
-    private Vector3 horizontalVelocity;
-
-    [Header("Movement Settings")]
+    [Header("Movement")]
     public float speed = 5f;
     public float acceleration = 10f;
     public float deceleration = 10f;
     public float rotationSpeed = 10f;
 
+    Rigidbody  rb;
+    InputAction moveAct;
+    Vector2    moveInput;
+    Vector3    horizVel;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        var input = GetComponent<PlayerInput>();
-        moveAction = input.actions.FindAction("Move");
+        var pi = GetComponent<PlayerInput>();
+        moveAct = pi.actions.FindAction("Move");
     }
 
-    void OnEnable()
-    {
-        moveAction.performed += HandleMove;
-        moveAction.canceled += HandleStop; // New event handler
-        moveAction.Enable();
-    }
+    void OnEnable()  { if (isLocalPlayer) moveAct.Enable(); }
+    void OnDisable() { if (isLocalPlayer) moveAct.Disable(); }
 
-    void OnDisable()
+    void Update()
     {
-        moveAction.performed -= HandleMove;
-        moveAction.canceled -= HandleStop; // New event unsubscription
-        moveAction.Disable();
-    }
+        if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive)
+            return;
 
-    private void HandleMove(InputAction.CallbackContext context)
-    {
-        moveInput = context.ReadValue<Vector2>();
-    }
-
-    private void HandleStop(InputAction.CallbackContext context)
-    {
-        moveInput = Vector2.zero; // Reset input when released
+        moveInput = moveAct.ReadValue<Vector2>();
     }
 
     void FixedUpdate()
     {
+        if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive)
+            return;
+
         ApplyMovement();
     }
 
-    private void ApplyMovement()
+    void ApplyMovement()
     {
-        if (moveInput.magnitude > 1f)
-            moveInput.Normalize();
+        if (moveInput.magnitude > 1f) moveInput.Normalize();
+        Vector3 target = new Vector3(moveInput.x, 0, moveInput.y) * speed;
 
-        Vector3 targetVelocity = new Vector3(moveInput.x, 0, moveInput.y) * speed;
+        horizVel = Vector3.MoveTowards(
+            horizVel,
+            target,
+            (target.magnitude > 0.01f ? acceleration : deceleration) * Time.fixedDeltaTime);
 
-        horizontalVelocity = Vector3.MoveTowards(
-            horizontalVelocity,
-            targetVelocity,
-            (targetVelocity.magnitude > 0.01f ? acceleration : deceleration) * Time.fixedDeltaTime
-        );
+        rb.linearVelocity = new Vector3(horizVel.x, rb.linearVelocity.y, horizVel.z);
 
-        rb.linearVelocity = new Vector3(
-            horizontalVelocity.x,
-            rb.linearVelocity.y,
-            horizontalVelocity.z
-        );
-
-        if (horizontalVelocity.magnitude > 0.1f)
+        if (horizVel.magnitude > 0.1f)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(horizontalVelocity.normalized);
-            transform.rotation = Quaternion.Slerp(
-                transform.rotation,
-                targetRotation,
-                rotationSpeed * Time.fixedDeltaTime
-            );
+            Quaternion rot = Quaternion.LookRotation(horizVel.normalized);
+            transform.rotation = Quaternion.Slerp(transform.rotation, rot, rotationSpeed * Time.fixedDeltaTime);
         }
     }
 }
