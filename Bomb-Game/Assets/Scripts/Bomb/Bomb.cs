@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using Mirror;
+using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 using UnityEngine;
 
@@ -61,6 +63,19 @@ public class Bomb : NetworkBehaviour
     public float      NormalThrowUpward => normalThrowUpward;
     public float      LobThrowSpeed     => lobThrowSpeed;
     public float      LobThrowUpward    => lobThrowUpward;
+    [Header("UI Visuals")]
+    [SerializeField] private Image fuseImage;
+    [SerializeField] private Image bombImage;
+    [SerializeField] private Sprite criticalBombSprite;
+    [SerializeField] private float criticalThreshold = 3f;
+    [SerializeField] private TextMeshProUGUI screenTimerText; // Added screen UI text
+    private Sprite normalBombSprite;
+
+    private int currentBounces;
+    private float groundHitTime;
+    private bool waitingToExplode;
+
+   
 
     // ───────────── Unity callbacks ─────────────
     void Awake()
@@ -73,6 +88,29 @@ public class Bomb : NetworkBehaviour
         if (timerText) 
             canvasTr = timerText.transform.parent;  // we rotate this towards camera each frame
         currentTimer = initialTimer;  // initialize our countdown
+        
+        
+
+        if (rb == null || bombCollider == null)
+            Debug.LogError("Bomb requires Rigidbody & Collider", this);
+        if (timerText == null)
+            Debug.LogWarning("Missing TextMeshProUGUI under Bomb", this);
+        if (screenTimerText == null)
+            Debug.LogWarning("Missing screen UI TextMeshProUGUI reference", this);
+            
+        // Make sure screenTimerText is not the same as timerText
+        if (screenTimerText == timerText)
+        {
+            Debug.LogError("Screen timer text cannot be the same as world timer text!", this);
+            screenTimerText = null;
+        }
+
+        currentTimer = initialTimer;
+        if (timerText != null)
+            canvasTransform = timerText.transform.parent;
+
+        if (bombImage != null)
+            normalBombSprite = bombImage.sprite;
     }
 
     void Update()
@@ -112,6 +150,33 @@ public class Bomb : NetworkBehaviour
         RpcUpdateTimer(Mathf.CeilToInt(currentTimer));
 
         if (currentTimer <= 0f && !waitingToExplode)
+        
+
+            
+        // Update screen UI timer text separately - this should be handled independently
+        // and not be affected by the world space transforms
+        if (screenTimerText != null && screenTimerText != timerText)
+            screenTimerText.text = Mathf.Ceil(currentTimer).ToString();
+
+        if (currentTimer <= 0f)
+            Explode();
+
+        // Update fuse fill
+        if (fuseImage != null)
+            fuseImage.fillAmount = currentTimer / initialTimer;
+
+        // Update bomb sprite
+        if (bombImage != null)
+        {
+            bombImage.sprite = currentTimer <= criticalThreshold 
+                ? criticalBombSprite 
+                : normalBombSprite;
+        }
+    }
+
+    private void FaceCamera()
+    {
+        if (canvasTransform != null && Camera.main != null)
         {
             currentTimer = 0f;
             Explode();  // boom!
@@ -120,6 +185,24 @@ public class Bomb : NetworkBehaviour
 
     [ClientRpc]
     void RpcUpdateTimer(int seconds)
+    public void AssignToPlayer(GameObject player)
+    {
+        holder = player;
+        Holder = player; // Make sure both holder variables are set
+        isHeld = true;
+        bombCollider.enabled = false;
+        waitingToExplode = false;
+        currentBounces = 0;
+        rb.mass = 1f;
+        // Removed: currentTimer = initialTimer;
+        returnPause = false;
+
+        UpdateHoldTransform();
+        if (holder.TryGetComponent<PlayerBombHandler>(out var handler))
+            handler.SetBomb(this);
+    }
+
+    public void ClearHolder()
     {
         if (timerText)
             timerText.text = seconds.ToString();  // update the displayed number
@@ -170,6 +253,7 @@ public class Bomb : NetworkBehaviour
 
         // clean up after a second
         StartCoroutine(DestroyAfterDelay(1f));
+        Holder = null; // Clear both holder variables
     }
 
     [Server]
