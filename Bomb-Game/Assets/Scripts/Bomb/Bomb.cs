@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 
 public class Bomb : MonoBehaviour
@@ -46,6 +47,14 @@ public class Bomb : MonoBehaviour
     [SerializeField] private string playerTag           = "Player";
     [SerializeField] private string mapOutTag           = "MapOut";
 
+    [Header("UI Visuals")]
+    [SerializeField] private Image fuseImage;
+    [SerializeField] private Image bombImage;
+    [SerializeField] private Sprite criticalBombSprite;
+    [SerializeField] private float criticalThreshold = 3f;
+    [SerializeField] private TextMeshProUGUI screenTimerText; // Added screen UI text
+    private Sprite normalBombSprite;
+
     private int currentBounces;
     private float groundHitTime;
     private bool waitingToExplode;
@@ -54,7 +63,7 @@ public class Bomb : MonoBehaviour
     public bool IsOnRight           => isOnRight;
     public bool IsHeld              => isHeld;
     public float CurrentTimer       => currentTimer;
-     public GameObject Holder { get; private set; }
+    public GameObject Holder { get; private set; }
     public float NormalThrowSpeed   => normalThrowSpeed;
     public float NormalThrowUpward  => normalThrowUpward;
     public float LobThrowSpeed      => lobThrowSpeed;
@@ -65,16 +74,31 @@ public class Bomb : MonoBehaviour
         rb           = GetComponent<Rigidbody>();
         bombCollider = GetComponent<Collider>();
         bombEffects  = TryGetComponent(out BombEffects be) ? be : null;
+        
+        // Make sure we're only getting the world space TextMeshProUGUI
+        // We need to specifically find the world space text, not any screen space UI text
         timerText    = GetComponentInChildren<TextMeshProUGUI>();
 
         if (rb == null || bombCollider == null)
             Debug.LogError("Bomb requires Rigidbody & Collider", this);
         if (timerText == null)
             Debug.LogWarning("Missing TextMeshProUGUI under Bomb", this);
+        if (screenTimerText == null)
+            Debug.LogWarning("Missing screen UI TextMeshProUGUI reference", this);
+            
+        // Make sure screenTimerText is not the same as timerText
+        if (screenTimerText == timerText)
+        {
+            Debug.LogError("Screen timer text cannot be the same as world timer text!", this);
+            screenTimerText = null;
+        }
 
         currentTimer = initialTimer;
         if (timerText != null)
             canvasTransform = timerText.transform.parent;
+
+        if (bombImage != null)
+            normalBombSprite = bombImage.sprite;
     }
 
     void Update()     => UpdateTimer();
@@ -98,11 +122,30 @@ public class Bomb : MonoBehaviour
         }
 
         currentTimer -= Time.deltaTime;
+        
+        // Update world space timer text - only update the in-world text
         if (timerText != null)
             timerText.text = Mathf.Ceil(currentTimer).ToString();
+            
+        // Update screen UI timer text separately - this should be handled independently
+        // and not be affected by the world space transforms
+        if (screenTimerText != null && screenTimerText != timerText)
+            screenTimerText.text = Mathf.Ceil(currentTimer).ToString();
 
         if (currentTimer <= 0f)
             Explode();
+
+        // Update fuse fill
+        if (fuseImage != null)
+            fuseImage.fillAmount = currentTimer / initialTimer;
+
+        // Update bomb sprite
+        if (bombImage != null)
+        {
+            bombImage.sprite = currentTimer <= criticalThreshold 
+                ? criticalBombSprite 
+                : normalBombSprite;
+        }
     }
 
     private void FaceCamera()
@@ -116,26 +159,28 @@ public class Bomb : MonoBehaviour
     }
 
     public void AssignToPlayer(GameObject player)
-{
-    holder = player;
-    isHeld = true;
-    bombCollider.enabled = false;
-    waitingToExplode = false;
-    currentBounces = 0;
-    rb.mass = 1f;
-    // Removed: currentTimer = initialTimer;
-    returnPause = false;
+    {
+        holder = player;
+        Holder = player; // Make sure both holder variables are set
+        isHeld = true;
+        bombCollider.enabled = false;
+        waitingToExplode = false;
+        currentBounces = 0;
+        rb.mass = 1f;
+        // Removed: currentTimer = initialTimer;
+        returnPause = false;
 
-    UpdateHoldTransform();
-    if (holder.TryGetComponent<PlayerBombHandler>(out var handler))
-        handler.SetBomb(this);
-}
+        UpdateHoldTransform();
+        if (holder.TryGetComponent<PlayerBombHandler>(out var handler))
+            handler.SetBomb(this);
+    }
 
     public void ClearHolder()
     {
         if (holder != null && holder.TryGetComponent<PlayerBombHandler>(out var handler))
             handler.ClearBomb();
         holder = null;
+        Holder = null; // Clear both holder variables
     }
 
     private void UpdateHoldTransform()
@@ -214,12 +259,13 @@ public class Bomb : MonoBehaviour
         }
     }
 
-     public void DetachFromPlayer()
+    public void DetachFromPlayer()
     {
         if (Holder != null)
         {
             Holder.GetComponent<PlayerBombHandler>()?.ClearBomb();
             Holder = null;
+            holder = null; // Clear both holder variables
         }
         transform.SetParent(null);
     }
