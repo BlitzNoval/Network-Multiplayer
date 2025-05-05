@@ -1,204 +1,293 @@
-using UnityEngine;
-using UnityEngine.InputSystem;
 using System.Collections;
 using System.Collections.Generic;
+using Mirror;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using System.Linq;
 
 [RequireComponent(typeof(LineRenderer), typeof(PlayerInput))]
-public class PlayerBombHandler : MonoBehaviour
-
+public class PlayerBombHandler : NetworkBehaviour
 {
-        private Bomb currentBomb;
-    
-    // Trajectory visualization
-    private LineRenderer trajectoryLine;
-    private bool isAiming;
-    private List<Vector3> trajectoryPoints = new List<Vector3>();
-    
-    // Input actions
-    private InputAction swapAction;
-    private InputAction throwAction;
-    
-    [Header("Trajectory Settings")]
-    [SerializeField, Range(10, 300)] private int maxPoints = 100;
-    [SerializeField] private LayerMask collisionMask;
-    
-    private float timeStep;
-    
-    // Public accessors
-    public bool IsAiming => isAiming;
-    public Vector3[] TrajectoryPoints => trajectoryPoints.ToArray();
-    public Bomb CurrentBomb => currentBomb; // Added property
+    // ───────────────────────── Fields ────────────────────────────
+    [Header("Trajectory")]
+    [SerializeField, Range(10,300)] int   maxPoints = 100;
+    [SerializeField] LayerMask collisionMask;
 
+    Bomb         currentBomb;
+    public Bomb CurrentBomb => currentBomb;
+    LineRenderer lr;
+    bool         isAiming;
+    List<Vector3> points = new();
+    float        timeStep;
+
+    // Input
+    InputAction swapAct, throwAct;
+    PlayerInput playerInput;
+    bool inputSubscribed;
+
+    // ───────────────────────── Unity ─────────────────────────────
     void Awake()
     {
-        trajectoryLine = GetComponent<LineRenderer>();
-        trajectoryLine.positionCount = 0;
-        trajectoryLine.startWidth = 0.1f;
-        trajectoryLine.endWidth = 0.1f;
-        trajectoryLine.material = new Material(Shader.Find("Sprites/Default"));
-        
-        var playerInput = GetComponent<PlayerInput>();
+        lr = GetComponent<LineRenderer>();
+        lr.positionCount = 0;
+        lr.startWidth = lr.endWidth = 0.1f;
+        lr.material = new Material(Shader.Find("Sprites/Default"));
+
+        playerInput = GetComponent<PlayerInput>();
         playerInput.notificationBehavior = PlayerNotifications.InvokeCSharpEvents;
-        
-        swapAction = playerInput.actions["SwapBomb"];
-        throwAction = playerInput.actions["Throw"];
-        
+
+        swapAct  = playerInput.actions["SwapBomb"];
+        throwAct = playerInput.actions["Throw"];
+        Debug.Log($"Awake: throwAct bound to {throwAct?.name}, controls: {string.Join(", ", throwAct?.controls.ToArray().Select(c => c.name))}", this); // created these debug logs with ai ;)
+
         timeStep = Time.fixedDeltaTime;
-    }
-
-
-    void OnEnable()
-    {
-        // Subscribe to input events
-        swapAction.performed += OnSwapBombPerformed;
-        throwAction.started += OnThrowStarted;
-        throwAction.canceled += OnThrowCanceled;
-    }
-
-    void OnDisable()
-    {
-        // Unsubscribe from input events
-        swapAction.performed -= OnSwapBombPerformed;
-        throwAction.started -= OnThrowStarted;
-        throwAction.canceled -= OnThrowCanceled;
     }
 
     void Start()
     {
-        // Register with GameManager
-        if (GameManager.Instance != null)
+        StartCoroutine(SubscribeToInput());
+    }
+
+    IEnumerator SubscribeToInput()
+    {
+        // Wait until isLocalPlayer is stable
+        while (!isLocalPlayer)
         {
-            GameManager.Instance.RegisterPlayer(gameObject);
+            Debug.Log($"SubscribeToInput: Waiting for isLocalPlayer to be true for {gameObject.name}", this);
+            yield return new WaitForSeconds(0.1f);
+        }
+
+        if (inputSubscribed)
+        {
+            Debug.Log($"SubscribeToInput: Input already subscribed for {gameObject.name}", this);
+            yield break;
+        }
+
+        swapAct.performed += Swap;
+        throwAct.started  += StartAim;
+        throwAct.canceled += ReleaseThrow;
+        inputSubscribed = true;
+
+        Debug.Log($"SubscribeToInput: Input subscribed for {gameObject.name}, isLocalPlayer={isLocalPlayer}, PlayerInput enabled={playerInput.enabled}", this);
+    }
+
+    void OnDisable()
+    {
+        if (!isLocalPlayer || !inputSubscribed) return;
+        swapAct.performed -= Swap;
+        throwAct.started  -= StartAim;
+        throwAct.canceled -= ReleaseThrow;
+        inputSubscribed = false;
+        
+        Debug.Log($"PlayerBombHandler disabled for {gameObject.name}, input unsubscribed", this);
+    }
+
+    void Update()
+    {
+        if (!isLocalPlayer)
+        {
+            Debug.LogWarning($"Update: Not local player for {gameObject.name}", this);
+            return;
+        }
+        
+        Debug.Log($"Update: isLocalPlayer={isLocalPlayer}, currentBomb={currentBomb}, isAiming={isAiming}", this);
+
+        // Fallback manual input check for debugging
+        if (Keyboard.current.spaceKey.wasPressedThisFrame)
+        {
+            Debug.Log("Manual check: Space key pressed", this);
+            StartAim(new InputAction.CallbackContext());
+        }
+        if (Keyboard.current.spaceKey.wasReleasedThisFrame)
+        {
+            Debug.Log("Manual check: Space key released", this);
+            ReleaseThrow(new InputAction.CallbackContext());
+        }
+        
+        // Automatically hide trajectory if no bomb is held while aiming
+        if (currentBomb == null && isAiming)
+        {
+            HideTrajectory();
+            isAiming = false;
         }
     }
 
-    void OnDestroy()
+    // ───────────────────────── Public hooks from Bomb ────────────
+    public void SetBomb(Bomb b)
     {
-        // Unregister from GameManager
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.UnregisterPlayer(gameObject);
-        }
-    }
-
-    public void SetBomb(Bomb bomb)
-    {
-        currentBomb = bomb;
+        currentBomb = b;
+        Debug.Log($"SetBomb called for {gameObject.name}, bomb: {b}, IsHeld={b?.IsHeld}", this);
     }
 
     public void ClearBomb()
     {
-        currentBomb = null;
-        isAiming = false;
-        HideTrajectory();
-    }
-
-    private void OnSwapBombPerformed(InputAction.CallbackContext context)
-    {
-        if (currentBomb != null)
+        if (isAiming)
         {
-            currentBomb.SwapHoldPoint();
+            HideTrajectory();
+            isAiming = false;
         }
+        
+        currentBomb = null;
+        Debug.Log($"ClearBomb called for {gameObject.name}", this);
     }
 
-    private void OnThrowStarted(InputAction.CallbackContext context)
+    // ───────────────────────── Input handlers (local) ────────────
+    void Swap(InputAction.CallbackContext _)
     {
-        StartAiming();
+        if (!isLocalPlayer || currentBomb == null)
+        {
+            Debug.Log($"Swap failed: isLocalPlayer={isLocalPlayer}, currentBomb={currentBomb}", this);
+            return;
+        }
+        CmdSwapBomb();
     }
 
-    private void OnThrowCanceled(InputAction.CallbackContext context)
+    void StartAim(InputAction.CallbackContext _)
     {
-        ThrowBomb();
-    }
-
-    private void StartAiming()
-    {
-        if (currentBomb == null || isAiming) return;
+        if (!isLocalPlayer || currentBomb == null)
+        {
+            Debug.Log($"StartAim failed: isLocalPlayer={isLocalPlayer}, currentBomb={currentBomb}", this);
+            return;
+        }
+        
+        Debug.Log($"StartAim called: isLocalPlayer={isLocalPlayer}, currentBomb={currentBomb}, IsHeld={currentBomb.IsHeld}", this);
+        
+        if (!currentBomb.IsHeld || currentBomb.Holder != gameObject)
+        {
+            Debug.LogWarning($"StartAim: Bomb is not properly held by this player.", this);
+            return;
+        }
         
         isAiming = true;
         StartCoroutine(AimLoop());
     }
 
-    private IEnumerator AimLoop()
+    void ReleaseThrow(InputAction.CallbackContext _)
     {
-        while (isAiming)
+        if (!isLocalPlayer)
         {
-            SimulateTrajectory();
-            yield return new WaitForSeconds(timeStep);
+            Debug.Log($"ReleaseThrow failed: isLocalPlayer={isLocalPlayer}", this);
+            return;
         }
+        
+        if (!isAiming)
+        {
+            Debug.Log("ReleaseThrow called but wasn't aiming", this);
+            return;
+        }
+        
+        if (currentBomb == null)
+        {
+            Debug.Log($"ReleaseThrow failed: currentBomb is null", this);
+            isAiming = false;
+            HideTrajectory();
+            return;
+        }
+        
+        Debug.Log($"ReleaseThrow called: isLocalPlayer={isLocalPlayer}, currentBomb={currentBomb}, IsHeld={currentBomb.IsHeld}", this);
+        
+        isAiming = false;
+        HideTrajectory();
+        CmdThrowBomb();
     }
 
-    private void ThrowBomb()
+    IEnumerator AimLoop()
     {
-        if (!isAiming || currentBomb == null) return;
+        while (isAiming && currentBomb != null)
+        {
+            DrawTrajectory();
+            yield return new WaitForSeconds(timeStep);
+        }
         
-        currentBomb.ThrowBomb();
-        isAiming = false;
         HideTrajectory();
     }
 
-    void Update()
+    // ───────────────────────── Commands (client→server) ──────────
+    [Command]
+    void CmdSwapBomb()
     {
-        if (currentBomb == null && isAiming)
+        Debug.Log($"CmdSwapBomb called: currentBomb={currentBomb}, holder check={currentBomb?.Holder == gameObject}", this);
+        
+        if (currentBomb && currentBomb.Holder == gameObject)
         {
-            isAiming = false;
-            HideTrajectory();
+            currentBomb.SwapHoldPoint();
+        }
+        else
+        {
+            Debug.LogWarning($"CmdSwapBomb failed: currentBomb={currentBomb}, Holder={currentBomb?.Holder}", this);
         }
     }
 
-    private void SimulateTrajectory()
+    [Command]
+    void CmdThrowBomb()
     {
-        trajectoryPoints.Clear();
-        if (currentBomb == null) return;
-
-        string holdPointName = currentBomb.IsOnRight ? "RightHoldPoint" : "LeftHoldPoint";
-        Transform holdPoint = transform.Find(holdPointName);
-        if (holdPoint == null) return;
-
-        Vector3 startPos = holdPoint.position;
-        float throwSpeed = currentBomb.IsOnRight ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
-        float upwardForce = currentBomb.IsOnRight ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
-
-        Vector3 initialVelocity = holdPoint.forward * throwSpeed + Vector3.up * upwardForce;
-        trajectoryLine.startColor = currentBomb.IsOnRight ? Color.blue : Color.yellow;
-        trajectoryLine.endColor = trajectoryLine.startColor;
-
-        Vector3 lastPos = startPos;
-        trajectoryPoints.Add(lastPos);
-        float time = 0f;
-
-        for (int i = 0; i < maxPoints; i++)
+        Debug.Log($"CmdThrowBomb called: currentBomb={currentBomb}, holder check={currentBomb?.Holder == gameObject}", this);
+        
+        if (currentBomb && currentBomb.Holder == gameObject)
         {
-            time += timeStep;
-            Vector3 newPos = startPos + initialVelocity * time + 0.5f * Physics.gravity * time * time;
-            Vector3 direction = newPos - lastPos;
-            float distance = direction.magnitude;
+            currentBomb.ThrowBomb();
+        }
+        else
+        {
+            Debug.LogWarning($"CmdThrowBomb failed: currentBomb={currentBomb}, Holder={currentBomb?.Holder}", this);
+        }
+    }
 
-            if (distance > 0f && Physics.Raycast(lastPos, direction.normalized, out RaycastHit hit, distance, collisionMask))
+    // ───────────────────────── Trajectory helpers ────────────────
+    void DrawTrajectory()
+    {
+        points.Clear();
+        if (currentBomb == null)
+        {
+            Debug.Log("DrawTrajectory: currentBomb is null", this);
+            HideTrajectory();
+            return;
+        }
+
+        string hand = currentBomb.IsOnRight ? "RightHoldPoint" : "LeftHoldPoint";
+        Transform origin = transform.Find(hand);
+        if (!origin)
+        {
+            Debug.Log($"DrawTrajectory: {hand} not found", this);
+            HideTrajectory();
+            return;
+        }
+
+        float speed   = currentBomb.IsOnRight ? currentBomb.NormalThrowSpeed
+                                              : currentBomb.LobThrowSpeed;
+        float upward  = currentBomb.IsOnRight ? currentBomb.NormalThrowUpward
+                                              : currentBomb.LobThrowUpward;
+
+        Vector3 startPos  = origin.position;
+        Vector3 velocity  = origin.forward * speed + Vector3.up * upward;
+        Vector3 lastPos   = startPos;
+        points.Add(lastPos);
+
+        float t = 0f;
+        for (int i = 0; i < maxPoints; ++i)
+        {
+            t += timeStep;
+            Vector3 next = startPos + velocity * t + 0.5f * Physics.gravity * t * t;
+            if (Physics.Raycast(lastPos, next - lastPos, out RaycastHit hit,
+                                (next - lastPos).magnitude, collisionMask))
             {
-                if (hit.collider.CompareTag("Map"))
-                {
-                    trajectoryPoints.Add(hit.point);
-                    break;
-                }
-            }
-
-            trajectoryPoints.Add(newPos);
-            lastPos = newPos;
-
-            // Early exit if projectile is clearly descending
-            if ((initialVelocity + Physics.gravity * time).y < 0f && newPos.y <= startPos.y)
-            {
+                points.Add(hit.point);
                 break;
             }
+            points.Add(next);
+            lastPos = next;
         }
 
-        trajectoryLine.positionCount = trajectoryPoints.Count;
-        trajectoryLine.SetPositions(trajectoryPoints.ToArray());
+        lr.positionCount = points.Count;
+        lr.SetPositions(points.ToArray());
+        lr.startColor = lr.endColor = currentBomb.IsOnRight ? Color.blue : Color.yellow;
     }
 
-    private void HideTrajectory()
+    void HideTrajectory()
     {
-        trajectoryLine.positionCount = 0;
+        if (lr != null)
+        {
+            lr.positionCount = 0;
+        }
     }
 }

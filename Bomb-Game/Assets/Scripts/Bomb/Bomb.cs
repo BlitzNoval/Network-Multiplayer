@@ -1,89 +1,99 @@
 using System;
-using UnityEngine;
+using System.Collections;
+using Mirror;
 using TMPro;
+using UnityEngine;
 
-public class Bomb : MonoBehaviour
+[RequireComponent(typeof(Rigidbody), typeof(Collider))]
+public class Bomb : NetworkBehaviour
 {
-    // --- GLOBAL EXPLOSION EVENT ---
-    public static event Action OnBombExplodedGlobal;
+    public static event Action OnBombExplodedGlobal; 
+    //  global event so GameManager (and anyone else) can know when the bomb finally pops
 
-    // --- REFERENCES & COMPONENT CACHING ---
-    private Rigidbody rb;
-    private Collider bombCollider;
-    private BombEffects bombEffects;
-    private TextMeshProUGUI timerText;
-    private Transform canvasTransform;
+    // ───────────── Inspector fields ─────────────
+    [Header("Timer")]
+    [SerializeField] float initialTimer        = 10f; // starting countdown in seconds
+    [SerializeField] float returnPauseDuration = 2f;  // pause before giving bomb back after falling off
 
-    // --- HOLDER STATE ---
-    private GameObject holder;
-    private bool isOnRight = true;
-    private bool isHeld = true;
-    private float lastThrowTime;
-    private GameObject lastThrower;
+    [Header("Throw")]
+    [SerializeField] float normalThrowSpeed      = 20f; // speed when you toss it from right hand
+    [SerializeField] float normalThrowUpward     =  2f; // slight lift on a normal throw
+    [SerializeField] float lobThrowSpeed         = 10f; // slower, higher arc when throwing from left hand
+    [SerializeField] float lobThrowUpward        =  5f; // more upward on lob
+    [SerializeField] float throwCooldown         =  0.5f; // seconds between throws
+    [SerializeField] float flightMassMultiplier  =  1f;   // optional mass tweak mid-flight
 
-    // --- TIMER STATE ---
-    [Header("Timer Settings")]
-    [SerializeField] private float initialTimer        = 10f;
-    [SerializeField] private float returnPauseDuration = 0.5f;
-    private float currentTimer;
-    private bool returnPause;
-    private float returnPauseStart;
+    [Header("Collision / Explosion")]
+    [SerializeField] int   maxBounces            = 1;   // how many times we bounce before exploding
+    [SerializeField] float groundExplosionDelay  = 1f;  // delay once we hit ground
+    [SerializeField] float explosionRadius       = 5f;  // how far our knockback reaches
+    [SerializeField] float baseKnockForce        = 5f;  // baseline knockback strength
+    [SerializeField] LayerMask mapLayerMask;           // which layers count as map-out
+    [SerializeField] string playerTag = "Player";      // tag to detect players
+    [SerializeField] string mapOutTag = "MapOut";      // tag for area that kicks bomb back
 
-    // --- THROW SETTINGS ---
-    [Header("Throw Settings")]
-    [SerializeField] private float normalThrowSpeed    = 20f;
-    [SerializeField] private float normalThrowUpward   =  2f;
-    [SerializeField] private float lobThrowSpeed       = 10f;
-    [SerializeField] private float lobThrowUpward      =  5f;
-    [SerializeField] private float throwCooldown       = 0.5f;
-    [SerializeField] private float flightMassMultiplier = 1f;
+    // ───────────── Cached references ───────────
+    Rigidbody       rb;         // physics body
+    Collider        col;        // collider for bouncing and passing
+    BombEffects     fx;         // VFX & SFX handler
+    TextMeshProUGUI timerText;  // UI showing countdown
+    Transform       canvasTr;   // parent transform for timer so it faces camera
 
-    // --- COLLISION & BOUNCE SETTINGS ---
-    [Header("Collision Settings")]
-    [SerializeField] private int maxBounces             = 1;
-    [SerializeField] private float groundExplosionDelay = 1f;
-    [SerializeField] private LayerMask mapLayerMask;
-    [SerializeField] private string playerTag           = "Player";
-    [SerializeField] private string mapOutTag           = "MapOut";
+    // ───────────── Network-synced state ───────
+    [SyncVar(hook = nameof(OnHolderChanged))] GameObject holder;  
+    //  who currently has the bomb (null if flying/free)
+    [SyncVar] bool  isOnRight   = true;  
+    [SyncVar] bool  isHeld      = true;  
+    [SyncVar] float currentTimer;  // sync countdown so everyone sees same number
 
-    private int currentBounces;
-    private float groundHitTime;
-    private bool waitingToExplode;
+    // ───────────── Server-only fields ───────────
+    float       lastThrowTime, groundHitTime;
+    bool        waitingToExplode, returnPause;
+    float       returnPauseStart;
+    int         currentBounces;
+    GameObject  lastThrower;  // track who threw it for return logic
 
-    // --- PUBLIC READONLY ACCESSORS ---
-    public bool IsOnRight           => isOnRight;
-    public bool IsHeld              => isHeld;
-    public float CurrentTimer       => currentTimer;
-     public GameObject Holder { get; private set; }
-    public float NormalThrowSpeed   => normalThrowSpeed;
-    public float NormalThrowUpward  => normalThrowUpward;
-    public float LobThrowSpeed      => lobThrowSpeed;
-    public float LobThrowUpward     => lobThrowUpward;
+    // ───────────── Public getters ─────────────
+    public GameObject Holder            => holder;
+    public bool       IsOnRight         => isOnRight;
+    public bool       IsHeld            => isHeld;
+    public float      NormalThrowSpeed  => normalThrowSpeed;
+    public float      NormalThrowUpward => normalThrowUpward;
+    public float      LobThrowSpeed     => lobThrowSpeed;
+    public float      LobThrowUpward    => lobThrowUpward;
 
+    // ───────────── Unity callbacks ─────────────
     void Awake()
     {
-        rb           = GetComponent<Rigidbody>();
-        bombCollider = GetComponent<Collider>();
-        bombEffects  = TryGetComponent(out BombEffects be) ? be : null;
-        timerText    = GetComponentInChildren<TextMeshProUGUI>();
-
-        if (rb == null || bombCollider == null)
-            Debug.LogError("Bomb requires Rigidbody & Collider", this);
-        if (timerText == null)
-            Debug.LogWarning("Missing TextMeshProUGUI under Bomb", this);
-
-        currentTimer = initialTimer;
-        if (timerText != null)
-            canvasTransform = timerText.transform.parent;
+        // grab our components once to avoid repeated GetComponent calls
+        rb        = GetComponent<Rigidbody>();
+        col       = GetComponent<Collider>();
+        fx        = GetComponent<BombEffects>();
+        timerText = GetComponentInChildren<TextMeshProUGUI>();
+        if (timerText) 
+            canvasTr = timerText.transform.parent;  // we rotate this towards camera each frame
+        currentTimer = initialTimer;  // initialize our countdown
     }
 
-    void Update()     => UpdateTimer();
-    void LateUpdate() => FaceCamera();
+    void Update()
+    {
+        if (isServer) TickTimer(); // only the server decrements the timer
+    }
 
-    private void UpdateTimer()
+    void LateUpdate()
+    {
+        // rotate the timer UI toward the main camera so it's always readable
+        if (canvasTr && Camera.main)
+            canvasTr.rotation = Quaternion.LookRotation(canvasTr.position - Camera.main.transform.position);
+    }
+
+    // ───────────── Countdown and explosion ─────────────
+    [Server]
+    void TickTimer()
     {
         if (waitingToExplode)
         {
+            // if we've landed, wait a bit and then blow
             if (Time.time >= groundHitTime + groundExplosionDelay)
                 Explode();
             return;
@@ -91,121 +101,209 @@ public class Bomb : MonoBehaviour
 
         if (returnPause)
         {
+            // pause countdown briefly if it hit map-out
             if (Time.time >= returnPauseStart + returnPauseDuration)
                 returnPause = false;
-            else
-                return;
+            return;
         }
 
+        // subtract time and tell clients
         currentTimer -= Time.deltaTime;
-        if (timerText != null)
-            timerText.text = Mathf.Ceil(currentTimer).ToString();
+        RpcUpdateTimer(Mathf.CeilToInt(currentTimer));
 
-        if (currentTimer <= 0f)
-            Explode();
-    }
-
-    private void FaceCamera()
-    {
-        if (canvasTransform != null && Camera.main != null)
+        if (currentTimer <= 0f && !waitingToExplode)
         {
-            canvasTransform.rotation = Quaternion.LookRotation(
-                canvasTransform.position - Camera.main.transform.position
-            );
+            currentTimer = 0f;
+            Explode();  // boom!
         }
     }
 
-    public void AssignToPlayer(GameObject player)
-{
-    holder = player;
-    isHeld = true;
-    bombCollider.enabled = false;
-    waitingToExplode = false;
-    currentBounces = 0;
-    rb.mass = 1f;
-    // Removed: currentTimer = initialTimer;
-    returnPause = false;
-
-    UpdateHoldTransform();
-    if (holder.TryGetComponent<PlayerBombHandler>(out var handler))
-        handler.SetBomb(this);
-}
-
-    public void ClearHolder()
+    [ClientRpc]
+    void RpcUpdateTimer(int seconds)
     {
-        if (holder != null && holder.TryGetComponent<PlayerBombHandler>(out var handler))
-            handler.ClearBomb();
+        if (timerText)
+            timerText.text = seconds.ToString();  // update the displayed number
+    }
+
+    [Server]
+    void Explode()
+    {
+        // guard against double-calls
+        if (waitingToExplode) return;
+        waitingToExplode = true;
+
+        // knockback logic: find nearby players
+        foreach (var hit in Physics.OverlapSphere(transform.position, explosionRadius))
+        {
+            if (!hit.CompareTag(playerTag)) continue;
+            if (!hit.TryGetComponent(out Rigidbody prb)) continue;
+            if (!hit.TryGetComponent(out PlayerLifeManager life)) continue;
+
+            // make most of force horizontal, with a bit of lift
+            Vector3 radial           = hit.transform.position - transform.position;
+            Vector3 horizDir         = new Vector3(radial.x, 0, radial.z).normalized;
+            const float sidePct      = 0.85f;  // mostly sideways
+            const float upwardPct    = 0.15f;  // small bump upward
+            Vector3 dir              = (horizDir * sidePct + Vector3.up * upwardPct).normalized;
+
+            // scale by player-specific multiplier, boost if it was in their hands
+            float forceMag = baseKnockForce * Mathf.Pow(life.knockbackMultiplier, 1.25f);
+            if (hit.gameObject == holder) forceMag *= 1.5f;
+
+            // small server-side push so spectators see movement
+            prb.AddForce(dir * forceMag * 0.2f, ForceMode.Impulse);
+
+            // full-force on the client owning that player for responsiveness
+            if (hit.TryGetComponent(out NetworkIdentity ni) && ni.connectionToClient != null)
+                life.TargetApplyKnockback(ni.connectionToClient, dir * forceMag);
+
+            life.RegisterKnockbackHit();
+        }
+
+        // let go of bomb if someone had it
+        holder?.GetComponent<PlayerBombHandler>()?.ClearBomb();
         holder = null;
+
+        // play VFX / SFX everywhere
+        RpcPlayExplosion();
+        OnBombExplodedGlobal?.Invoke();
+
+        // clean up after a second
+        StartCoroutine(DestroyAfterDelay(1f));
     }
 
-    private void UpdateHoldTransform()
+    [Server]
+    IEnumerator DestroyAfterDelay(float delay)
     {
-        if (!isHeld || holder == null) return;
-
-        var pointName = isOnRight ? "RightHoldPoint" : "LeftHoldPoint";
-        var holdPoint = holder.transform.Find(pointName);
-        if (holdPoint == null) return;
-
-        transform.SetParent(holdPoint);
-        transform.localPosition = Vector3.zero;
-        rb.isKinematic          = true;
+        yield return new WaitForSeconds(delay);
+        NetworkServer.Destroy(gameObject);
     }
 
+    [ClientRpc]
+    void RpcPlayExplosion()
+    {
+        if (fx != null && !fx.IsPlayingEffects)
+            fx.PlayExplosionEffects(); // cue explosion visuals & sound
+    }
+
+    // ───────────── Holder assignment ─────────────
+    [Server]
+    public void AssignToPlayer(GameObject p)
+    {
+        // server tells us who holds the bomb now
+        holder         = p;
+        isHeld         = true;
+        col.enabled    = false;
+        currentBounces = 0;
+        rb.isKinematic = true;
+        rb.mass        = 1f;
+        returnPause    = false;
+        currentTimer   = Mathf.Max(currentTimer, 3f); // give them some breathing room
+    }
+
+    void OnHolderChanged(GameObject oldH, GameObject newH)
+    {
+        // clear old player's reference
+        oldH?.GetComponent<PlayerBombHandler>()?.ClearBomb();
+
+        if (newH)
+        {
+            // hook it into the new player's hand mesh
+            newH.GetComponent<PlayerBombHandler>()?.SetBomb(this);
+            Transform grip = newH.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
+            if (grip)
+            {
+                transform.SetParent(grip);
+                transform.localPosition = Vector3.zero;
+            }
+            rb.isKinematic = true;
+            col.enabled    = false;
+            lastThrower    = newH;
+        }
+        else
+        {
+            // free-flying bomb
+            transform.SetParent(null);
+            rb.isKinematic = false;
+            col.enabled    = true;
+        }
+    }
+
+    [Server]
     public void SwapHoldPoint()
     {
-        if (!isHeld) return;
+        // flip from right-hand to left-hand hold
         isOnRight = !isOnRight;
-        UpdateHoldTransform();
+        RpcRefreshGrip(isOnRight);
     }
 
+    [ClientRpc]
+    void RpcRefreshGrip(bool right)
+    {
+        if (!holder) return;
+        Transform grip = holder.transform.Find(right ? "RightHoldPoint" : "LeftHoldPoint");
+        if (grip)
+        {
+            transform.SetParent(grip);
+            transform.localPosition = Vector3.zero;
+        }
+    }
+
+    [Server]
     public void ThrowBomb()
     {
-        if (holder == null || Time.time < lastThrowTime + throwCooldown)
+        // server-run throw check
+        if (!isHeld || holder == null || Time.time < lastThrowTime + throwCooldown)
             return;
 
-        lastThrower          = holder;
+        lastThrower = holder;
         transform.SetParent(null);
-        rb.isKinematic       = false;
-        bombCollider.enabled = true;
-        isHeld               = false;
-        rb.mass             *= flightMassMultiplier;
+        isHeld         = false;
+        rb.isKinematic = false;
+        col.enabled    = true;
+        rb.mass       *= flightMassMultiplier;
 
-        Vector3 forward = holder.transform.forward;
-        Vector3 force   = isOnRight
+        Transform origin = holder.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
+        Vector3 forward  = origin ? origin.forward : holder.transform.forward;
+        Vector3 force    = isOnRight
             ? forward * normalThrowSpeed + Vector3.up * normalThrowUpward
-            : forward * lobThrowSpeed    + Vector3.up * lobThrowUpward;
+            : forward * lobThrowSpeed   + Vector3.up * lobThrowUpward;
 
+        rb.velocity = Vector3.zero;
         rb.AddForce(force, ForceMode.Impulse);
-        lastThrowTime   = Time.time;
+
         currentBounces  = 0;
-        ClearHolder();
+        lastThrowTime   = Time.time;
+        holder          = null;
     }
 
-    void OnCollisionEnter(Collision col)
+    [ServerCallback]
+    void OnCollisionEnter(Collision c)
     {
-        if (isHeld) return;
+        // if we hit a player, hand it off
+        if (c.gameObject.CompareTag(playerTag))
+        {
+            if (c.gameObject != holder)
+                AssignToPlayer(c.gameObject);
+            return;
+        }
 
-        // Return to last thrower if touching MapOut tag or map layers
-        if (col.gameObject.CompareTag(mapOutTag) ||
-            (((1 << col.gameObject.layer) & mapLayerMask) != 0))
+        if (isHeld) return; // ignore while in hand
+
+        // if we leave map bounds, return to thrower
+        if (c.gameObject.CompareTag(mapOutTag) ||
+            ((1 << c.gameObject.layer & mapLayerMask) != 0))
         {
             if (lastThrower != null)
             {
                 returnPause      = true;
                 returnPauseStart = Time.time;
                 AssignToPlayer(lastThrower);
-                return;
             }
-        }
-
-        // Assign to player on contact
-        if (col.gameObject.CompareTag(playerTag))
-        {
-            AssignToPlayer(col.gameObject);
             return;
         }
 
-        // Bounce logic
+        // count our bounces
         currentBounces++;
         if (currentBounces >= maxBounces)
         {
@@ -214,34 +312,6 @@ public class Bomb : MonoBehaviour
         }
     }
 
-     public void DetachFromPlayer()
-    {
-        if (Holder != null)
-        {
-            Holder.GetComponent<PlayerBombHandler>()?.ClearBomb();
-            Holder = null;
-        }
-        transform.SetParent(null);
-    }
-
-    public void TriggerImmediateExplosion()
-    {
-        StopAllCoroutines();
-        Explode();
-    }
-
-    // Modified existing Explode method
-    private void Explode()
-    {
-        // Existing explosion logic
-        bombEffects?.PlayExplosionEffects();
-        OnBombExplodedGlobal?.Invoke();
-        
-        // Security cleanup
-        if (Holder != null)
-        {
-            Holder.GetComponent<PlayerBombHandler>()?.ClearBomb();
-        }
-        Destroy(gameObject);
-    }
+    [Server]
+    public void TriggerImmediateExplosion() => Explode();
 }
