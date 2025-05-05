@@ -655,7 +655,6 @@ GameObject:
   - component: {fileID: 304580030}
   - component: {fileID: 304580032}
   - component: {fileID: 304580031}
-  - component: {fileID: 304580033}
   m_Layer: 5
   m_Name: Player 1 (3)
   m_TagString: Untagged
@@ -722,26 +721,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 304580029}
   m_CullTransparentMesh: 1
---- !u!114 &304580033
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 304580029}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9e6c67142dbbcf7449132168349d3a98, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  sharedImage: {fileID: 0}
-  joinRoomButton: {fileID: 2040942873}
-  joinRoomSprite: {fileID: 0}
-  createRoomButton: {fileID: 0}
-  createRoomSprite: {fileID: 0}
-  backButton: {fileID: 741538176}
-  backSprite: {fileID: 0}
-  defaultSprite: {fileID: 0}
 --- !u!1 &355534276
 GameObject:
   m_ObjectHideFlags: 0
@@ -1255,7 +1234,6 @@ GameObject:
   - component: {fileID: 812089703}
   - component: {fileID: 812089705}
   - component: {fileID: 812089704}
-  - component: {fileID: 812089706}
   m_Layer: 5
   m_Name: Player 1 (1)
   m_TagString: Untagged
@@ -1322,26 +1300,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 812089702}
   m_CullTransparentMesh: 1
---- !u!114 &812089706
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 812089702}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9e6c67142dbbcf7449132168349d3a98, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  sharedImage: {fileID: 0}
-  joinRoomButton: {fileID: 2040942873}
-  joinRoomSprite: {fileID: 0}
-  createRoomButton: {fileID: 0}
-  createRoomSprite: {fileID: 0}
-  backButton: {fileID: 741538176}
-  backSprite: {fileID: 0}
-  defaultSprite: {fileID: 0}
 --- !u!1 &814429964
 GameObject:
   m_ObjectHideFlags: 0
@@ -2362,7 +2320,6 @@ GameObject:
   - component: {fileID: 1612252041}
   - component: {fileID: 1612252043}
   - component: {fileID: 1612252042}
-  - component: {fileID: 1612252044}
   m_Layer: 5
   m_Name: Player 1
   m_TagString: Untagged
@@ -2429,26 +2386,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1612252040}
   m_CullTransparentMesh: 1
---- !u!114 &1612252044
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1612252040}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9e6c67142dbbcf7449132168349d3a98, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  sharedImage: {fileID: 0}
-  joinRoomButton: {fileID: 2040942873}
-  joinRoomSprite: {fileID: 0}
-  createRoomButton: {fileID: 0}
-  createRoomSprite: {fileID: 0}
-  backButton: {fileID: 741538176}
-  backSprite: {fileID: 0}
-  defaultSprite: {fileID: 0}
 --- !u!1 &1679953991
 GameObject:
   m_ObjectHideFlags: 0
@@ -2737,7 +2674,6 @@ GameObject:
   - component: {fileID: 1969427496}
   - component: {fileID: 1969427498}
   - component: {fileID: 1969427497}
-  - component: {fileID: 1969427499}
   m_Layer: 5
   m_Name: Player 1 (2)
   m_TagString: Untagged
@@ -2804,26 +2740,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1969427495}
   m_CullTransparentMesh: 1
---- !u!114 &1969427499
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1969427495}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9e6c67142dbbcf7449132168349d3a98, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  sharedImage: {fileID: 0}
-  joinRoomButton: {fileID: 2040942873}
-  joinRoomSprite: {fileID: 0}
-  createRoomButton: {fileID: 0}
-  createRoomSprite: {fileID: 0}
-  backButton: {fileID: 741538176}
-  backSprite: {fileID: 0}
-  defaultSprite: {fileID: 0}
 --- !u!1 &1974052553
 GameObject:
   m_ObjectHideFlags: 0
