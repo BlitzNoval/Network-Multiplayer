@@ -262,6 +262,8 @@ GameObject:
   - component: {fileID: 6049661001868269297}
   - component: {fileID: 1722947946795985453}
   - component: {fileID: 6085821998421801923}
+  - component: {fileID: 3039373420667251137}
+  - component: {fileID: 3875619885219601610}
   m_Layer: 0
   m_Name: Bomb
   m_TagString: Untagged
@@ -417,18 +419,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1ae086514efee947a7100d07f0be646, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  holder: {fileID: 0}
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   initialTimer: 10
-  timerText: {fileID: 0}
   returnPauseDuration: 0.2
-  normalThrowSpeed: 15
+  normalThrowSpeed: 20
   normalThrowUpward: 2.5
   lobThrowSpeed: 15
   lobThrowUpward: 6
-  maxBounces: 2
   throwCooldown: 0.5
-  groundExplosionDelay: 1
   flightMassMultiplier: 1
+  maxBounces: 2
+  groundExplosionDelay: 1
+  explosionRadius: 4
+  baseKnockForce: 5
+  mapLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  playerTag: Player
+  mapOutTag: MapOut
 --- !u!82 &6085821998421801923
 AudioSource:
   m_ObjectHideFlags: 0
@@ -526,6 +536,57 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &3039373420667251137
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5032718245858861815}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sceneId: 0
+  _assetId: 871899523
+  serverOnly: 0
+  visibility: 0
+  hasSpawned: 0
+--- !u!114 &3875619885219601610
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5032718245858861815}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ff3ba0becae47b8b9381191598957c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  syncDirection: 1
+  syncMode: 0
+  syncInterval: 0
+  target: {fileID: 4790263372197079112}
+  syncPosition: 1
+  syncRotation: 1
+  syncScale: 0
+  onlySyncOnChange: 1
+  compressRotation: 1
+  interpolatePosition: 1
+  interpolateRotation: 1
+  interpolateScale: 1
+  coordinateSpace: 0
+  timelineOffset: 1
+  showGizmos: 0
+  showOverlay: 0
+  overlayColor: {r: 0, g: 0, b: 0, a: 0.5}
+  onlySyncOnChangeCorrectionMultiplier: 2
+  useFixedUpdate: 0
+  rotationSensitivity: 0.01
+  positionPrecision: 0.01
+  scalePrecision: 0.01
 --- !u!1 &5744270042671887037
 GameObject:
   m_ObjectHideFlags: 0

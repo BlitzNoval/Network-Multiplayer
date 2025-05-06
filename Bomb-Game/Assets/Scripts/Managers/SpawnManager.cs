@@ -1,108 +1,125 @@
 using System.Collections.Generic;
+using Mirror;
 using UnityEngine;
-using UnityEngine.Events;
 
 [RequireComponent(typeof(Collider))]
-public class SpawnManager : MonoBehaviour
+public class SpawnManager : NetworkBehaviour
 {
-    [Header("Spawn Points (fill in as many as you like)")]
-    [Tooltip("Transforms marking where players may spawn.")]
-    public List<Transform> spawnPoints = new List<Transform>();
+    public static SpawnManager Instance { get; private set; }
 
-    [Header("Cooldown Settings")]
-    [Tooltip("Seconds after a spawn point is used before it can be reused.")]
+    [Header("Spawn Points")]
+    public List<Transform> spawnPoints = new();
+    [Header("Reuse Cool-down")]
     public float pointCooldown = 1f;
 
-    // Tracks when each point was last used
-    private float[] lastUsedTime;
-
-    // Event: (playerGameObject, spawnPointTransform)
-    [System.Serializable]
-    public class PlayerSpawnEvent : UnityEvent<GameObject, Transform> { }
-
-    /// <summary>
-    /// Fires when a Player enters the MapOut trigger.
-    /// Default listener will teleport locally.
-    /// Networking code should subscribe instead for server-side spawning.
-    /// </summary>
-    public PlayerSpawnEvent OnPlayerSpawn = new PlayerSpawnEvent();
+    float[] lastUsed;
+    private List<int> recentlyUsed = new List<int>();
+    private Collider mapOutCollider;
 
     void Awake()
     {
-        // Initialize so all spawn points are immediately available
-        lastUsedTime = new float[spawnPoints.Count];
-        for (int i = 0; i < lastUsedTime.Length; i++)
-            lastUsedTime[i] = -pointCooldown;
-
-        // Add default local-teleport listener
-        OnPlayerSpawn.AddListener(DefaultTeleport);
+        Initialize();
+        Debug.Log($"SpawnManager Awake on {gameObject.name}, tag={gameObject.tag}, isTrigger={GetComponent<Collider>().isTrigger}, Instance set at {Time.time}", this);
     }
 
-    void OnValidate()
+    void OnEnable()
     {
-        // Ensure collider is a trigger
-        var col = GetComponent<Collider>();
-        if (col) col.isTrigger = true;
+        mapOutCollider = GetComponent<Collider>();
+        mapOutCollider.isTrigger = true; // Re-apply trigger on enable
+        Debug.Log($"SpawnManager OnEnable on {gameObject.name}, tag={gameObject.tag}, isTrigger={mapOutCollider.isTrigger}, time={Time.time}", this);
     }
 
-    // Handle player entering trigger (intended for server-side processing when networked)
-     // SpawnManager.cs (partial)
-   public void OnTriggerEnter(Collider other)
+    public override void OnStartServer()
     {
-        if (!other.CompareTag("Player")) return;
+        Initialize();
+        Debug.Log($"SpawnManager OnStartServer on {gameObject.name}, tag={gameObject.tag}, isTrigger={GetComponent<Collider>().isTrigger}, Instance set at {Time.time}", this);
+    }
 
-        PlayerLifeManager lifeManager = other.GetComponent<PlayerLifeManager>();
-        if (lifeManager != null && !lifeManager.IsDead)
+    void Initialize()
+    {
+        Instance = this;
+        lastUsed = new float[spawnPoints.Count];
+        for (int i = 0; i < lastUsed.Length; i++) lastUsed[i] = -pointCooldown;
+        mapOutCollider = GetComponent<Collider>();
+        mapOutCollider.isTrigger = true; // Ensure trigger is set
+    }
+
+    [ServerCallback]
+    void OnTriggerEnter(Collider other)
+    {
+        Debug.Log($"OnTriggerEnter: collider={other.gameObject.name}, tag={other.gameObject.tag}, self tag={gameObject.tag}, time={Time.time}", this);
+
+        // Check if the colliding object is the player and this is the MapOut platform
+        if (other.CompareTag("Player") && gameObject.CompareTag("MapOut"))
         {
-            lifeManager.HandleDeath();
-            
-            if (lifeManager.CurrentLives > 0)
+            var life = other.GetComponent<PlayerLifeManager>();
+            Debug.Log($"PlayerLifeManager check: found={life != null}, IsDead={life?.IsDead ?? true}, time={Time.time}", this);
+
+            if (life == null)
             {
-                int idx = ChooseSpawnIndex();
-                Transform pt = spawnPoints[idx];
-                OnPlayerSpawn.Invoke(other.gameObject, pt);
-                lastUsedTime[idx] = Time.time;
+                Debug.LogError($"PlayerLifeManager component not found on {other.gameObject.name}", this);
+                return;
+            }
+
+            if (life && !life.IsDead)
+            {
+                Debug.Log($"Player {other.gameObject.name} hit MapOut platform, triggering HandleDeath, time={Time.time}", this);
+                life.HandleDeath();
+
+                if (life.currentLives > 0)
+                {
+                    int idx = ChooseSpawnIndex();
+                    Transform pt = spawnPoints[idx];
+                    other.transform.SetPositionAndRotation(pt.position, pt.rotation);
+                    lastUsed[idx] = Time.time;
+                    Debug.Log($"Respawned {other.gameObject.name} at spawn point {idx}, position={pt.position}, time={Time.time}", this);
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"Player {other.gameObject.name} is dead or null, skipping HandleDeath, time={Time.time}", this);
             }
         }
     }
 
-    // Choose a spawn index (intended for server-side processing when networked)
     public int ChooseSpawnIndex()
     {
         float now = Time.time;
         var free = new List<int>();
 
-        // Collect all points off-cooldown
-        for (int i = 0; i < lastUsedTime.Length; i++)
-            if (now - lastUsedTime[i] >= pointCooldown)
+        for (int i = 0; i < lastUsed.Length; ++i)
+        {
+            if (now - lastUsed[i] >= pointCooldown && !recentlyUsed.Contains(i))
                 free.Add(i);
+        }
 
         if (free.Count > 0)
         {
-            // Random choice among free points
-            return free[Random.Range(0, free.Count)];
+            int idx = free[Random.Range(0, free.Count)];
+            recentlyUsed.Add(idx);
+            if (recentlyUsed.Count > spawnPoints.Count / 2) // Allow reuse after half the points are used
+                recentlyUsed.RemoveAt(0);
+            lastUsed[idx] = Time.time;
+            return idx;
         }
-        else
+
+        float maxTime = float.MinValue;
+        int best = 0;
+        for (int i = 0; i < lastUsed.Length; ++i)
         {
-            // All busy → pick the one that'll free up soonest
-            float bestRemain = float.MaxValue;
-            int bestIdx = 0;
-            for (int i = 0; i < lastUsedTime.Length; i++)
+            if (now - lastUsed[i] > maxTime)
             {
-                float rem = pointCooldown - (now - lastUsedTime[i]);
-                if (rem < bestRemain)
-                {
-                    bestRemain = rem;
-                    bestIdx = i;
-                }
+                maxTime = now - lastUsed[i];
+                best = i;
             }
-            return bestIdx;
         }
+        lastUsed[best] = Time.time;
+        return best;
     }
 
-    // Default, local-only teleport handler
-    private void DefaultTeleport(GameObject player, Transform spawnPoint)
+    [Server] public Transform GetNextSpawnPoint()
     {
-        player.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+        int idx = ChooseSpawnIndex();
+        return spawnPoints[idx];
     }
 }

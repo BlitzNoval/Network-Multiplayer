@@ -50,15 +50,25 @@ public class BombEffects : MonoBehaviour
     // Play all explosion effects (intended for client-side call when networked)
     public void PlayExplosionEffects() 
     {
-        if (isPlayingEffects) return;
+        // Check if already playing effects and prevent multiple calls
+        if (isPlayingEffects) 
+        {
+            Debug.Log("PlayExplosionEffects already running, ignoring duplicate call", this);
+            return;
+        }
+        
         isPlayingEffects = true;
         
+        Debug.Log("PlayExplosionEffects called", this);
+        // Cache position in case bomb is destroyed
+        Vector3 position = transform.position;
+
         // Start audio playback immediately with priority
         GameObject tempAudio = null;
         if (explosionSound != null) 
         {
             tempAudio = new GameObject("TempExplosionAudio");
-            tempAudio.transform.position = transform.position;
+            tempAudio.transform.position = position;
             AudioSource tempSource = tempAudio.AddComponent<AudioSource>();
             
             // Configure audio for minimal delay
@@ -82,7 +92,7 @@ public class BombEffects : MonoBehaviour
         // Play VFX slightly delayed to match audio if needed
         if (explosionVFXPrefab != null) 
         {
-            ParticleSystem vfx = Instantiate(explosionVFXPrefab, transform.position, Quaternion.identity);
+            ParticleSystem vfx = Instantiate(explosionVFXPrefab, position, Quaternion.identity);
             vfx.Play();
             Destroy(vfx.gameObject, vfx.main.duration);
         }
@@ -100,7 +110,6 @@ public class BombEffects : MonoBehaviour
             shaker.SetShakeAmount(shakeMagnitude);
             shaker.StartShake(shakeDuration);
         }
-        
-        isPlayingEffects = false;
+    
     }
 }
