@@ -1,4 +1,3 @@
-// PlayerLifeManager.cs
 using System;
 using System.Collections;
 using Mirror;
@@ -51,7 +50,6 @@ public class PlayerLifeManager : NetworkBehaviour
         knockbackHitCount   = 0;
     }
 
-    // *** NEW: register to UI as soon as this client learns about this player ***
     public override void OnStartClient()
     {
         base.OnStartClient();
@@ -59,7 +57,6 @@ public class PlayerLifeManager : NetworkBehaviour
             PlayerUIManager.Instance.Register(this);
     }
 
-    // *** NEW: unregister on client shutdown ***
     public override void OnStopClient()
     {
         base.OnStopClient();

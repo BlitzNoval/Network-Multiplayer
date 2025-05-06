@@ -1,4 +1,3 @@
-// PlayerUIPanel.cs
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -12,15 +11,12 @@ public class PlayerUIPanel : MonoBehaviour
 
     readonly Color[] playerColors = new Color[]
     {
-        new Color(0.208f, 0.380f, 0.702f), // Blue
-        new Color(0.706f, 0.196f, 0.224f), // Red
-        new Color(0.275f, 0.663f, 0.298f), // Green
-        new Color(0.965f, 0.580f, 0.098f)  // Orange
+        new Color(0.208f, 0.380f, 0.702f), 
+        new Color(0.706f, 0.196f, 0.224f), 
+        new Color(0.275f, 0.663f, 0.298f), 
+        new Color(0.965f, 0.580f, 0.098f)  
     };
 
-    /// <summary>
-    /// Called once, when panel is first activated.
-    /// </summary>
     public void Initialize(int playerNumber)
     {
         playerLabel.text = $"P{playerNumber}";
@@ -33,9 +29,6 @@ public class PlayerUIPanel : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// SyncVar hook signature: (old, new)
-    /// </summary>
     public void SetLives(int oldLives, int newLives)
     {
         if (newLives < oldLives && AudioManager.Instance != null)
@@ -46,9 +39,6 @@ public class PlayerUIPanel : MonoBehaviour
         heart3.enabled = newLives >= 3;
     }
 
-    /// <summary>
-    /// SyncVar hook signature: (oldMultiplier, newMultiplier)
-    /// </summary>
     public void SetKnockback(float oldMult, float newMult)
     {
         int percentage = Mathf.Max(0, (int)((newMult - 1f) * 100f));
