@@ -25,6 +25,10 @@ public class PlayerBombHandler : NetworkBehaviour
     PlayerInput playerInput;
     bool inputSubscribed;
 
+    // Animation
+    private PlayerAnimator playerAnimator;
+    private Animator animator;
+
     // ───────────────────────── Unity ─────────────────────────────
     void Awake()
     {
@@ -38,7 +42,11 @@ public class PlayerBombHandler : NetworkBehaviour
 
         swapAct  = playerInput.actions["SwapBomb"];
         throwAct = playerInput.actions["Throw"];
-        Debug.Log($"Awake: throwAct bound to {throwAct?.name}, controls: {string.Join(", ", throwAct?.controls.ToArray().Select(c => c.name))}", this); // created these debug logs with ai ;)
+        Debug.Log($"Awake: throwAct bound to {throwAct?.name}, controls: {string.Join(", ", throwAct?.controls.ToArray().Select(c => c.name))}", this);
+
+        // Get animation components
+        playerAnimator = GetComponent<PlayerAnimator>();
+        animator = GetComponent<Animator>();
 
         timeStep = Time.fixedDeltaTime;
     }
@@ -117,6 +125,9 @@ public class PlayerBombHandler : NetworkBehaviour
     {
         currentBomb = b;
         Debug.Log($"SetBomb called for {gameObject.name}, bomb: {b}, IsHeld={b?.IsHeld}", this);
+
+        // Update animation state for bomb in hand
+        UpdateHandAnimationState();
     }
 
     public void ClearBomb()
@@ -129,6 +140,26 @@ public class PlayerBombHandler : NetworkBehaviour
         
         currentBomb = null;
         Debug.Log($"ClearBomb called for {gameObject.name}", this);
+
+        // Reset hand animation state
+        UpdateHandAnimationState();
+    }
+
+    // Update animation state based on which hand holds the bomb
+    private void UpdateHandAnimationState()
+    {
+        if (animator != null)
+        {
+            int handState = 0; // No bomb
+            
+            if (currentBomb != null && currentBomb.Holder == gameObject)
+            {
+                handState = currentBomb.IsOnRight ? 2 : 1; // 1 = Left, 2 = Right
+            }
+            
+            // Set animation parameter directly for immediate local feedback
+            animator.SetInteger("activeHand", handState);
+        }
     }
 
     // ───────────────────────── Input handlers (local) ────────────
@@ -188,6 +219,13 @@ public class PlayerBombHandler : NetworkBehaviour
         
         isAiming = false;
         HideTrajectory();
+        
+        // Trigger throw animation locally for immediate feedback
+        if (animator != null)
+        {
+            animator.SetTrigger("Throw");
+        }
+        
         CmdThrowBomb();
     }
 
@@ -211,6 +249,13 @@ public class PlayerBombHandler : NetworkBehaviour
         if (currentBomb && currentBomb.Holder == gameObject)
         {
             currentBomb.SwapHoldPoint();
+            
+            // Update animation state on all clients
+            if (playerAnimator != null)
+            {
+                // This will be synced through PlayerAnimator's SyncVar
+                UpdateHandAnimationState();
+            }
         }
         else
         {
@@ -225,6 +270,12 @@ public class PlayerBombHandler : NetworkBehaviour
         
         if (currentBomb && currentBomb.Holder == gameObject)
         {
+            // Notify the PlayerAnimator to trigger throw animation on all clients
+            if (playerAnimator != null)
+            {
+                playerAnimator.OnBombThrow();
+            }
+            
             currentBomb.ThrowBomb();
         }
         else
