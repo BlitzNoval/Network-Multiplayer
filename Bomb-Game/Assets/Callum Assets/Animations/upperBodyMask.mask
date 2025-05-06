@@ -8,4 +8,142 @@ AvatarMask:
   m_PrefabAsset: {fileID: 0}
   m_Name: upperBodyMask
   m_Mask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
-  m_Elements: []
+  m_Elements:
+  - m_Path: 
+    m_Weight: 1
+  - m_Path: metarig
+    m_Weight: 0
+  - m_Path: metarig/spine
+    m_Weight: 0
+  - m_Path: metarig/spine/pelvis.L
+    m_Weight: 0
+  - m_Path: metarig/spine/pelvis.L/pelvis.L_end
+    m_Weight: 0
+  - m_Path: metarig/spine/pelvis.R
+    m_Weight: 0
+  - m_Path: metarig/spine/pelvis.R/pelvis.R_end
+    m_Weight: 0
+  - m_Path: metarig/spine/spine.001
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/index_finger1.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/index_finger1.L/index_finger2.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/index_finger1.L/index_finger2.L/index_finger3.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/index_finger1.L/index_finger2.L/index_finger3.L/index_finger3.L_end
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/middle_finger1.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/middle_finger1.L/middle_finger2.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/middle_finger1.L/middle_finger2.L/middle_finger3.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/middle_finger1.L/middle_finger2.L/middle_finger3.L/middle_finger3.L_end
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/third_finger1.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/third_finger1.L/third_finger2.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/third_finger1.L/third_finger2.L/third_finger3.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/hand.L/third_finger1.L/third_finger2.L/third_finger3.L/third_finger3.L_end
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/thumb1.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/thumb1.L/thumb2.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/thumb1.L/thumb2.L/thumb3.L
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.L/upper_arm.L/forearm.L/thumb1.L/thumb2.L/thumb3.L/thumb3.L_end
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/index_finger1.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/index_finger1.R/index_finger2.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/index_finger1.R/index_finger2.R/index_finger3.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/index_finger1.R/index_finger2.R/index_finger3.R/index_finger3.R_end
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/middle_finger1.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/middle_finger1.R/middle_finger2.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/middle_finger1.R/middle_finger2.R/middle_finger3.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/middle_finger1.R/middle_finger2.R/middle_finger3.R/middle_finger3.R_end
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/third_finger1.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/third_finger1.R/third_finger2.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/third_finger1.R/third_finger2.R/third_finger3.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/hand.R/third_finger1.R/third_finger2.R/third_finger3.R/third_finger3.R_end
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/thumb1.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/thumb1.R/thumb2.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/thumb1.R/thumb2.R/thumb3.R
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/shoulder.R/upper_arm.R/forearm.R/thumb1.R/thumb2.R/thumb3.R/thumb3.R_end
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/spine.004
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/spine.004/spine.005
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/spine.004/spine.005/spine.006
+    m_Weight: 1
+  - m_Path: metarig/spine/spine.001/spine.002/spine.003/spine.004/spine.005/spine.006/spine.006_end
+    m_Weight: 1
+  - m_Path: metarig/spine/thigh.L
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.L/shin.L
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.L/shin.L/foot.L
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.L/shin.L/foot.L/heel.02.L
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.L/shin.L/foot.L/heel.02.L/heel.02.L_end
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.L/shin.L/foot.L/toe.L
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.L/shin.L/foot.L/toe.L/toe.L_end
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.R
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.R/shin.R
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.R/shin.R/foot.R
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.R/shin.R/foot.R/heel.02.R
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.R/shin.R/foot.R/heel.02.R/heel.02.R_end
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.R/shin.R/foot.R/toe.R
+    m_Weight: 0
+  - m_Path: metarig/spine/thigh.R/shin.R/foot.R/toe.R/toe.R_end
+    m_Weight: 0
+  - m_Path: Robo Boy
+    m_Weight: 0

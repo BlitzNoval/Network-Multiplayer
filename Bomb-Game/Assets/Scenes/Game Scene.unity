@@ -1011,15 +1011,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eddb89d731bfcf9489c8fdc7944db1b9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   spawnPoints:
   - {fileID: 1423709104}
   - {fileID: 90760929}
   - {fileID: 1654321569}
   - {fileID: 432314149}
   pointCooldown: 1
-  OnPlayerSpawn:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!65 &178622689
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -5802,8 +5802,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c2ab347579f4923409c1e8197f78a099, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   bombPrefab: {fileID: 5032718245858861815, guid: e1fe868113cff7847a39e74bb78d656e, type: 3}
-  bombSpawnPoint: {fileID: 0}
+  ui: {fileID: 0}
+  GameActive: 0
 --- !u!1 &1267810533
 GameObject:
   m_ObjectHideFlags: 0
