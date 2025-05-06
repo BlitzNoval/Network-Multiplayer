@@ -860,7 +860,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxLives: 3
-  respawnDuration: 0.5
+  respawnInvincibility: 0.5
 --- !u!114 &5581323352735480486
 MonoBehaviour:
   m_ObjectHideFlags: 0
