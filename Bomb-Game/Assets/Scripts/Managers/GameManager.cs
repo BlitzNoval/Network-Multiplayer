@@ -15,9 +15,11 @@ public class GameManager : NetworkBehaviour
 
     [SyncVar] public bool GameActive;
 
-    readonly List<GameObject> players = new();
-    public IReadOnlyList<GameObject> ActivePlayers => players;
-    GameObject bomb;
+        readonly List<GameObject> players = new();
+        public IReadOnlyList<GameObject> ActivePlayers => players;
+        private static int nextPlayerNumber = 1;
+        GameObject bomb;
+
 
     void Awake()
     {
@@ -37,7 +39,9 @@ public class GameManager : NetworkBehaviour
 
     public override void OnStartServer()
     {
+        nextPlayerNumber = 1; 
         StartCoroutine(RoundLoop());
+        
     }
 
     [Server] IEnumerator RoundLoop()
@@ -86,13 +90,19 @@ public class GameManager : NetworkBehaviour
         ui.HideCountdown();
     }
 
-    [Server] public void RegisterPlayer(GameObject p)
+    [Server]
+    public void RegisterPlayer(GameObject player)
     {
-        if (p != null && !players.Contains(p))
+        if (players.Contains(player)) return;
+        players.Add(player);
+        var lifeManager = player.GetComponent<PlayerLifeManager>();
+        if (lifeManager != null)
         {
-            players.Add(p);
-            Debug.Log($"Registered player {p.name}, total players: {players.Count}", this);
+            lifeManager.playerNumber = nextPlayerNumber;
+            nextPlayerNumber++;
+            if (nextPlayerNumber > 4) nextPlayerNumber = 1; // Wrap around (optional)
         }
+        Debug.Log($"Registered player with playerNumber {lifeManager.playerNumber}");
     }
 
     [Server] public void UnregisterPlayer(GameObject p)

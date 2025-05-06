@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
+  m_SkyboxMaterial: {fileID: 2100000, guid: f531e09e2ad2fb440b4eed7605863143, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -235,7 +235,7 @@ GameObject:
   - component: {fileID: 1504302}
   - component: {fileID: 1504303}
   m_Layer: 0
-  m_Name: AudioManager
+  m_Name: GameMusic
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -266,10 +266,10 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 8300000, guid: 1769038d09037b24cb5a2aec06128737, type: 3}
-  m_Resource: {fileID: 8300000, guid: 1769038d09037b24cb5a2aec06128737, type: 3}
+  m_audioClip: {fileID: 8300000, guid: 58ad286837dd2fe478a84df516758b07, type: 3}
+  m_Resource: {fileID: 8300000, guid: 58ad286837dd2fe478a84df516758b07, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.25
+  m_Volume: 1
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -1240,8 +1240,9 @@ GameObject:
   - component: {fileID: 157084242}
   - component: {fileID: 157084244}
   - component: {fileID: 157084243}
+  - component: {fileID: 157084245}
   m_Layer: 0
-  m_Name: 'PlayerKnockback - 1 '
+  m_Name: PlayerPanel1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1308,6 +1309,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 157084241}
   m_CullTransparentMesh: 1
+--- !u!114 &157084245
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 157084241}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e41daf4390fcae468c4b15b89ac5a2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  heart1: {fileID: 924646052}
+  heart2: {fileID: 1141507732}
+  heart3: {fileID: 380978006}
+  playerLabel: {fileID: 1243961627}
+  colorPanel: {fileID: 682623536}
+  percentageText: {fileID: 1211983779}
 --- !u!1 &172575294
 GameObject:
   m_ObjectHideFlags: 0
@@ -2099,8 +2118,9 @@ GameObject:
   - component: {fileID: 307273049}
   - component: {fileID: 307273051}
   - component: {fileID: 307273050}
+  - component: {fileID: 307273052}
   m_Layer: 0
-  m_Name: PlayerKnockback - 4
+  m_Name: PlayerPanel4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2167,6 +2187,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 307273048}
   m_CullTransparentMesh: 1
+--- !u!114 &307273052
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 307273048}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e41daf4390fcae468c4b15b89ac5a2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  heart1: {fileID: 194623504}
+  heart2: {fileID: 180402854}
+  heart3: {fileID: 611297093}
+  playerLabel: {fileID: 1272431777}
+  colorPanel: {fileID: 1017498527}
+  percentageText: {fileID: 1227033884}
 --- !u!1 &316133898
 GameObject:
   m_ObjectHideFlags: 0
@@ -4246,8 +4284,9 @@ GameObject:
   - component: {fileID: 885961894}
   - component: {fileID: 885961896}
   - component: {fileID: 885961895}
+  - component: {fileID: 885961897}
   m_Layer: 0
-  m_Name: PlayerKnockback - 2
+  m_Name: PlayerPanel2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4314,6 +4353,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 885961893}
   m_CullTransparentMesh: 1
+--- !u!114 &885961897
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 885961893}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e41daf4390fcae468c4b15b89ac5a2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  heart1: {fileID: 853481237}
+  heart2: {fileID: 863671331}
+  heart3: {fileID: 1438938682}
+  playerLabel: {fileID: 1980668680}
+  colorPanel: {fileID: 862458274}
+  percentageText: {fileID: 826042924}
 --- !u!1 &924646050
 GameObject:
   m_ObjectHideFlags: 0
@@ -8884,8 +8941,9 @@ GameObject:
   - component: {fileID: 1839982953}
   - component: {fileID: 1839982955}
   - component: {fileID: 1839982954}
+  - component: {fileID: 1839982956}
   m_Layer: 0
-  m_Name: PlayerKnockback - 3
+  m_Name: PlayerPanel3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8952,6 +9010,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1839982952}
   m_CullTransparentMesh: 1
+--- !u!114 &1839982956
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1839982952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e41daf4390fcae468c4b15b89ac5a2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  heart1: {fileID: 1161542841}
+  heart2: {fileID: 1473281269}
+  heart3: {fileID: 113965807}
+  playerLabel: {fileID: 47957514}
+  colorPanel: {fileID: 2066698606}
+  percentageText: {fileID: 664287251}
 --- !u!1 &1867657015
 GameObject:
   m_ObjectHideFlags: 0
@@ -8993,6 +9069,9 @@ GameObject:
   m_Component:
   - component: {fileID: 1931506684}
   - component: {fileID: 1931506685}
+  - component: {fileID: 1931506687}
+  - component: {fileID: 1931506686}
+  - component: {fileID: 1931506688}
   m_Layer: 0
   m_Name: UIManager
   m_TagString: Untagged
@@ -9030,6 +9109,136 @@ MonoBehaviour:
   countdownText: {fileID: 473171942}
   winnerPanel: {fileID: 1154801040}
   winnerText: {fileID: 440300519}
+--- !u!82 &1931506686
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1931506683}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 0.496
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!114 &1931506687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1931506683}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6065ddd365026448b127db491c9e960, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  audioSource: {fileID: 1931506686}
+  lifeLostSound1: {fileID: 8300000, guid: 0f907aa74fb30b94da657e1752beb375, type: 3}
+  lifeLostSound2: {fileID: 8300000, guid: cb6ffa89fd495bc4db10afe37f0b174d, type: 3}
+  lifeLostSound3: {fileID: 8300000, guid: 28faf1d35edbb21458801e2d62b1556c, type: 3}
+--- !u!114 &1931506688
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1931506683}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb9dbd6385236004e9dd602f557246c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  panels:
+  - {fileID: 157084245}
+  - {fileID: 885961897}
+  - {fileID: 1839982956}
+  - {fileID: 307273052}
 --- !u!1 &1934893657
 GameObject:
   m_ObjectHideFlags: 0
