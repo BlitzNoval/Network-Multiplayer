@@ -1,3 +1,4 @@
+// PlayerLifeManager.cs
 using System;
 using System.Collections;
 using Mirror;
@@ -7,10 +8,16 @@ using UnityEngine;
 public class PlayerLifeManager : NetworkBehaviour
 {
     [Header("Lives")]
-    [SerializeField]   int   maxLives           = 3;
-    [SerializeField]   float respawnDelay      = 2f;
-    [SerializeField]   float fallThreshold     = -10f;
-    [SerializeField]   float absoluteFallLimit = -500f;
+    [SyncVar] [SerializeField] int   maxLives           = 3;
+    [SyncVar] [SerializeField] float respawnDelay      = 2f;
+    [SyncVar] [SerializeField] float fallThreshold     = -10f;
+    [SyncVar] [SerializeField] float absoluteFallLimit = -500f;
+
+    // PUBLIC SETTERS for DevConsole
+    public void SetMaxLives(int v)            => maxLives           = v;
+    public void SetRespawnDelay(float v)      => respawnDelay       = v;
+    public void SetFallThreshold(float v)     => fallThreshold      = v;
+    public void SetAbsoluteFallLimit(float v) => absoluteFallLimit  = v;
 
     [SyncVar] public bool  IsDead;
     [SyncVar] public float totalHoldTime;
@@ -113,14 +120,13 @@ public class PlayerLifeManager : NetworkBehaviour
         SetAliveState(false, true);
         yield return new WaitForSeconds(respawnDelay);
 
-        // wait until spawn manager ready
-        while (SpawnManager.Instance == null || SpawnManager.Instance.GetNextSpawnPoint() == null)
+        while (SpawnManager.Instance == null ||
+               SpawnManager.Instance.GetNextSpawnPoint() == null)
             yield return new WaitForSeconds(0.1f);
 
         var spawn = SpawnManager.Instance.GetNextSpawnPoint();
         transform.SetPositionAndRotation(spawn.position, spawn.rotation);
 
-        // reset knockback state
         knockbackMultiplier = 1f;
         totalHoldTime       = 0f;
         knockbackHitCount   = 0;
