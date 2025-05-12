@@ -894,7 +894,7 @@ MonoBehaviour:
     m_ActionId: 2cf6ca8b-01e7-43cb-b229-1861d23ff3cd
     m_ActionName: 'Player/Move[/Keyboard/w,/Keyboard/s,/Keyboard/a,/Keyboard/d]'
   m_NeverAutoSwitchControlSchemes: 0
-  m_DefaultControlScheme: KeyboardMouse
+  m_DefaultControlScheme: 
   m_DefaultActionMap: Player
   m_SplitScreenIndex: -1
   m_Camera: {fileID: 0}
@@ -1075,11 +1075,12 @@ MonoBehaviour:
   respawnDelay: 2
   fallThreshold: -10
   absoluteFallLimit: -500
-  currentLives: 0
   IsDead: 0
-  knockbackMultiplier: 1
   totalHoldTime: 0
   knockbackHitCount: 0
+  playerNumber: 0
+  currentLives: 0
+  knockbackMultiplier: 1
 --- !u!95 &6115396542742235922
 Animator:
   serializedVersion: 7
