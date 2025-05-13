@@ -6,10 +6,10 @@ using UnityEngine.InputSystem;
 public class PlayerMovement : NetworkBehaviour
 {
     [Header("Movement")]
-    public float speed = 5f;
-    public float acceleration = 10f;
-    public float deceleration = 10f;
-    public float rotationSpeed = 10f;
+    [SyncVar] public float speed = 5f;
+    [SyncVar] public float acceleration = 10f;
+    [SyncVar] public float deceleration = 10f;
+    [SyncVar] public float rotationSpeed = 10f;
 
     Rigidbody  rb;
     InputAction moveAct;

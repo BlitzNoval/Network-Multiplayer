@@ -1,3 +1,5 @@
+// PlayerLifeManager.cs
+using System;
 using System.Collections;
 using Mirror;
 using UnityEngine;
@@ -6,16 +8,31 @@ using UnityEngine;
 public class PlayerLifeManager : NetworkBehaviour
 {
     [Header("Lives")]
-    [SerializeField] int   maxLives          = 3;
-    [SerializeField] float respawnDelay      = 2f;
-    [SerializeField] float fallThreshold     = -10f;
-    [SerializeField] float absoluteFallLimit = -500f;
+    [SyncVar] [SerializeField] int   maxLives           = 3;
+    [SyncVar] [SerializeField] float respawnDelay      = 2f;
+    [SyncVar] [SerializeField] float fallThreshold     = -10f;
+    [SyncVar] [SerializeField] float absoluteFallLimit = -500f;
 
-    [SyncVar] public int   currentLives;
+    // PUBLIC SETTERS for DevConsole
+    public void SetMaxLives(int v)            => maxLives           = v;
+    public void SetRespawnDelay(float v)      => respawnDelay       = v;
+    public void SetFallThreshold(float v)     => fallThreshold      = v;
+    public void SetAbsoluteFallLimit(float v) => absoluteFallLimit  = v;
+
     [SyncVar] public bool  IsDead;
-    [SyncVar] public float knockbackMultiplier = 1f;
     [SyncVar] public float totalHoldTime;
     [SyncVar] public int   knockbackHitCount;
+
+    // assigned by GameManager
+    [SyncVar] public int   playerNumber;
+
+    [SyncVar(hook = nameof(OnCurrentLivesChanged))]
+    public int   currentLives;
+    [SyncVar(hook = nameof(OnKnockbackMultiplierChanged))]
+    public float knockbackMultiplier = 1f;
+
+    public event Action<int,int>     OnLivesChanged;
+    public event Action<float,float> OnKnockbackChanged;
 
     PlayerBombHandler bombHandler;
     PlayerMovement    movement;
@@ -32,6 +49,7 @@ public class PlayerLifeManager : NetworkBehaviour
 
     public override void OnStartServer()
     {
+        base.OnStartServer();
         currentLives        = maxLives;
         IsDead              = false;
         knockbackMultiplier = 1f;
@@ -39,21 +57,27 @@ public class PlayerLifeManager : NetworkBehaviour
         knockbackHitCount   = 0;
     }
 
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        if (PlayerUIManager.Instance != null)
+            PlayerUIManager.Instance.Register(this);
+    }
+
+    public override void OnStopClient()
+    {
+        base.OnStopClient();
+        if (PlayerUIManager.Instance != null)
+            PlayerUIManager.Instance.Unregister(this);
+    }
+
     void FixedUpdate()
     {
         if (!isServer || IsDead) return;
 
-        float yPos = transform.position.y;
-
-        if (yPos < fallThreshold)
-        {
+        float y = transform.position.y;
+        if (y < fallThreshold || y < absoluteFallLimit)
             HandleDeath();
-        } 
-        else if (yPos < absoluteFallLimit)
-        {
-            HandleDeath();
-        }
-
 
         if (bombHandler?.CurrentBomb != null &&
             bombHandler.CurrentBomb.Holder == gameObject)
@@ -63,77 +87,75 @@ public class PlayerLifeManager : NetworkBehaviour
         }
     }
 
-    // ───────────── Knock-back multiplier ─────────────
-    [Server] void UpdateKnockbackMultiplier()
+    [Server]
+    void UpdateKnockbackMultiplier()
     {
-        float baseMultiplier = 1f;
-        float holdTimeFactor = 0.1f;
-        float hitFactor      = 0.2f;
-        float multiplier     = baseMultiplier *
-                               (1 + holdTimeFactor * totalHoldTime) *
-                               Mathf.Pow(1 + hitFactor * knockbackHitCount, 2);
-        knockbackMultiplier  = Mathf.Min(multiplier, 4f);
+        float baseMult     = 1f;
+        float holdFactor   = 0.1f;
+        float hitFactor    = 0.2f;
+        float mult         = baseMult *
+                             (1 + holdFactor * totalHoldTime) *
+                             Mathf.Pow(1 + hitFactor * knockbackHitCount, 2);
+        knockbackMultiplier = Mathf.Min(mult, 4f);
     }
 
-    // ───────────── Death / Respawn ─────────────
-    [Server] public void HandleDeath()
+    void OnCurrentLivesChanged(int oldLives, int newLives)
+        => OnLivesChanged?.Invoke(oldLives, newLives);
+
+    void OnKnockbackMultiplierChanged(float oldM, float newM)
+        => OnKnockbackChanged?.Invoke(oldM, newM);
+
+    [Server]
+    public void HandleDeath()
     {
         if (IsDead) return;
-
         currentLives--;
-        if (currentLives <= 0)
-        {
-            FinalDeath();
-            return;
-        }
+        if (currentLives <= 0) { FinalDeath(); return; }
         StartCoroutine(RespawnRoutine());
     }
 
-    [Server] IEnumerator RespawnRoutine()
+    [Server]
+    IEnumerator RespawnRoutine()
     {
         SetAliveState(false, true);
         yield return new WaitForSeconds(respawnDelay);
 
-        while (true)
-        {
-            if (SpawnManager.Instance == null) { yield return new WaitForSeconds(0.1f); continue; }
+        while (SpawnManager.Instance == null ||
+               SpawnManager.Instance.GetNextSpawnPoint() == null)
+            yield return new WaitForSeconds(0.1f);
 
-            Transform spawnPoint = SpawnManager.Instance.GetNextSpawnPoint();
-            if (spawnPoint == null)            { yield return new WaitForSeconds(0.1f); continue; }
+        var spawn = SpawnManager.Instance.GetNextSpawnPoint();
+        transform.SetPositionAndRotation(spawn.position, spawn.rotation);
 
-            transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
-            knockbackMultiplier = 1f;
-            totalHoldTime       = 0f;
-            knockbackHitCount   = 0;
-            SetAliveState(true, false);
-            break;
-        }
+        knockbackMultiplier = 1f;
+        totalHoldTime       = 0f;
+        knockbackHitCount   = 0;
+        SetAliveState(true, false);
     }
 
-    [Server] void FinalDeath()
+    [Server]
+    void FinalDeath()
     {
-        if (bombHandler && bombHandler.CurrentBomb)
+        if (bombHandler?.CurrentBomb != null)
             bombHandler.CurrentBomb.TriggerImmediateExplosion();
 
         GameManager.Instance?.UnregisterPlayer(gameObject);
         NetworkServer.Destroy(gameObject);
     }
 
-    [Server] public void RegisterKnockbackHit()
+    [Server]
+    public void RegisterKnockbackHit()
     {
         knockbackHitCount++;
         UpdateKnockbackMultiplier();
     }
 
-    // ───────────── Knock-back RPC ─────────────
     [TargetRpc]
     public void TargetApplyKnockback(NetworkConnectionToClient _, Vector3 force)
     {
         movement.enabled = false;
+        rb.AddForce(force, ForceMode.Impulse);
         StartCoroutine(ReEnableMovement(0.5f));
-
-        if (TryGetComponent<Rigidbody>(out var rb))
-            rb.AddForce(force, ForceMode.Impulse);
     }
 
     IEnumerator ReEnableMovement(float delay)
@@ -142,14 +164,14 @@ public class PlayerLifeManager : NetworkBehaviour
         movement.enabled = true;
     }
 
-    // ───────────── Helpers ─────────────
-    void SetAliveState(bool state, bool triggerMode)
+    void SetAliveState(bool alive, bool triggerMode)
     {
-        IsDead           = !state;
-        movement.enabled = state;
+        IsDead           = !alive;
+        movement.enabled = alive;
         col.enabled      = true;
         col.isTrigger    = triggerMode;
-        rb.isKinematic   = !state;
-        if (!rb.isKinematic) rb.linearVelocity = Vector3.zero;
+        rb.isKinematic   = !alive;
+        if (!rb.isKinematic)
+            rb.linearVelocity = Vector3.zero;
     }
 }
