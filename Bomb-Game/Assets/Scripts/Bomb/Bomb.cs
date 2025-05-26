@@ -8,32 +8,29 @@ using UnityEngine;
 public class Bomb : NetworkBehaviour
 {
     public static event Action OnBombExplodedGlobal;
-    // Global event so GameManager (and anyone else) can know when the bomb finally pops
 
-    // ───────────── Inspector fields ─────────────
     [Header("Timer")]
-    [SyncVar] [SerializeField] float initialTimer        = 10f; // starting countdown in seconds
-    [SyncVar] [SerializeField] float returnPauseDuration = 2f;  // pause before giving bomb back after falling off
+    [SyncVar] [SerializeField] float initialTimer        = 10f;
+    [SyncVar] [SerializeField] float returnPauseDuration = 2f;
 
     [Header("Throw")]
-    [SyncVar] [SerializeField] float normalThrowSpeed      = 20f; // speed when you toss it from right hand
-    [SyncVar] [SerializeField] float normalThrowUpward     =  2f; // slight lift on a normal throw
-    [SyncVar] [SerializeField] float lobThrowSpeed         = 10f; // slower, higher arc when throwing from left hand
-    [SyncVar] [SerializeField] float lobThrowUpward        =  5f; // more upward on lob
-    [SyncVar] [SerializeField] float throwCooldown         =  0.5f; // seconds between throws
-    [SyncVar] [SerializeField] float flightMassMultiplier  =  1f;   // optional mass tweak mid-flight
+    [SyncVar] [SerializeField] float normalThrowSpeed      = 20f;
+    [SyncVar] [SerializeField] float normalThrowUpward     =  2f;
+    [SyncVar] [SerializeField] float lobThrowSpeed         = 10f;
+    [SyncVar] [SerializeField] float lobThrowUpward        =  5f;
+    [SyncVar] [SerializeField] float throwCooldown         =  0.5f;
+    [SyncVar] [SerializeField] float flightMassMultiplier  =  1f;
 
     [Header("Collision / Explosion")]
-    [SyncVar] [SerializeField] int   maxBounces            = 1;   // how many times we bounce before exploding
-    [SyncVar] [SerializeField] float groundExplosionDelay  = 1f;  // delay once we hit ground
-    [SyncVar] [SerializeField] float explosionRadius       = 5f;  // how far our knockback reaches
-    [SyncVar] [SerializeField] float baseKnockForce        = 5f;  // baseline knockback strength
+    [SyncVar] [SerializeField] int   maxBounces            = 1;
+    [SyncVar] [SerializeField] float groundExplosionDelay  = 1f;
+    [SyncVar] [SerializeField] float explosionRadius       = 5f;
+    [SyncVar] [SerializeField] float baseKnockForce        = 5f;
 
-    [SerializeField] LayerMask mapLayerMask;      // which layers count as map-out
-    [SerializeField] string playerTag = "Player"; // tag to detect players
-    [SerializeField] string mapOutTag = "MapOut"; // tag for area that kicks bomb back
+    [SerializeField] LayerMask mapLayerMask;
+    [SerializeField] string playerTag = "Player";
+    [SerializeField] string mapOutTag = "MapOut";
 
-    // ───────────── PUBLIC SETTERS for DevConsole ─────────────
     public void SetInitialTimer(float v)        => initialTimer        = v;
     public void SetReturnPauseDuration(float v) => returnPauseDuration = v;
     public void SetNormalThrowSpeed(float v)    => normalThrowSpeed    = v;
@@ -47,27 +44,23 @@ public class Bomb : NetworkBehaviour
     public void SetExplosionRadius(float v)     => explosionRadius     = v;
     public void SetBaseKnockForce(float v)      => baseKnockForce      = v;
 
-    // ───────────── Cached references ───────────
-    Rigidbody       rb;         // physics body
-    Collider        col;        // collider for bouncing and passing
-    BombEffects     fx;         // VFX & SFX handler
-    TextMeshProUGUI timerText;  // UI showing countdown
-    Transform       canvasTr;   // parent transform for timer so it faces camera
+    Rigidbody       rb;
+    Collider        col;
+    BombEffects     fx;
+    TextMeshProUGUI timerText;
+    Transform       canvasTr;
 
-    // ───────────── Network-synced state ───────
-    [SyncVar(hook = nameof(OnHolderChanged))] GameObject holder;  
+    [SyncVar(hook = nameof(OnHolderChanged))] GameObject holder;
     [SyncVar] bool  isOnRight   = true;
-    [SyncVar] bool  isHeld      = true;  
-    [SyncVar] float currentTimer;  // sync countdown so everyone sees same number
+    [SyncVar] bool  isHeld      = true;
+    [SyncVar] float currentTimer;
 
-    // ───────────── Server-only fields ───────────
     float       lastThrowTime, groundHitTime;
     bool        waitingToExplode, returnPause;
     float       returnPauseStart;
     int         currentBounces;
-    GameObject  lastThrower;  // track who threw it for return logic
+    GameObject  lastThrower;
 
-    // ───────────── Public getters ─────────────
     public GameObject Holder            => holder;
     public bool       IsOnRight         => isOnRight;
     public bool       IsHeld            => isHeld;
@@ -76,7 +69,6 @@ public class Bomb : NetworkBehaviour
     public float      LobThrowSpeed     => lobThrowSpeed;
     public float      LobThrowUpward    => lobThrowUpward;
 
-    // ───────────── Unity callbacks ─────────────
     void Awake()
     {
         rb        = GetComponent<Rigidbody>();
@@ -99,10 +91,12 @@ public class Bomb : NetworkBehaviour
             canvasTr.rotation = Quaternion.LookRotation(canvasTr.position - Camera.main.transform.position);
     }
 
-    // ───────────── Countdown and explosion ─────────────
     [Server]
     void TickTimer()
     {
+        if (GameManager.Instance != null && GameManager.Instance.IsPaused)
+            return; // Skip timer updates when paused
+
         if (waitingToExplode)
         {
             if (Time.time >= groundHitTime + groundExplosionDelay)
@@ -152,7 +146,7 @@ public class Bomb : NetworkBehaviour
             const float upwardPct = 0.15f;
             Vector3 dir = (horizDir * sidePct + Vector3.up * upwardPct).normalized;
 
-            float forceMag = baseKnockForce * Mathf.Pow(life.knockbackMultiplier, 1.25f);
+            float forceMag = baseKnockForce * Mathf.Pow(life.KnockbackMultiplier, 1.25f);
             if (hit.gameObject == holder) forceMag *= 1.5f;
 
             prb.AddForce(dir * forceMag * 0.2f, ForceMode.Impulse);
@@ -174,7 +168,19 @@ public class Bomb : NetworkBehaviour
     [Server]
     IEnumerator DestroyAfterDelay(float delay)
     {
-        yield return new WaitForSeconds(delay);
+        float elapsed = 0f;
+        while (elapsed < delay)
+        {
+            if (GameManager.Instance != null && GameManager.Instance.IsPaused)
+            {
+                yield return null; // Pause the coroutine
+            }
+            else
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
         NetworkServer.Destroy(gameObject);
     }
 
@@ -185,7 +191,6 @@ public class Bomb : NetworkBehaviour
             fx.PlayExplosionEffects();
     }
 
-    // ───────────── Holder assignment ─────────────
     [Server]
     public void AssignToPlayer(GameObject p)
     {
@@ -273,6 +278,9 @@ public class Bomb : NetworkBehaviour
     [ServerCallback]
     void OnCollisionEnter(Collision c)
     {
+        if (GameManager.Instance != null && GameManager.Instance.IsPaused)
+            return; // Skip collision handling when paused
+
         if (c.gameObject.CompareTag(playerTag))
         {
             if (c.gameObject != holder)

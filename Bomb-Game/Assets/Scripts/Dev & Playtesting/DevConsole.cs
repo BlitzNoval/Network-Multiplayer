@@ -1,4 +1,3 @@
-// DevConsole.cs
 using UnityEngine;
 using UnityEngine.UI;
 using Mirror;
@@ -90,7 +89,7 @@ public class DevConsole : MonoBehaviour
             FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         var options = new System.Collections.Generic.List<string>();
         foreach (var p in players)
-            options.Add($"Player {p.playerNumber}");
+            options.Add($"Player {p.PlayerNumber}");
         playerDropdown.AddOptions(options);
     }
 
@@ -137,7 +136,7 @@ public class DevConsole : MonoBehaviour
             p.SetAbsoluteFallLimit(value);
     }
 
-    void UpdateSpeed    (float v) { foreach (var m in Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)) m.speed        = v; }
+    void UpdateSpeed(float v) { foreach (var m in Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)) m.speed = v; }
     void UpdateAcceleration(float v) { foreach (var m in Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)) m.acceleration = v; }
     void UpdateDeceleration(float v) { foreach (var m in Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)) m.deceleration = v; }
     void UpdateRotationSpeed(float v) { foreach (var m in Object.FindObjectsByType<PlayerMovement>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)) m.rotationSpeed = v; }
@@ -242,7 +241,7 @@ public class DevConsole : MonoBehaviour
             FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         int i = playerDropdown.value;
         if (i >= 0 && i < players.Length)
-            players[i].currentLives = v;
+            players[i].CurrentLives = v;
     }
 
     void UpdateKnockbackMultiplier(float v)
@@ -251,7 +250,7 @@ public class DevConsole : MonoBehaviour
             FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         int i = playerDropdown.value;
         if (i >= 0 && i < players.Length)
-            players[i].knockbackMultiplier = v;
+            players[i].KnockbackMultiplier = v;
     }
 
     void UpdateTotalHoldTime(float v)
@@ -260,7 +259,7 @@ public class DevConsole : MonoBehaviour
             FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         int i = playerDropdown.value;
         if (i >= 0 && i < players.Length)
-            players[i].totalHoldTime = v;
+            players[i].TotalHoldTime = v;
     }
 
     void UpdateKnockbackHitCount(int v)
@@ -269,7 +268,7 @@ public class DevConsole : MonoBehaviour
             FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         int i = playerDropdown.value;
         if (i >= 0 && i < players.Length)
-            players[i].knockbackHitCount = v;
+            players[i].KnockbackHitCount = v;
     }
 
     bool IsHost() => NetworkManager.singleton.mode == NetworkManagerMode.Host;

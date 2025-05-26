@@ -1,6 +1,7 @@
+using Mirror;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using Mirror;
 using UnityEngine;
 
 public class GameManager : NetworkBehaviour
@@ -11,65 +12,113 @@ public class GameManager : NetworkBehaviour
     public GameObject bombPrefab;
 
     [Header("UI")]
-    public GameUI ui;       
+    public GameUI ui;
 
     [SyncVar] public bool GameActive;
+    [SyncVar(hook = nameof(OnPauseStateChanged))] public bool IsPaused;
+    [SyncVar(hook = nameof(OnPauserChanged))] public NetworkIdentity Pauser;
 
-        readonly List<GameObject> players = new();
-        public IReadOnlyList<GameObject> ActivePlayers => players;
-        private static int nextPlayerNumber = 1;
-        GameObject bomb;
+    readonly List<GameObject> players = new();
+    public IReadOnlyList<GameObject> ActivePlayers => players;
+    private static int nextPlayerNumber = 1;
+    GameObject bomb;
 
+    public Dictionary<string, GameObject> playerObjects = new Dictionary<string, GameObject>();
+
+    public event Action<bool, bool> IsPausedChanged;
+    public event Action<NetworkIdentity, NetworkIdentity> PauserChanged;
 
     void Awake()
     {
-        if (Instance == null) Instance = this;
-        else { Destroy(gameObject); return; }
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Debug.Log("GameManager initialized", this);
     }
 
     void OnEnable()
     {
         Bomb.OnBombExplodedGlobal += HandleBombExploded;
+        Debug.Log("GameManager OnEnable: Subscribed to events", this);
     }
 
     void OnDisable()
     {
         Bomb.OnBombExplodedGlobal -= HandleBombExploded;
+        Debug.Log("GameManager OnDisable: Unsubscribed from events", this);
+    }
+
+    void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
+        Debug.Log("GameManager destroyed", this);
     }
 
     public override void OnStartServer()
     {
-        nextPlayerNumber = 1; 
+        ResetState();
+        GameActive = true;
         StartCoroutine(RoundLoop());
-        
+        Debug.Log("OnStartServer: Game started", this);
     }
 
-    [Server] IEnumerator RoundLoop()
+    [Server]
+    public void ResetState()
     {
-        GameActive = true;
+        nextPlayerNumber = 1;
+        players.Clear();
+        playerObjects.Clear();
+        IsPaused = false;
+        Pauser = null;
+        bomb = null;
+        Debug.Log("ResetState: Cleared game state", this);
+    }
+
+    [Server]
+    IEnumerator RoundLoop()
+    {
         yield return Countdown();
         SpawnBomb();
 
-        while (GameActive) yield return null;
+        while (GameActive)
+        {
+            if (IsPaused)
+            {
+                yield return null;
+                continue;
+            }
+            yield return null;
+        }
         yield return new WaitForSeconds(5f);
 
         NetworkManager.singleton.StopHost();
     }
 
-    [Server] IEnumerator Countdown()
+    [Server]
+    IEnumerator Countdown()
     {
-        // Count down from 9 to 1 (total 9 seconds until bomb spawns)
         for (int i = 9; i > 0; i--)
         {
+            while (IsPaused) yield return null;
             RpcCountdown(i.ToString());
             yield return new WaitForSeconds(1f);
         }
+        while (IsPaused) yield return null;
         RpcCountdown("GO!!!");
         yield return new WaitForSeconds(1f);
         RpcHideCountdown();
     }
 
-    [ClientRpc] void RpcCountdown(string txt)
+    [ClientRpc]
+    void RpcCountdown(string txt)
     {
         if (ui == null)
         {
@@ -80,7 +129,8 @@ public class GameManager : NetworkBehaviour
         ui.ShowCountdown(txt);
     }
 
-    [ClientRpc] void RpcHideCountdown()
+    [ClientRpc]
+    void RpcHideCountdown()
     {
         if (ui == null)
         {
@@ -93,28 +143,44 @@ public class GameManager : NetworkBehaviour
     [Server]
     public void RegisterPlayer(GameObject player)
     {
-        if (players.Contains(player)) return;
+        if (player == null || players.Contains(player))
+        {
+            Debug.LogWarning($"RegisterPlayer: Player is null or already registered", this);
+            return;
+        }
+
         players.Add(player);
         var lifeManager = player.GetComponent<PlayerLifeManager>();
         if (lifeManager != null)
         {
-            lifeManager.playerNumber = nextPlayerNumber;
+            lifeManager.PlayerNumber = nextPlayerNumber;
             nextPlayerNumber++;
-            if (nextPlayerNumber > 4) nextPlayerNumber = 1; // Wrap around (optional)
+            if (nextPlayerNumber > 4) nextPlayerNumber = 1;
+            Debug.Log($"RegisterPlayer: Assigned PlayerNumber={lifeManager.PlayerNumber} to {player.name}", this);
         }
-        Debug.Log($"Registered player with playerNumber {lifeManager.playerNumber}");
+        else
+        {
+            Debug.LogError($"RegisterPlayer: PlayerLifeManager missing on {player.name}", this);
+        }
+
+        var playerInfo = player.GetComponent<PlayerInfo>();
+        if (playerInfo != null)
+        {
+            playerObjects[playerInfo.playerName] = player;
+            Debug.Log($"RegisterPlayer: Added {playerInfo.playerName} to playerObjects", this);
+        }
     }
 
-    [Server] public void UnregisterPlayer(GameObject p)
+    [Server]
+    public void UnregisterPlayer(GameObject p)
     {
         if (p != null && players.Remove(p))
         {
+            var playerInfo = p.GetComponent<PlayerInfo>();
+            if (playerInfo != null)
+                playerObjects.Remove(playerInfo.playerName);
             Debug.Log($"Unregistered player {p.name}, remaining players: {players.Count}", this);
             CheckWinner();
-        }
-        else if (p == null)
-        {
-            Debug.LogWarning($"Attempted to unregister null player, current players: {players.Count}", this);
         }
     }
 
@@ -122,79 +188,131 @@ public class GameManager : NetworkBehaviour
     {
         int alive = 0;
         GameObject win = null;
-        foreach (var p in players)
+        foreach (var p in players.ToArray())
         {
             if (p == null)
             {
-                Debug.LogWarning($"Found null player in list, removing", this);
                 players.Remove(p);
                 continue;
             }
             var life = p.GetComponent<PlayerLifeManager>();
-            if (life && life.currentLives > 0)
+            if (life && !life.IsDisconnected && life.CurrentLives > 0)
             {
                 alive++;
                 win = p;
             }
         }
-        Debug.Log($"CheckWinner: alive players={alive}, win={win?.name}, total players={players.Count}", this);
         if (alive == 1 && win != null)
         {
-            string winnerName = win.GetComponent<MyRoomPlayer>()?.playerName;
-            if (string.IsNullOrEmpty(winnerName))
-            {
-                Debug.LogWarning($"Winner {win.name} has no valid playerName, falling back to object name", this);
-                winnerName = win.name;
-            }
-            else
-            {
-                Debug.Log($"Winner name set to entered name: {winnerName}", this);
-            }
+            string winnerName = win.GetComponent<PlayerInfo>()?.playerName ?? $"Player {win.GetComponent<PlayerLifeManager>().PlayerNumber}";
+            Debug.Log($"Winner determined: {winnerName}", this);
             RpcShowWinner(winnerName);
             GameActive = false;
         }
         else if (alive == 0)
         {
-            Debug.LogWarning("No players alive, game should end", this);
-            GameActive = false; // End game if no players remain
+            GameActive = false;
         }
     }
 
-    [Server] public void SpawnBomb()
+    [Server]
+    public void SpawnBomb()
     {
-        if (bomb || players.Count == 0) return;
+        if (bomb || players.Count == 0)
+        {
+            Debug.LogWarning($"SpawnBomb: Bomb exists or no players (players={players.Count})", this);
+            return;
+        }
 
-        // Clean up the players list by removing null or destroyed entries
         players.RemoveAll(p => p == null);
         if (players.Count == 0)
         {
-            Debug.LogWarning("No valid players to spawn bomb, aborting", this);
+            Debug.LogWarning("SpawnBomb: No valid players to spawn bomb", this);
             return;
         }
 
-        GameObject target = players[Random.Range(0, players.Count)];
-        if (target == null)
-        {
-            Debug.LogWarning("Selected target is null after cleanup, aborting", this);
-            return;
-        }
-
+        GameObject target = players[UnityEngine.Random.Range(0, players.Count)];
         bomb = Instantiate(bombPrefab, target.transform.position + Vector3.up, Quaternion.identity);
         NetworkServer.Spawn(bomb);
         bomb.GetComponent<Bomb>().AssignToPlayer(target);
+        Debug.Log($"SpawnBomb: Bomb assigned to {target.name}", this);
     }
 
-    [Server] void HandleBombExploded()
+    [Server]
+    void HandleBombExploded()
     {
-        bomb = null; // Clear reference to allow respawn
+        bomb = null;
         StartCoroutine(RespawnBombAfterDelay());
     }
 
-    [Server] IEnumerator RespawnBombAfterDelay()
+    [Server]
+    IEnumerator RespawnBombAfterDelay()
     {
         yield return new WaitForSeconds(2f);
         SpawnBomb();
     }
 
-    [ClientRpc] void RpcShowWinner(string name) => ui?.ShowWinner(name);
+    [ClientRpc]
+    void RpcShowWinner(string name) => ui?.ShowWinner(name);
+
+    [Server]
+    public void PauseGame(NetworkIdentity pauser)
+    {
+        if (!IsPaused)
+        {
+            IsPaused = true;
+            Pauser = pauser;
+            Debug.Log($"PauseGame: Paused by {pauser?.netId ?? 0}", this);
+        }
+    }
+
+    [Server]
+    public void ResumeGame(NetworkIdentity pauser)
+    {
+        if (IsPaused && (pauser == null || Pauser == pauser))
+        {
+            IsPaused = false;
+            Pauser = null;
+            Debug.Log("ResumeGame: Game resumed", this);
+        }
+    }
+
+    [Server]
+    void OnServerDisconnect(NetworkConnectionToClient conn)
+    {
+        Debug.Log($"OnServerDisconnect: Connection {conn.connectionId} disconnected", this);
+        foreach (var player in players.ToArray())
+        {
+            var netId = player.GetComponent<NetworkIdentity>();
+            if (netId != null && netId.connectionToClient == conn)
+            {
+                UnregisterPlayer(player);
+            }
+        }
+        if (NetworkServer.active && players.Count == 0)
+        {
+            ResetState();
+            NetworkManager.singleton.StopHost();
+        }
+    }
+
+    [ServerCallback]
+    void Update()
+    {
+        if (IsPaused && Pauser != null && Pauser.connectionToClient == null)
+        {
+            ResumeGame(null);
+            Debug.Log("Update: Pauser disconnected, resuming game", this);
+        }
+    }
+
+    void OnPauseStateChanged(bool oldValue, bool newValue)
+    {
+        IsPausedChanged?.Invoke(oldValue, newValue);
+    }
+
+    void OnPauserChanged(NetworkIdentity oldValue, NetworkIdentity newValue)
+    {
+        PauserChanged?.Invoke(oldValue, newValue);
+    }
 }

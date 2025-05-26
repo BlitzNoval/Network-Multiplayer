@@ -1,4 +1,3 @@
-// PlayerLifeManager.cs
 using System;
 using System.Collections;
 using Mirror;
@@ -13,23 +12,23 @@ public class PlayerLifeManager : NetworkBehaviour
     [SyncVar] [SerializeField] float fallThreshold     = -10f;
     [SyncVar] [SerializeField] float absoluteFallLimit = -500f;
 
-    // PUBLIC SETTERS for DevConsole
+    [SyncVar] public bool IsDisconnected;
+
     public void SetMaxLives(int v)            => maxLives           = v;
     public void SetRespawnDelay(float v)      => respawnDelay       = v;
     public void SetFallThreshold(float v)     => fallThreshold      = v;
     public void SetAbsoluteFallLimit(float v) => absoluteFallLimit  = v;
 
     [SyncVar] public bool  IsDead;
-    [SyncVar] public float totalHoldTime;
-    [SyncVar] public int   knockbackHitCount;
+    [SyncVar] public float TotalHoldTime;
+    [SyncVar] public int   KnockbackHitCount;
 
-    // assigned by GameManager
-    [SyncVar] public int   playerNumber;
+    [SyncVar] public int   PlayerNumber;
 
     [SyncVar(hook = nameof(OnCurrentLivesChanged))]
-    public int   currentLives;
+    public int CurrentLives;
     [SyncVar(hook = nameof(OnKnockbackMultiplierChanged))]
-    public float knockbackMultiplier = 1f;
+    public float KnockbackMultiplier = 1f;
 
     public event Action<int,int>     OnLivesChanged;
     public event Action<float,float> OnKnockbackChanged;
@@ -50,11 +49,12 @@ public class PlayerLifeManager : NetworkBehaviour
     public override void OnStartServer()
     {
         base.OnStartServer();
-        currentLives        = maxLives;
+        CurrentLives        = maxLives;
         IsDead              = false;
-        knockbackMultiplier = 1f;
-        totalHoldTime       = 0f;
-        knockbackHitCount   = 0;
+        IsDisconnected      = false;
+        KnockbackMultiplier = 1f;
+        TotalHoldTime       = 0f;
+        KnockbackHitCount   = 0;
     }
 
     public override void OnStartClient()
@@ -73,7 +73,8 @@ public class PlayerLifeManager : NetworkBehaviour
 
     void FixedUpdate()
     {
-        if (!isServer || IsDead) return;
+        if (!isServer || IsDead || IsDisconnected || (GameManager.Instance != null && GameManager.Instance.IsPaused))
+            return;
 
         float y = transform.position.y;
         if (y < fallThreshold || y < absoluteFallLimit)
@@ -82,7 +83,7 @@ public class PlayerLifeManager : NetworkBehaviour
         if (bombHandler?.CurrentBomb != null &&
             bombHandler.CurrentBomb.Holder == gameObject)
         {
-            totalHoldTime += Time.deltaTime;
+            TotalHoldTime += Time.deltaTime;
             UpdateKnockbackMultiplier();
         }
     }
@@ -94,9 +95,9 @@ public class PlayerLifeManager : NetworkBehaviour
         float holdFactor   = 0.1f;
         float hitFactor    = 0.2f;
         float mult         = baseMult *
-                             (1 + holdFactor * totalHoldTime) *
-                             Mathf.Pow(1 + hitFactor * knockbackHitCount, 2);
-        knockbackMultiplier = Mathf.Min(mult, 4f);
+                             (1 + holdFactor * TotalHoldTime) *
+                             Mathf.Pow(1 + hitFactor * KnockbackHitCount, 2);
+        KnockbackMultiplier = Mathf.Min(mult, 4f);
     }
 
     void OnCurrentLivesChanged(int oldLives, int newLives)
@@ -109,8 +110,8 @@ public class PlayerLifeManager : NetworkBehaviour
     public void HandleDeath()
     {
         if (IsDead) return;
-        currentLives--;
-        if (currentLives <= 0) { FinalDeath(); return; }
+        CurrentLives--;
+        if (CurrentLives <= 0) { FinalDeath(); return; }
         StartCoroutine(RespawnRoutine());
     }
 
@@ -127,10 +128,10 @@ public class PlayerLifeManager : NetworkBehaviour
         var spawn = SpawnManager.Instance.GetNextSpawnPoint();
         transform.SetPositionAndRotation(spawn.position, spawn.rotation);
 
-        knockbackMultiplier = 1f;
-        totalHoldTime       = 0f;
-        knockbackHitCount   = 0;
-        SetAliveState(true, false);
+        KnockbackMultiplier = 1f;
+        TotalHoldTime       = 0f;
+        KnockbackHitCount   = 0;
+        SetAliveState(true, true);
     }
 
     [Server]
@@ -146,7 +147,7 @@ public class PlayerLifeManager : NetworkBehaviour
     [Server]
     public void RegisterKnockbackHit()
     {
-        knockbackHitCount++;
+        KnockbackHitCount++;
         UpdateKnockbackMultiplier();
     }
 
@@ -164,7 +165,7 @@ public class PlayerLifeManager : NetworkBehaviour
         movement.enabled = true;
     }
 
-    void SetAliveState(bool alive, bool triggerMode)
+    public void SetAliveState(bool alive, bool triggerMode)
     {
         IsDead           = !alive;
         movement.enabled = alive;

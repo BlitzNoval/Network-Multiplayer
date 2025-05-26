@@ -8,7 +8,6 @@ using System.Linq;
 [RequireComponent(typeof(LineRenderer), typeof(PlayerInput))]
 public class PlayerBombHandler : NetworkBehaviour
 {
-    // ───────────────────────── Fields ────────────────────────────
     [Header("Trajectory")]
     [SerializeField, Range(10,300)] int   maxPoints = 100;
     [SerializeField] LayerMask collisionMask;
@@ -29,7 +28,6 @@ public class PlayerBombHandler : NetworkBehaviour
     private PlayerAnimator playerAnimator;
     private Animator animator;
 
-    // ───────────────────────── Unity ─────────────────────────────
     void Awake()
     {
         lr = GetComponent<LineRenderer>();
@@ -44,7 +42,6 @@ public class PlayerBombHandler : NetworkBehaviour
         throwAct = playerInput.actions["Throw"];
         Debug.Log($"Awake: throwAct bound to {throwAct?.name}, controls: {string.Join(", ", throwAct?.controls.ToArray().Select(c => c.name))}", this);
 
-        // Get animation components
         playerAnimator = GetComponent<PlayerAnimator>();
         animator = GetComponent<Animator>();
 
@@ -58,7 +55,6 @@ public class PlayerBombHandler : NetworkBehaviour
 
     IEnumerator SubscribeToInput()
     {
-        // Wait until isLocalPlayer is stable
         while (!isLocalPlayer)
         {
             Debug.Log($"SubscribeToInput: Waiting for isLocalPlayer to be true for {gameObject.name}", this);
@@ -92,13 +88,15 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void Update()
     {
-        if (!isLocalPlayer)
+        if (!isLocalPlayer || (GameManager.Instance != null && GameManager.Instance.IsPaused))
         {
-            Debug.LogWarning($"Update: Not local player for {gameObject.name}", this);
-            return;
+            if (isAiming)
+            {
+                HideTrajectory();
+                isAiming = false;
+            }
+            return; // Skip if paused
         }
-        
-        Debug.Log($"Update: isLocalPlayer={isLocalPlayer}, currentBomb={currentBomb}, isAiming={isAiming}", this);
 
         // Fallback manual input check for debugging
         if (Keyboard.current.spaceKey.wasPressedThisFrame)
@@ -111,8 +109,7 @@ public class PlayerBombHandler : NetworkBehaviour
             Debug.Log("Manual check: Space key released", this);
             ReleaseThrow(new InputAction.CallbackContext());
         }
-        
-        // Automatically hide trajectory if no bomb is held while aiming
+
         if (currentBomb == null && isAiming)
         {
             HideTrajectory();
@@ -120,13 +117,10 @@ public class PlayerBombHandler : NetworkBehaviour
         }
     }
 
-    // ───────────────────────── Public hooks from Bomb ────────────
     public void SetBomb(Bomb b)
     {
         currentBomb = b;
         Debug.Log($"SetBomb called for {gameObject.name}, bomb: {b}, IsHeld={b?.IsHeld}", this);
-
-        // Update animation state for bomb in hand
         UpdateHandAnimationState();
     }
 
@@ -140,29 +134,24 @@ public class PlayerBombHandler : NetworkBehaviour
         
         currentBomb = null;
         Debug.Log($"ClearBomb called for {gameObject.name}", this);
-
-        // Reset hand animation state
         UpdateHandAnimationState();
     }
 
-    // Update animation state based on which hand holds the bomb
     private void UpdateHandAnimationState()
     {
         if (animator != null)
         {
-            int handState = 0; // No bomb
+            int handState = 0;
             
             if (currentBomb != null && currentBomb.Holder == gameObject)
             {
-                handState = currentBomb.IsOnRight ? 2 : 1; // 1 = Left, 2 = Right
+                handState = currentBomb.IsOnRight ? 2 : 1;
             }
             
-            // Set animation parameter directly for immediate local feedback
             animator.SetInteger("activeHand", handState);
         }
     }
 
-    // ───────────────────────── Input handlers (local) ────────────
     void Swap(InputAction.CallbackContext _)
     {
         if (!isLocalPlayer || currentBomb == null)
@@ -220,7 +209,6 @@ public class PlayerBombHandler : NetworkBehaviour
         isAiming = false;
         HideTrajectory();
         
-        // Trigger throw animation locally for immediate feedback
         if (animator != null)
         {
             animator.SetTrigger("Throw");
@@ -231,7 +219,7 @@ public class PlayerBombHandler : NetworkBehaviour
 
     IEnumerator AimLoop()
     {
-        while (isAiming && currentBomb != null)
+        while (isAiming && currentBomb != null && (GameManager.Instance == null || !GameManager.Instance.IsPaused))
         {
             DrawTrajectory();
             yield return new WaitForSeconds(timeStep);
@@ -240,7 +228,6 @@ public class PlayerBombHandler : NetworkBehaviour
         HideTrajectory();
     }
 
-    // ───────────────────────── Commands (client→server) ──────────
     [Command]
     void CmdSwapBomb()
     {
@@ -249,17 +236,7 @@ public class PlayerBombHandler : NetworkBehaviour
         if (currentBomb && currentBomb.Holder == gameObject)
         {
             currentBomb.SwapHoldPoint();
-            
-            // Update animation state on all clients
-            if (playerAnimator != null)
-            {
-                // This will be synced through PlayerAnimator's SyncVar
-                UpdateHandAnimationState();
-            }
-        }
-        else
-        {
-            Debug.LogWarning($"CmdSwapBomb failed: currentBomb={currentBomb}, Holder={currentBomb?.Holder}", this);
+            UpdateHandAnimationState();
         }
     }
 
@@ -270,7 +247,6 @@ public class PlayerBombHandler : NetworkBehaviour
         
         if (currentBomb && currentBomb.Holder == gameObject)
         {
-            // Notify the PlayerAnimator to trigger throw animation on all clients
             if (playerAnimator != null)
             {
                 playerAnimator.OnBombThrow();
@@ -278,19 +254,13 @@ public class PlayerBombHandler : NetworkBehaviour
             
             currentBomb.ThrowBomb();
         }
-        else
-        {
-            Debug.LogWarning($"CmdThrowBomb failed: currentBomb={currentBomb}, Holder={currentBomb?.Holder}", this);
-        }
     }
 
-    // ───────────────────────── Trajectory helpers ────────────────
     void DrawTrajectory()
     {
         points.Clear();
         if (currentBomb == null)
         {
-            Debug.Log("DrawTrajectory: currentBomb is null", this);
             HideTrajectory();
             return;
         }
@@ -299,7 +269,6 @@ public class PlayerBombHandler : NetworkBehaviour
         Transform origin = transform.Find(hand);
         if (!origin)
         {
-            Debug.Log($"DrawTrajectory: {hand} not found", this);
             HideTrajectory();
             return;
         }

@@ -22,73 +22,124 @@ public class MainMenuUI : MonoBehaviour
 
     void Start()
     {
+        // Set default values
+        if (playerNameInput != null) playerNameInput.text = "Player" + Random.Range(1000, 9999);
+        if (roomNameInput != null) roomNameInput.text = "DefaultRoom";
+        if (portInput != null) portInput.text = "7777";
+        if (ipAddressInput != null) ipAddressInput.text = "localhost";
+
         createButton.interactable = false;
-        joinButton.interactable   = false;
+        joinButton.interactable = false;
 
-        playerNameInput.onValueChanged.AddListener(_ => Validate());
-        roomNameInput.onValueChanged.AddListener(_ => Validate());
-        portInput.onValueChanged.AddListener(_ => Validate());
-        ipAddressInput.onValueChanged.AddListener(_ => Validate()); // NEW
+        // Add input validation listeners
+        if (playerNameInput != null) playerNameInput.onValueChanged.AddListener(_ => Validate());
+        if (roomNameInput != null) roomNameInput.onValueChanged.AddListener(_ => Validate());
+        if (portInput != null) portInput.onValueChanged.AddListener(_ => Validate());
+        if (ipAddressInput != null) ipAddressInput.onValueChanged.AddListener(_ => Validate());
 
-        createButton.onClick.AddListener(OnCreateRoom);
-        joinButton.onClick.AddListener(OnJoinRoom);
+        // Add button click listeners
+        if (createButton != null) createButton.onClick.AddListener(OnCreateRoom);
+        if (joinButton != null) joinButton.onClick.AddListener(OnJoinRoom);
 
         if (invalidRoomPanel != null)
             invalidRoomPanel.SetActive(false);
     }
 
-    void Validate()
+    bool Validate()
     {
-        bool baseOk = !string.IsNullOrWhiteSpace(playerNameInput.text) &&
-                      !string.IsNullOrWhiteSpace(roomNameInput.text) &&
-                      int.TryParse(portInput.text, out int p) && p > 0 && p <= 65535;
+        bool baseOk = playerNameInput != null && !string.IsNullOrWhiteSpace(playerNameInput.text) &&
+                      roomNameInput != null && !string.IsNullOrWhiteSpace(roomNameInput.text) &&
+                      portInput != null && int.TryParse(portInput.text, out int p) && p > 0 && p <= 65535;
 
-        // Create button: only needs player name, room name, and port
         createButton.interactable = baseOk;
-
-        joinButton.interactable = baseOk && !string.IsNullOrWhiteSpace(ipAddressInput.text);
+        joinButton.interactable = baseOk && ipAddressInput != null && !string.IsNullOrWhiteSpace(ipAddressInput.text);
+        return baseOk;
     }
 
     void OnCreateRoom()
     {
+        if (!Validate())
+        {
+            ShowInvalidRoomPanel();
+            Debug.LogWarning("Create room failed: Invalid input fields");
+            return;
+        }
+
         var rm = MyRoomManager.Singleton;
+        if (rm == null)
+        {
+            Debug.LogError("MyRoomManager.Singleton is null");
+            ShowInvalidRoomPanel();
+            return;
+        }
+
         rm.RoomName = roomNameInput.text;
         rm.DesiredRoomName = roomNameInput.text;
         MyRoomPlayer.LocalPlayerName = playerNameInput.text;
 
+        var tp = NetworkManager.singleton.GetComponent<TelepathyTransport>();
+        if (tp == null)
+        {
+            Debug.LogError("TelepathyTransport component missing on NetworkManager");
+            ShowInvalidRoomPanel();
+            return;
+        }
+
         if (int.TryParse(portInput.text, out int port))
         {
-            var tp = NetworkManager.singleton.GetComponent<TelepathyTransport>();
             tp.port = (ushort)port;
         }
         else
         {
-            Debug.LogError("Invalid port entered!");
+            Debug.LogError("Invalid port entered, using default 7777");
+            tp.port = 7777;
         }
 
         NetworkManager.singleton.StartHost();
-        Debug.Log($"Hosting room '{rm.RoomName}' as '{MyRoomPlayer.LocalPlayerName}' on port {portInput.text}");
+        Debug.Log($"Hosting room '{rm.RoomName}' as '{MyRoomPlayer.LocalPlayerName}' on port {tp.port}");
     }
 
     void OnJoinRoom()
     {
-        MyRoomManager.Singleton.DesiredRoomName = roomNameInput.text;
+        if (!Validate())
+        {
+            ShowInvalidRoomPanel();
+            Debug.LogWarning("Join room failed: Invalid input fields");
+            return;
+        }
+
+        var rm = MyRoomManager.Singleton;
+        if (rm == null)
+        {
+            Debug.LogError("MyRoomManager.Singleton is null");
+            ShowInvalidRoomPanel();
+            return;
+        }
+
+        rm.DesiredRoomName = roomNameInput.text;
         MyRoomPlayer.LocalPlayerName = playerNameInput.text;
+        NetworkManager.singleton.networkAddress = ipAddressInput.text;
+
+        var tp = NetworkManager.singleton.GetComponent<TelepathyTransport>();
+        if (tp == null)
+        {
+            Debug.LogError("TelepathyTransport component missing on NetworkManager");
+            ShowInvalidRoomPanel();
+            return;
+        }
 
         if (int.TryParse(portInput.text, out int port))
         {
-            var tp = NetworkManager.singleton.GetComponent<TelepathyTransport>();
             tp.port = (ushort)port;
         }
         else
         {
-            Debug.LogError("Invalid port entered!");
+            Debug.LogError("Invalid port entered, using default 7777");
+            tp.port = 7777;
         }
 
-        NetworkManager.singleton.networkAddress = ipAddressInput.text;
-
         NetworkManager.singleton.StartClient();
-        Debug.Log($"Joining room '{roomNameInput.text}' as '{playerNameInput.text}' on port {portInput.text} at IP {ipAddressInput.text}");
+        Debug.Log($"Joining room '{rm.DesiredRoomName}' as '{MyRoomPlayer.LocalPlayerName}' on port {tp.port} at IP {NetworkManager.singleton.networkAddress}");
     }
 
     public void ShowInvalidRoomPanel()
@@ -104,6 +155,13 @@ public class MainMenuUI : MonoBehaviour
 
     IEnumerator CountdownAndHide()
     {
+        if (countdownText == null)
+        {
+            Debug.LogWarning("CountdownText is not assigned!");
+            invalidRoomPanel.SetActive(false);
+            yield break;
+        }
+
         for (int i = 3; i >= 1; i--)
         {
             countdownText.text = $"Closing in {i}...";

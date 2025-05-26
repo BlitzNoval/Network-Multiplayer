@@ -31,6 +31,23 @@ public class PlayerMovement : NetworkBehaviour
         if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive)
             return;
 
+        // Check for ESC key press to pause or resume
+        if (Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            if (GameManager.Instance.IsPaused)
+            {
+                // Only the player who paused can resume
+                if (GameManager.Instance.Pauser == netIdentity)
+                {
+                    CmdResumeGame();
+                }
+            }
+            else
+            {
+                CmdPauseGame();
+            }
+        }
+
         moveInput = moveAct.ReadValue<Vector2>();
     }
 
@@ -38,6 +55,13 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive)
             return;
+
+        if (GameManager.Instance.IsPaused)
+        {
+            // Stop movement when paused
+            rb.linearVelocity = Vector3.zero;
+            return;
+        }
 
         ApplyMovement();
     }
@@ -59,5 +83,17 @@ public class PlayerMovement : NetworkBehaviour
             Quaternion rot = Quaternion.LookRotation(horizVel.normalized);
             transform.rotation = Quaternion.Slerp(transform.rotation, rot, rotationSpeed * Time.fixedDeltaTime);
         }
+    }
+
+    [Command]
+    public void CmdPauseGame()
+    {
+        GameManager.Instance.PauseGame(netIdentity);
+    }
+
+    [Command]
+    public void CmdResumeGame()
+    {
+        GameManager.Instance.ResumeGame(netIdentity);
     }
 }

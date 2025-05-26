@@ -25,7 +25,7 @@ public class SpawnManager : NetworkBehaviour
     void OnEnable()
     {
         mapOutCollider = GetComponent<Collider>();
-        mapOutCollider.isTrigger = true; // Re-apply trigger on enable
+        mapOutCollider.isTrigger = true;
         Debug.Log($"SpawnManager OnEnable on {gameObject.name}, tag={gameObject.tag}, isTrigger={mapOutCollider.isTrigger}, time={Time.time}", this);
     }
 
@@ -41,7 +41,7 @@ public class SpawnManager : NetworkBehaviour
         lastUsed = new float[spawnPoints.Count];
         for (int i = 0; i < lastUsed.Length; i++) lastUsed[i] = -pointCooldown;
         mapOutCollider = GetComponent<Collider>();
-        mapOutCollider.isTrigger = true; // Ensure trigger is set
+        mapOutCollider.isTrigger = true;
     }
 
     [ServerCallback]
@@ -49,7 +49,6 @@ public class SpawnManager : NetworkBehaviour
     {
         Debug.Log($"OnTriggerEnter: collider={other.gameObject.name}, tag={other.gameObject.tag}, self tag={gameObject.tag}, time={Time.time}", this);
 
-        // Check if the colliding object is the player and this is the MapOut platform
         if (other.CompareTag("Player") && gameObject.CompareTag("MapOut"))
         {
             var life = other.GetComponent<PlayerLifeManager>();
@@ -66,7 +65,7 @@ public class SpawnManager : NetworkBehaviour
                 Debug.Log($"Player {other.gameObject.name} hit MapOut platform, triggering HandleDeath, time={Time.time}", this);
                 life.HandleDeath();
 
-                if (life.currentLives > 0)
+                if (life.CurrentLives > 0)
                 {
                     int idx = ChooseSpawnIndex();
                     Transform pt = spawnPoints[idx];
@@ -97,7 +96,7 @@ public class SpawnManager : NetworkBehaviour
         {
             int idx = free[Random.Range(0, free.Count)];
             recentlyUsed.Add(idx);
-            if (recentlyUsed.Count > spawnPoints.Count / 2) // Allow reuse after half the points are used
+            if (recentlyUsed.Count > spawnPoints.Count / 2)
                 recentlyUsed.RemoveAt(0);
             lastUsed[idx] = Time.time;
             return idx;
@@ -117,7 +116,8 @@ public class SpawnManager : NetworkBehaviour
         return best;
     }
 
-    [Server] public Transform GetNextSpawnPoint()
+    [Server]
+    public Transform GetNextSpawnPoint()
     {
         int idx = ChooseSpawnIndex();
         return spawnPoints[idx];
