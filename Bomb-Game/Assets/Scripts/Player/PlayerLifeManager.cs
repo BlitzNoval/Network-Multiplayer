@@ -9,15 +9,15 @@ public class PlayerLifeManager : NetworkBehaviour
     [Header("Lives")]
     [SyncVar] [SerializeField] int   maxLives           = 3;
     [SyncVar] [SerializeField] float respawnDelay      = 2f;
-    [SyncVar] [SerializeField] float fallThreshold     = -10f;
-    [SyncVar] [SerializeField] float absoluteFallLimit = -500f;
+
+    [Header("Fall Detection")]
+    [SerializeField] float fallDistanceThreshold = 10f; // Distance below floor reference to trigger death
+    private Transform floorReference;
 
     [SyncVar] public bool IsDisconnected;
 
     public void SetMaxLives(int v)            => maxLives           = v;
-    public void SetRespawnDelay(float v)      => respawnDelay       = v;
-    public void SetFallThreshold(float v)     => fallThreshold      = v;
-    public void SetAbsoluteFallLimit(float v) => absoluteFallLimit  = v;
+    public void SetRespawnDelay(float v)      => respawnDelay      = v;
 
     [SyncVar] public bool  IsDead;
     [SyncVar] public float TotalHoldTime;
@@ -44,6 +44,10 @@ public class PlayerLifeManager : NetworkBehaviour
         movement    = GetComponent<PlayerMovement>();
         col         = GetComponent<Collider>();
         rb          = GetComponent<Rigidbody>();
+        // Find the floor reference object by tag
+        floorReference = GameObject.FindWithTag("FloorReference")?.transform;
+        if (floorReference == null)
+            Debug.LogError("FloorReference object not found in the scene!");
     }
 
     public override void OnStartServer()
@@ -76,12 +80,13 @@ public class PlayerLifeManager : NetworkBehaviour
         if (!isServer || IsDead || IsDisconnected || (GameManager.Instance != null && GameManager.Instance.IsPaused))
             return;
 
-        float y = transform.position.y;
-        if (y < fallThreshold || y < absoluteFallLimit)
+        // Check if player is below the floor reference by the threshold
+        if (floorReference != null && transform.position.y < floorReference.position.y - fallDistanceThreshold)
+        {
             HandleDeath();
+        }
 
-        if (bombHandler?.CurrentBomb != null &&
-            bombHandler.CurrentBomb.Holder == gameObject)
+        if (bombHandler?.CurrentBomb != null && bombHandler.CurrentBomb.Holder == gameObject)
         {
             TotalHoldTime += Time.deltaTime;
             UpdateKnockbackMultiplier();
@@ -109,7 +114,8 @@ public class PlayerLifeManager : NetworkBehaviour
     [Server]
     public void HandleDeath()
     {
-        if (IsDead) return;
+        if (IsDead) return; // Safety check to prevent multiple calls
+        Debug.Log($"HandleDeath called for player {PlayerNumber}, CurrentLives={CurrentLives}");
         CurrentLives--;
         if (CurrentLives <= 0) { FinalDeath(); return; }
         StartCoroutine(RespawnRoutine());
@@ -118,11 +124,10 @@ public class PlayerLifeManager : NetworkBehaviour
     [Server]
     IEnumerator RespawnRoutine()
     {
-        SetAliveState(false, true);
+        SetAliveState(false, true); // Set IsDead = true immediately
         yield return new WaitForSeconds(respawnDelay);
 
-        while (SpawnManager.Instance == null ||
-               SpawnManager.Instance.GetNextSpawnPoint() == null)
+        while (SpawnManager.Instance == null || SpawnManager.Instance.GetNextSpawnPoint() == null)
             yield return new WaitForSeconds(0.1f);
 
         var spawn = SpawnManager.Instance.GetNextSpawnPoint();
@@ -131,7 +136,7 @@ public class PlayerLifeManager : NetworkBehaviour
         KnockbackMultiplier = 1f;
         TotalHoldTime       = 0f;
         KnockbackHitCount   = 0;
-        SetAliveState(true, true);
+        SetAliveState(true, true); // Set IsDead = false after respawn
     }
 
     [Server]

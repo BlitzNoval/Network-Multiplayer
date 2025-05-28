@@ -44,43 +44,6 @@ public class SpawnManager : NetworkBehaviour
         mapOutCollider.isTrigger = true;
     }
 
-    [ServerCallback]
-    void OnTriggerEnter(Collider other)
-    {
-        Debug.Log($"OnTriggerEnter: collider={other.gameObject.name}, tag={other.gameObject.tag}, self tag={gameObject.tag}, time={Time.time}", this);
-
-        if (other.CompareTag("Player") && gameObject.CompareTag("MapOut"))
-        {
-            var life = other.GetComponent<PlayerLifeManager>();
-            Debug.Log($"PlayerLifeManager check: found={life != null}, IsDead={life?.IsDead ?? true}, time={Time.time}", this);
-
-            if (life == null)
-            {
-                Debug.LogError($"PlayerLifeManager component not found on {other.gameObject.name}", this);
-                return;
-            }
-
-            if (life && !life.IsDead)
-            {
-                Debug.Log($"Player {other.gameObject.name} hit MapOut platform, triggering HandleDeath, time={Time.time}", this);
-                life.HandleDeath();
-
-                if (life.CurrentLives > 0)
-                {
-                    int idx = ChooseSpawnIndex();
-                    Transform pt = spawnPoints[idx];
-                    other.transform.SetPositionAndRotation(pt.position, pt.rotation);
-                    lastUsed[idx] = Time.time;
-                    Debug.Log($"Respawned {other.gameObject.name} at spawn point {idx}, position={pt.position}, time={Time.time}", this);
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"Player {other.gameObject.name} is dead or null, skipping HandleDeath, time={Time.time}", this);
-            }
-        }
-    }
-
     public int ChooseSpawnIndex()
     {
         float now = Time.time;
