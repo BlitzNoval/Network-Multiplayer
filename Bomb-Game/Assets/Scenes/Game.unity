@@ -1558,7 +1558,7 @@ GameObject:
   - component: {fileID: 166531628}
   - component: {fileID: 166531627}
   - component: {fileID: 166531626}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (2)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -2269,9 +2269,9 @@ GameObject:
   - component: {fileID: 236021276}
   - component: {fileID: 236021275}
   - component: {fileID: 236021274}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (1)
-  m_TagString: MapOut
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -2670,9 +2670,9 @@ GameObject:
   - component: {fileID: 297600727}
   - component: {fileID: 297600726}
   - component: {fileID: 297600725}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (2)
-  m_TagString: MapOut
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -6208,7 +6208,7 @@ GameObject:
   - component: {fileID: 815675224}
   - component: {fileID: 815675223}
   - component: {fileID: 815675222}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (16)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -7153,7 +7153,7 @@ GameObject:
   - component: {fileID: 939525525}
   - component: {fileID: 939525524}
   - component: {fileID: 939525523}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (14)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -7322,7 +7322,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 945321315}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Enviroment
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7804,7 +7804,7 @@ GameObject:
   - component: {fileID: 1051374217}
   - component: {fileID: 1051374216}
   - component: {fileID: 1051374215}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (3)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -8190,7 +8190,7 @@ GameObject:
   - component: {fileID: 1077408825}
   - component: {fileID: 1077408824}
   - component: {fileID: 1077408823}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (13)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -8870,7 +8870,7 @@ GameObject:
   - component: {fileID: 1135746438}
   - component: {fileID: 1135746437}
   - component: {fileID: 1135746436}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (17)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -10391,7 +10391,7 @@ GameObject:
   - component: {fileID: 1238273717}
   - component: {fileID: 1238273716}
   - component: {fileID: 1238273715}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (5)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -11163,7 +11163,7 @@ GameObject:
   - component: {fileID: 1309349487}
   - component: {fileID: 1309349486}
   - component: {fileID: 1309349485}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (8)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -11566,7 +11566,7 @@ GameObject:
   - component: {fileID: 1341650119}
   - component: {fileID: 1341650118}
   - component: {fileID: 1341650117}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (12)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -12793,7 +12793,7 @@ GameObject:
   - component: {fileID: 1520316919}
   - component: {fileID: 1520316918}
   - component: {fileID: 1520316917}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (11)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -13164,7 +13164,7 @@ GameObject:
   - component: {fileID: 1546609892}
   - component: {fileID: 1546609891}
   - component: {fileID: 1546609890}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (9)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -13565,7 +13565,7 @@ GameObject:
   - component: {fileID: 1656269412}
   - component: {fileID: 1656269411}
   - component: {fileID: 1656269410}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (6)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -15837,7 +15837,7 @@ GameObject:
   - component: {fileID: 1956008667}
   - component: {fileID: 1956008666}
   - component: {fileID: 1956008665}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (4)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -16359,7 +16359,7 @@ GameObject:
   - component: {fileID: 1981786552}
   - component: {fileID: 1981786551}
   - component: {fileID: 1981786550}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (10)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -17254,7 +17254,7 @@ GameObject:
   - component: {fileID: 2100385320}
   - component: {fileID: 2100385319}
   - component: {fileID: 2100385318}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (15)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
@@ -17537,7 +17537,7 @@ GameObject:
   - component: {fileID: 2144274071}
   - component: {fileID: 2144274070}
   - component: {fileID: 2144274069}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: BlackFlat (7)
   m_TagString: MapOut
   m_Icon: {fileID: 0}
