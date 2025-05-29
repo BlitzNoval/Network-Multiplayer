@@ -2,37 +2,35 @@ using System.Collections.Generic;
 using Mirror;
 using UnityEngine;
 
-[RequireComponent(typeof(Collider))]
 public class SpawnManager : NetworkBehaviour
 {
     public static SpawnManager Instance { get; private set; }
 
     [Header("Spawn Points")]
     public List<Transform> spawnPoints = new();
+
+    [Header("Respawn Settings")]
+    public Transform respawnReference;
+    public float respawnOffset = 40f;
+
     [Header("Reuse Cool-down")]
     public float pointCooldown = 1f;
 
     float[] lastUsed;
     private List<int> recentlyUsed = new List<int>();
-    private Collider mapOutCollider;
 
     void Awake()
     {
         Initialize();
-        Debug.Log($"SpawnManager Awake on {gameObject.name}, tag={gameObject.tag}, isTrigger={GetComponent<Collider>().isTrigger}, Instance set at {Time.time}", this);
-    }
-
-    void OnEnable()
-    {
-        mapOutCollider = GetComponent<Collider>();
-        mapOutCollider.isTrigger = true;
-        Debug.Log($"SpawnManager OnEnable on {gameObject.name}, tag={gameObject.tag}, isTrigger={mapOutCollider.isTrigger}, time={Time.time}", this);
+        if (respawnReference == null)
+            Debug.LogError("respawnReference is not set in SpawnManager", this);
+        Debug.Log($"SpawnManager Awake on {gameObject.name}, Instance set at {Time.time}", this);
     }
 
     public override void OnStartServer()
     {
         Initialize();
-        Debug.Log($"SpawnManager OnStartServer on {gameObject.name}, tag={gameObject.tag}, isTrigger={GetComponent<Collider>().isTrigger}, Instance set at {Time.time}", this);
+        Debug.Log($"SpawnManager OnStartServer on {gameObject.name}, Instance set at {Time.time}", this);
     }
 
     void Initialize()
@@ -40,45 +38,6 @@ public class SpawnManager : NetworkBehaviour
         Instance = this;
         lastUsed = new float[spawnPoints.Count];
         for (int i = 0; i < lastUsed.Length; i++) lastUsed[i] = -pointCooldown;
-        mapOutCollider = GetComponent<Collider>();
-        mapOutCollider.isTrigger = true;
-    }
-
-    [ServerCallback]
-    void OnTriggerEnter(Collider other)
-    {
-        Debug.Log($"OnTriggerEnter: collider={other.gameObject.name}, tag={other.gameObject.tag}, self tag={gameObject.tag}, time={Time.time}", this);
-
-        if (other.CompareTag("Player") && gameObject.CompareTag("MapOut"))
-        {
-            var life = other.GetComponent<PlayerLifeManager>();
-            Debug.Log($"PlayerLifeManager check: found={life != null}, IsDead={life?.IsDead ?? true}, time={Time.time}", this);
-
-            if (life == null)
-            {
-                Debug.LogError($"PlayerLifeManager component not found on {other.gameObject.name}", this);
-                return;
-            }
-
-            if (life && !life.IsDead)
-            {
-                Debug.Log($"Player {other.gameObject.name} hit MapOut platform, triggering HandleDeath, time={Time.time}", this);
-                life.HandleDeath();
-
-                if (life.CurrentLives > 0)
-                {
-                    int idx = ChooseSpawnIndex();
-                    Transform pt = spawnPoints[idx];
-                    other.transform.SetPositionAndRotation(pt.position, pt.rotation);
-                    lastUsed[idx] = Time.time;
-                    Debug.Log($"Respawned {other.gameObject.name} at spawn point {idx}, position={pt.position}, time={Time.time}", this);
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"Player {other.gameObject.name} is dead or null, skipping HandleDeath, time={Time.time}", this);
-            }
-        }
     }
 
     public int ChooseSpawnIndex()
