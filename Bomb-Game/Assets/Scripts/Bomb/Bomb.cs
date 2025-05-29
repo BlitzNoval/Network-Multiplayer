@@ -24,12 +24,13 @@ public class Bomb : NetworkBehaviour
     [Header("Collision / Explosion")]
     [SyncVar] [SerializeField] int   maxBounces            = 1;
     [SyncVar] [SerializeField] float groundExplosionDelay  = 1f;
-    [SyncVar] [SerializeField] float explosionRadius       = 5f;
-    [SyncVar] [SerializeField] float baseKnockForce        = 5f;
 
     [SerializeField] LayerMask mapLayerMask;
     [SerializeField] string playerTag = "Player";
     [SerializeField] string mapOutTag = "MapOut";
+
+    // Knockback calculator reference
+    private KnockbackCalculator knockbackCalculator;
 
     public void SetInitialTimer(float v)        => initialTimer        = v;
     public void SetReturnPauseDuration(float v) => returnPauseDuration = v;
@@ -41,8 +42,6 @@ public class Bomb : NetworkBehaviour
     public void SetFlightMassMultiplier(float v)=> flightMassMultiplier= v;
     public void SetMaxBounces(int v)            => maxBounces          = v;
     public void SetGroundExplosionDelay(float v)=> groundExplosionDelay= v;
-    public void SetExplosionRadius(float v)     => explosionRadius     = v;
-    public void SetBaseKnockForce(float v)      => baseKnockForce      = v;
 
     Rigidbody       rb;
     Collider        col;
@@ -64,7 +63,7 @@ public class Bomb : NetworkBehaviour
     public GameObject Holder            => holder;
     public bool       IsOnRight         => isOnRight;
     public bool       IsHeld            => isHeld;
-    public float      CurrentTimer      => currentTimer; // Added for timer access
+    public float      CurrentTimer      => currentTimer;
     public float      NormalThrowSpeed  => normalThrowSpeed;
     public float      NormalThrowUpward => normalThrowUpward;
     public float      LobThrowSpeed     => lobThrowSpeed;
@@ -79,6 +78,13 @@ public class Bomb : NetworkBehaviour
         if (timerText)
             canvasTr = timerText.transform.parent;
         currentTimer = initialTimer;
+        
+        // Add knockback calculator if not present
+        knockbackCalculator = GetComponent<KnockbackCalculator>();
+        if (knockbackCalculator == null)
+        {
+            knockbackCalculator = gameObject.AddComponent<KnockbackCalculator>();
+        }
     }
 
     void Update()
@@ -135,29 +141,53 @@ public class Bomb : NetworkBehaviour
         if (waitingToExplode) return;
         waitingToExplode = true;
 
-        foreach (var hit in Physics.OverlapSphere(transform.position, explosionRadius))
+        Vector3 explosionPos = transform.position;
+        
+        // Debug visualization
+        knockbackCalculator.DrawDebugSectors(explosionPos);
+        
+        // Get all potential targets
+        var potentialTargets = Physics.OverlapSphere(explosionPos, knockbackCalculator.GetComponent<KnockbackCalculator>() ? 
+            5f : 5f); // Use knockback calculator's explosion radius if available
+        
+        foreach (var hit in potentialTargets)
         {
             if (!hit.CompareTag(playerTag)) continue;
-            if (!hit.TryGetComponent(out Rigidbody prb)) continue;
-            if (!hit.TryGetComponent(out PlayerLifeManager life)) continue;
-
-            Vector3 radial = hit.transform.position - transform.position;
-            Vector3 horizDir = new Vector3(radial.x, 0, radial.z).normalized;
-            const float sidePct   = 0.85f;
-            const float upwardPct = 0.15f;
-            Vector3 dir = (horizDir * sidePct + Vector3.up * upwardPct).normalized;
-
-            float forceMag = baseKnockForce * Mathf.Pow(life.KnockbackMultiplier, 1.25f);
-            if (hit.gameObject == holder) forceMag *= 1.5f;
-
-            prb.AddForce(dir * forceMag * 0.2f, ForceMode.Impulse);
-
+            
+            var lifeManager = hit.GetComponent<PlayerLifeManager>();
+            if (lifeManager == null) continue;
+            
+            var rb = hit.GetComponent<Rigidbody>();
+            if (rb == null) continue;
+            
+            // Calculate knockback using our advanced system
+            bool isHolder = hit.gameObject == holder;
+            float percentageKnockback = lifeManager.PercentageKnockback;
+            
+            var knockbackResult = knockbackCalculator.CalculateKnockback(
+                explosionPos, 
+                hit.gameObject, 
+                percentageKnockback, 
+                isHolder
+            );
+            
+            if (!knockbackResult.affected) continue;
+            
+            // Apply physics force locally for immediate feedback
+            rb.AddForce(knockbackResult.force * 0.2f, ForceMode.Impulse);
+            
+            // Send targeted RPC for authoritative knockback
             if (hit.TryGetComponent(out NetworkIdentity ni) && ni.connectionToClient != null)
-                life.TargetApplyKnockback(ni.connectionToClient, dir * forceMag);
-
-            life.RegisterKnockbackHit();
+            {
+                lifeManager.TargetApplyKnockback(ni.connectionToClient, knockbackResult.force);
+            }
+            
+            // Register the hit and add explosion percentage
+            lifeManager.RegisterKnockbackHit();
+            lifeManager.AddExplosionKnockbackPercentage(knockbackResult.sector);
         }
 
+        // Clear bomb from holder
         holder?.GetComponent<PlayerBombHandler>()?.ClearBomb();
         holder = null;
 
@@ -195,7 +225,7 @@ public class Bomb : NetworkBehaviour
     {
         holder = p;
         isHeld = true;
-        col.isTrigger = true; // Set to trigger for touch passing
+        col.isTrigger = true;
         currentBounces = 0;
         rb.isKinematic = true;
         rb.mass = 1f;
@@ -257,7 +287,7 @@ public class Bomb : NetworkBehaviour
         transform.SetParent(null);
         isHeld = false;
         rb.isKinematic = false;
-        col.isTrigger = false; // Reset to collider for flight
+        col.isTrigger = false;
         rb.mass *= flightMassMultiplier;
 
         Transform origin = holder.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
@@ -335,4 +365,11 @@ public class Bomb : NetworkBehaviour
 
     [Server]
     public void TriggerImmediateExplosion() => Explode();
+    
+    // Debug toggle for knockback visualization
+    public void SetKnockbackDebugMode(bool enabled)
+    {
+        if (knockbackCalculator != null)
+            knockbackCalculator.SetDebugMode(enabled);
+    }
 }

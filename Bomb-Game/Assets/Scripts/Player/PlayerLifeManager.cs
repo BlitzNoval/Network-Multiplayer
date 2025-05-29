@@ -23,11 +23,20 @@ public class PlayerLifeManager : NetworkBehaviour
 
     [SyncVar(hook = nameof(OnCurrentLivesChanged))]
     public int CurrentLives;
-    [SyncVar(hook = nameof(OnKnockbackMultiplierChanged))]
-    public float KnockbackMultiplier = 1f;
+
+    [Header("Knockback Settings")]
+    [SyncVar(hook = nameof(OnPercentageKnockbackChanged))] 
+    private float percentageKnockback = 0f;
+    [SerializeField] private float baseKnockbackIncreaseRate = 10f; // Base rate per second
+    [SerializeField] private float maxKnockbackPercentage = 350f; // Increased to 350%
+    [SerializeField] private float[] milestoneMultipliers = { 1f, 1.5f, 2f, 2.5f }; // At 0%, 100%, 200%, 300%
+    
+    // Properties
+    public float KnockbackMultiplier => 1f + (percentageKnockback / 100f);
+    public float PercentageKnockback => percentageKnockback;
 
     public event Action<int,int>     OnLivesChanged;
-    public event Action<float,float> OnKnockbackChanged;
+    public event Action<float,float> OnKnockbackPercentageChanged;
 
     PlayerBombHandler bombHandler;
     PlayerMovement    movement;
@@ -37,6 +46,8 @@ public class PlayerLifeManager : NetworkBehaviour
     private bool isRespawning; // Server-side flag to prevent multiple death triggers
     private float lastRespawnTime; // Time when the last respawn occurred
     private const float gracePeriod = 0.5f; // Grace period in seconds after respawn
+    private bool isHoldingBomb;
+    private float lastKnockbackTime;
 
     void Awake()
     {
@@ -52,7 +63,7 @@ public class PlayerLifeManager : NetworkBehaviour
         CurrentLives        = maxLives;
         IsDead              = false;
         IsDisconnected      = false;
-        KnockbackMultiplier = 1f;
+        percentageKnockback = 0f;
         TotalHoldTime       = 0f;
         KnockbackHitCount   = 0;
         isRespawning        = false;
@@ -71,6 +82,42 @@ public class PlayerLifeManager : NetworkBehaviour
         base.OnStopClient();
         if (PlayerUIManager.Instance != null)
             PlayerUIManager.Instance.Unregister(this);
+    }
+
+    void Update()
+    {
+        if (!isServer) return;
+        
+        // Update knockback percentage while holding bomb
+        if (bombHandler != null && bombHandler.CurrentBomb != null)
+        {
+            if (bombHandler.CurrentBomb.Holder == gameObject)
+            {
+                if (!isHoldingBomb)
+                {
+                    isHoldingBomb = true;
+                }
+                
+                // Calculate rate multiplier based on current percentage milestones
+                float rateMultiplier = 1f;
+                if (percentageKnockback >= 300f) rateMultiplier = milestoneMultipliers[3];
+                else if (percentageKnockback >= 200f) rateMultiplier = milestoneMultipliers[2];
+                else if (percentageKnockback >= 100f) rateMultiplier = milestoneMultipliers[1];
+                else rateMultiplier = milestoneMultipliers[0];
+                
+                // Increase knockback percentage with milestone multiplier
+                float increase = baseKnockbackIncreaseRate * rateMultiplier * Time.deltaTime;
+                SetKnockbackPercentage(Mathf.Min(percentageKnockback + increase, maxKnockbackPercentage));
+            }
+            else if (isHoldingBomb)
+            {
+                isHoldingBomb = false;
+            }
+        }
+        else if (isHoldingBomb)
+        {
+            isHoldingBomb = false;
+        }
     }
 
     void FixedUpdate()
@@ -97,10 +144,10 @@ public class PlayerLifeManager : NetworkBehaviour
             RpcLogWarningToClient("SpawnManager.Instance or respawnReference is null");
         }
 
+        // Update total hold time (legacy system - kept for compatibility)
         if (bombHandler?.CurrentBomb != null && bombHandler.CurrentBomb.Holder == gameObject)
         {
-            TotalHoldTime += Time.deltaTime;
-            UpdateKnockbackMultiplier();
+            TotalHoldTime += Time.fixedDeltaTime;
         }
     }
 
@@ -117,22 +164,18 @@ public class PlayerLifeManager : NetworkBehaviour
     }
 
     [Server]
-    void UpdateKnockbackMultiplier()
+    public void SetKnockbackPercentage(float newPercentage)
     {
-        float baseMult     = 1f;
-        float holdFactor   = 0.1f;
-        float hitFactor    = 0.2f;
-        float mult         = baseMult *
-                             (1 + holdFactor * TotalHoldTime) *
-                             Mathf.Pow(1 + hitFactor * KnockbackHitCount, 2);
-        KnockbackMultiplier = Mathf.Min(mult, 4f);
+        percentageKnockback = Mathf.Clamp(newPercentage, 0f, maxKnockbackPercentage);
     }
 
     void OnCurrentLivesChanged(int oldLives, int newLives)
         => OnLivesChanged?.Invoke(oldLives, newLives);
 
-    void OnKnockbackMultiplierChanged(float oldM, float newM)
-        => OnKnockbackChanged?.Invoke(oldM, newM);
+    void OnPercentageKnockbackChanged(float oldValue, float newValue)
+    {
+        OnKnockbackPercentageChanged?.Invoke(oldValue, newValue);
+    }
 
     [Server]
     public void HandleDeath()
@@ -174,7 +217,8 @@ public class PlayerLifeManager : NetworkBehaviour
         RpcTeleport(newPosition, spawn.rotation);
         RpcLogToClient($"After teleport on server: position={rb.position}");
 
-        KnockbackMultiplier = 1f;
+        // Reset knockback values on respawn
+        percentageKnockback = 0f;
         TotalHoldTime       = 0f;
         KnockbackHitCount   = 0;
         SetAliveState(true, false);
@@ -224,7 +268,27 @@ public class PlayerLifeManager : NetworkBehaviour
     public void RegisterKnockbackHit()
     {
         KnockbackHitCount++;
-        UpdateKnockbackMultiplier();
+        lastKnockbackTime = Time.time;
+        // The new percentage-based system handles knockback scaling
+    }
+    
+    [Server]
+    public void AddExplosionKnockbackPercentage(int sector)
+    {
+        // Add percentage based on sector (S1=40%, S2=30%, S3=20%, S4=10%)
+        float percentageToAdd = 0f;
+        switch (sector)
+        {
+            case 1: percentageToAdd = 40f; break;
+            case 2: percentageToAdd = 30f; break;
+            case 3: percentageToAdd = 20f; break;
+            case 4: percentageToAdd = 10f; break;
+        }
+        
+        if (percentageToAdd > 0)
+        {
+            SetKnockbackPercentage(Mathf.Min(percentageKnockback + percentageToAdd, maxKnockbackPercentage));
+        }
     }
 
     [TargetRpc]

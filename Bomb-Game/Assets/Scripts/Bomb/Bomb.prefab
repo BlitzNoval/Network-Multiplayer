@@ -320,6 +320,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: d2589f58036e101428826eab029e9689, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3990632208570701316}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: d2589f58036e101428826eab029e9689, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4160194393448048763}
   m_SourcePrefab: {fileID: 100100000, guid: d2589f58036e101428826eab029e9689, type: 3}
 --- !u!4 &6931229046574634843 stripped
 Transform:
@@ -422,8 +425,6 @@ MonoBehaviour:
   flightMassMultiplier: 1
   maxBounces: 2
   groundExplosionDelay: 1
-  explosionRadius: 4
-  baseKnockForce: 5
   mapLayerMask:
     serializedVersion: 2
     m_Bits: 0
@@ -573,7 +574,65 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sceneId: 0
-  _assetId: 3769925660
+  _assetId: 2767523730
   serverOnly: 0
   visibility: 0
   hasSpawned: 0
+--- !u!114 &4160194393448048763
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7744921099468738017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31d3361528923924da0a5bbe85562ef3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  baseKnockback: 10
+  explosionRadius: 5
+  sectorFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  sectorRadii:
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1
+  sectorMultipliers:
+  - 1
+  - 0.8
+  - 0.5
+  - 0.2
+  upwardBias: 0.3
+  horizontalBias: 0.7
+  massInfluence: 0.5
+  showDebugSectors: 1
+  debugDisplayDuration: 2
+  sectorColors:
+  - {r: 1, g: 0, b: 0, a: 1}
+  - {r: 1, g: 0.5, b: 0, a: 1}
+  - {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  - {r: 0, g: 1, b: 0, a: 1}

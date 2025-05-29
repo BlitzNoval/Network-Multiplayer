@@ -65,10 +65,10 @@ public class PlayerUIManager : MonoBehaviour
         panel.gameObject.SetActive(true);
         panel.Initialize(lifeManager.PlayerNumber);
         panel.SetLives(lifeManager.CurrentLives, lifeManager.CurrentLives);
-        panel.SetKnockback(0f, lifeManager.KnockbackMultiplier);
+        panel.SetKnockback(0f, lifeManager.PercentageKnockback);
 
         lifeManager.OnLivesChanged += panel.SetLives;
-        lifeManager.OnKnockbackChanged += panel.SetKnockback;
+        lifeManager.OnKnockbackPercentageChanged += panel.SetKnockback;
 
         activePanels[lifeManager.PlayerNumber] = panel;
         Debug.Log($"Registered player {lifeManager.PlayerNumber} to panel {idx}, activePanels={activePanels.Count}", this);
@@ -88,7 +88,7 @@ public class PlayerUIManager : MonoBehaviour
             {
                 panel.gameObject.SetActive(false);
                 lifeManager.OnLivesChanged -= panel.SetLives;
-                lifeManager.OnKnockbackChanged -= panel.SetKnockback;
+                lifeManager.OnKnockbackPercentageChanged -= panel.SetKnockback;
             }
             activePanels.Remove(lifeManager.PlayerNumber);
             Debug.Log($"Unregistered player {lifeManager.PlayerNumber}, activePanels={activePanels.Count}", this);

@@ -39,9 +39,10 @@ public class PlayerUIPanel : MonoBehaviour
         heart3.enabled = newLives >= 3;
     }
 
-    public void SetKnockback(float oldMult, float newMult)
+    public void SetKnockback(float oldPercentage, float newPercentage)
     {
-        int percentage = Mathf.Max(0, (int)((newMult - 1f) * 100f));
+        // The value passed in is already the percentage (0-350), not a multiplier
+        int percentage = Mathf.Clamp(Mathf.RoundToInt(newPercentage), 0, 350);
         percentageText.text = $"{percentage}%";
     }
 }
