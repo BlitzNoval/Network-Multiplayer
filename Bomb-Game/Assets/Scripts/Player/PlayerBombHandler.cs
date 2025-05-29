@@ -245,7 +245,7 @@ public class PlayerBombHandler : NetworkBehaviour
     {
         Debug.Log($"CmdThrowBomb called: currentBomb={currentBomb}, holder check={currentBomb?.Holder == gameObject}", this);
         
-        if (currentBomb && currentBomb.Holder == gameObject)
+        if (currentBomb && currentBomb.Holder == gameObject && currentBomb.CurrentTimer > 1.5f)
         {
             if (playerAnimator != null)
             {

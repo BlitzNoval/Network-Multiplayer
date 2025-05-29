@@ -64,6 +64,7 @@ public class Bomb : NetworkBehaviour
     public GameObject Holder            => holder;
     public bool       IsOnRight         => isOnRight;
     public bool       IsHeld            => isHeld;
+    public float      CurrentTimer      => currentTimer; // Added for timer access
     public float      NormalThrowSpeed  => normalThrowSpeed;
     public float      NormalThrowUpward => normalThrowUpward;
     public float      LobThrowSpeed     => lobThrowSpeed;
@@ -95,7 +96,7 @@ public class Bomb : NetworkBehaviour
     void TickTimer()
     {
         if (GameManager.Instance != null && GameManager.Instance.IsPaused)
-            return; // Skip timer updates when paused
+            return;
 
         if (waitingToExplode)
         {
@@ -172,9 +173,7 @@ public class Bomb : NetworkBehaviour
         while (elapsed < delay)
         {
             if (GameManager.Instance != null && GameManager.Instance.IsPaused)
-            {
-                yield return null; // Pause the coroutine
-            }
+                yield return null;
             else
             {
                 elapsed += Time.deltaTime;
@@ -196,7 +195,7 @@ public class Bomb : NetworkBehaviour
     {
         holder = p;
         isHeld = true;
-        col.enabled = false;
+        col.isTrigger = true; // Set to trigger for touch passing
         currentBounces = 0;
         rb.isKinematic = true;
         rb.mass = 1f;
@@ -218,14 +217,14 @@ public class Bomb : NetworkBehaviour
                 transform.localPosition = Vector3.zero;
             }
             rb.isKinematic = true;
-            col.enabled = false;
+            col.isTrigger = true;
             lastThrower = newH;
         }
         else
         {
             transform.SetParent(null);
             rb.isKinematic = false;
-            col.enabled = true;
+            col.isTrigger = false;
         }
     }
 
@@ -258,7 +257,7 @@ public class Bomb : NetworkBehaviour
         transform.SetParent(null);
         isHeld = false;
         rb.isKinematic = false;
-        col.enabled = true;
+        col.isTrigger = false; // Reset to collider for flight
         rb.mass *= flightMassMultiplier;
 
         Transform origin = holder.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
@@ -273,13 +272,23 @@ public class Bomb : NetworkBehaviour
         currentBounces = 0;
         lastThrowTime  = Time.time;
         holder = null;
+
+        StartCoroutine(ReturnToThrowerAfterDelay());
+    }
+
+    [Server]
+    IEnumerator ReturnToThrowerAfterDelay()
+    {
+        yield return new WaitForSeconds(2f);
+        if (!isHeld && lastThrower != null && GameManager.Instance.IsPlayerActive(lastThrower))
+            AssignToPlayer(lastThrower);
     }
 
     [ServerCallback]
     void OnCollisionEnter(Collision c)
     {
         if (GameManager.Instance != null && GameManager.Instance.IsPaused)
-            return; // Skip collision handling when paused
+            return;
 
         if (c.gameObject.CompareTag(playerTag))
         {
@@ -308,6 +317,20 @@ public class Bomb : NetworkBehaviour
             waitingToExplode = true;
             groundHitTime    = Time.time;
         }
+    }
+
+    [ServerCallback]
+    void OnTriggerEnter(Collider other)
+    {
+        if (isHeld && other.CompareTag(playerTag) && other.gameObject != holder)
+            AssignToPlayer(other.gameObject);
+    }
+
+    [Server]
+    public void ResetTimer()
+    {
+        currentTimer = initialTimer;
+        RpcUpdateTimer(Mathf.CeilToInt(currentTimer));
     }
 
     [Server]

@@ -207,8 +207,15 @@ public class PlayerLifeManager : NetworkBehaviour
     void FinalDeath()
     {
         if (bombHandler?.CurrentBomb != null)
-            bombHandler.CurrentBomb.TriggerImmediateExplosion();
-
+        {
+            Bomb bomb = bombHandler.CurrentBomb;
+            bomb.ResetTimer();
+            GameObject nextPlayer = GameManager.Instance.GetNextPlayer(gameObject);
+            if (nextPlayer != null)
+                bomb.AssignToPlayer(nextPlayer);
+            else
+                bomb.TriggerImmediateExplosion();
+        }
         GameManager.Instance?.UnregisterPlayer(gameObject);
         NetworkServer.Destroy(gameObject);
     }

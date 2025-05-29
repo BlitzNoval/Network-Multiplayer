@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 public class GameManager : NetworkBehaviour
 {
@@ -314,5 +315,19 @@ public class GameManager : NetworkBehaviour
     void OnPauserChanged(NetworkIdentity oldValue, NetworkIdentity newValue)
     {
         PauserChanged?.Invoke(oldValue, newValue);
+    }
+
+    [Server]
+    public GameObject GetNextPlayer(GameObject excludePlayer)
+    {
+        var alivePlayers = players.Where(p => p != excludePlayer && p.GetComponent<PlayerLifeManager>().CurrentLives > 0).ToList();
+        if (alivePlayers.Count == 0) return null;
+        return alivePlayers[UnityEngine.Random.Range(0, alivePlayers.Count)];
+    }
+
+    [Server]
+    public bool IsPlayerActive(GameObject player)
+    {
+        return players.Contains(player);
     }
 }
