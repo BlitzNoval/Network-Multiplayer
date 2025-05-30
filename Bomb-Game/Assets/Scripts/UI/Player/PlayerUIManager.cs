@@ -20,10 +20,7 @@ public class PlayerUIManager : MonoBehaviour
             {
                 if (panel != null)
                     panel.gameObject.SetActive(false);
-                else
-                    Debug.LogError("PlayerUIPanel is null in panels array", this);
             }
-            Debug.Log("PlayerUIManager initialized", this);
         }
         else
         {
@@ -35,35 +32,27 @@ public class PlayerUIManager : MonoBehaviour
     {
         if (Instance == this)
             Instance = null;
-        Debug.Log("PlayerUIManager destroyed", this);
     }
 
     public void Register(PlayerLifeManager lifeManager)
     {
         if (lifeManager == null)
-        {
-            Debug.LogError("Register: lifeManager is null", this);
             return;
-        }
 
         int idx = lifeManager.PlayerNumber - 1;
-        Debug.Log($"Register: PlayerNumber={lifeManager.PlayerNumber}, idx={idx}", this);
-
         if (idx < 0 || idx >= panels.Length)
-        {
-            Debug.LogWarning($"[UI] Invalid panel index {idx} for player #{lifeManager.PlayerNumber}", this);
             return;
-        }
 
         var panel = panels[idx];
         if (panel == null)
-        {
-            Debug.LogError($"Panel at index {idx} is null", this);
             return;
-        }
+
+        var playerInfo = lifeManager.GetComponent<PlayerInfo>();
+        string playerName = playerInfo != null ? playerInfo.playerName : $"P{lifeManager.PlayerNumber}";
 
         panel.gameObject.SetActive(true);
         panel.Initialize(lifeManager.PlayerNumber);
+        panel.SetPlayerName(playerName);
         panel.SetLives(lifeManager.CurrentLives, lifeManager.CurrentLives);
         panel.SetKnockback(0f, lifeManager.PercentageKnockback);
 
@@ -71,16 +60,12 @@ public class PlayerUIManager : MonoBehaviour
         lifeManager.OnKnockbackPercentageChanged += panel.SetKnockback;
 
         activePanels[lifeManager.PlayerNumber] = panel;
-        Debug.Log($"Registered player {lifeManager.PlayerNumber} to panel {idx}, activePanels={activePanels.Count}", this);
     }
 
     public void Unregister(PlayerLifeManager lifeManager)
     {
         if (lifeManager == null)
-        {
-            Debug.LogWarning("Unregister: lifeManager is null", this);
             return;
-        }
 
         if (activePanels.TryGetValue(lifeManager.PlayerNumber, out var panel))
         {
@@ -91,7 +76,6 @@ public class PlayerUIManager : MonoBehaviour
                 lifeManager.OnKnockbackPercentageChanged -= panel.SetKnockback;
             }
             activePanels.Remove(lifeManager.PlayerNumber);
-            Debug.Log($"Unregistered player {lifeManager.PlayerNumber}, activePanels={activePanels.Count}", this);
         }
     }
 
@@ -103,6 +87,5 @@ public class PlayerUIManager : MonoBehaviour
                 panel.gameObject.SetActive(false);
         }
         activePanels.Clear();
-        Debug.Log("ResetPanels: Cleared all active panels", this);
     }
 }
