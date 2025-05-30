@@ -26,7 +26,7 @@ public class MainMenuUI : MonoBehaviour
         if (playerNameInput != null) playerNameInput.text = "Player" + Random.Range(1000, 9999);
         if (roomNameInput != null) roomNameInput.text = "DefaultRoom";
         if (portInput != null) portInput.text = "7777";
-        if (ipAddressInput != null) ipAddressInput.text = "localhost";
+        if (ipAddressInput != null) ipAddressInput.text = "";
 
         createButton.interactable = false;
         joinButton.interactable = false;

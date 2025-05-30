@@ -19,14 +19,15 @@ public class PlayerUIPanel : MonoBehaviour
 
     public void Initialize(int playerNumber)
     {
-        playerLabel.text = $"P{playerNumber}";
         if (playerNumber >= 1 && playerNumber <= playerColors.Length)
             colorPanel.color = playerColors[playerNumber - 1];
         else
-        {
             colorPanel.color = Color.gray;
-            Debug.LogWarning($"Invalid playerNumber {playerNumber} for color assignment.");
-        }
+    }
+
+    public void SetPlayerName(string name)
+    {
+        playerLabel.text = name;
     }
 
     public void SetLives(int oldLives, int newLives)
