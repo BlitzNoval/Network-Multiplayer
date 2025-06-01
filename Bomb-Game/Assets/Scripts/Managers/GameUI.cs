@@ -1,6 +1,6 @@
-using TMPro;
-using UnityEngine;
 using Mirror;
+using UnityEngine;
+using TMPro;
 using System.Collections;
 
 public class GameUI : MonoBehaviour
@@ -19,6 +19,10 @@ public class GameUI : MonoBehaviour
     [Header("Pause")]
     public GameObject pauseMenuPanel;     
     public GameObject pausedNotificationPanel;
+
+    [Header("Bomb Timer")]
+    public GameObject timerPanel;
+    public TMP_Text   timerText;
 
     void Start()
     {
@@ -76,6 +80,26 @@ public class GameUI : MonoBehaviour
         if (winnerPanel)
         {
             winnerPanel.SetActive(true);
+        }
+    }
+
+    public void UpdateBombTimer(int seconds)
+    {
+        if (timerPanel != null)
+        {
+            timerPanel.SetActive(true);
+        }
+        if (timerText != null)
+        {
+            timerText.text = seconds.ToString();
+        }
+    }
+
+    public void HideBombTimer()
+    {
+        if (timerPanel != null)
+        {
+            timerPanel.SetActive(false);
         }
     }
 
