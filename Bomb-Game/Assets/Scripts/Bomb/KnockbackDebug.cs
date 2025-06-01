@@ -23,7 +23,7 @@ public class KnockbackDebugController : MonoBehaviour
         // Find bomb if we don't have reference
         if (currentBomb == null)
         {
-            currentBomb = FindObjectOfType<Bomb>();
+            currentBomb = Object.FindObjectOfType<Bomb>(); // Updated to FindObjectOfType
             if (currentBomb != null && debugModeEnabled)
             {
                 currentBomb.SetKnockbackDebugMode(debugModeEnabled);
@@ -34,14 +34,14 @@ public class KnockbackDebugController : MonoBehaviour
     private void UpdateDebugMode()
     {
         // Update all bombs in scene
-        var bombs = FindObjectsOfType<Bomb>();
+        var bombs = Object.FindObjectsOfType<Bomb>(); // Updated to FindObjectsOfType
         foreach (var bomb in bombs)
         {
             bomb.SetKnockbackDebugMode(debugModeEnabled);
         }
         
         // Update all knockback calculators
-        var calculators = FindObjectsOfType<KnockbackCalculator>();
+        var calculators = Object.FindObjectsOfType<KnockbackCalculator>(); // Updated to FindObjectsOfType
         foreach (var calc in calculators)
         {
             calc.SetDebugMode(debugModeEnabled);
@@ -56,7 +56,7 @@ public class KnockbackDebugController : MonoBehaviour
         GUI.Label(new Rect(10, 10, 300, 20), "Knockback Debug Mode: ON (Press F1 to toggle)");
         
         // Display player knockback percentages
-        var players = FindObjectsOfType<PlayerLifeManager>();
+        var players = Object.FindObjectsOfType<PlayerLifeManager>(); // Updated to FindObjectsOfType
         int yOffset = 40;
         
         foreach (var player in players)

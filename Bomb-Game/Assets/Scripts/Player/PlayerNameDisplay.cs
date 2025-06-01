@@ -5,17 +5,44 @@ using Mirror;
 public class PlayerNameDisplay : NetworkBehaviour
 {
     [SerializeField] private GameObject namePanel;
+    [SerializeField] private Billboard billboard; // Optional: Reference to Billboard for setup
 
     public override void OnStartClient()
     {
         base.OnStartClient();
-        var playerInfo = GetComponent<PlayerInfo>();
-        if (playerInfo != null && namePanel != null)
+        var lifeManager = GetComponent<PlayerLifeManager>();
+        if (lifeManager != null && namePanel != null)
         {
-            namePanel.GetComponentInChildren<TextMeshPro>().text = playerInfo.playerName;
+            string playerTag = $"P{lifeManager.PlayerNumber}";
+            SetPlayerTag(playerTag);
             if (isLocalPlayer)
             {
-                namePanel.SetActive(false);
+                namePanel.SetActive(false); // Hide tag for local player
+            }
+            // Optional: Assign playerTransform to Billboard
+            if (billboard != null)
+            {
+                billboard.playerTransform = transform; // Set to the player's transform
+            }
+        }
+        else
+        {
+            Debug.LogError("PlayerLifeManager or namePanel is missing.", this);
+        }
+    }
+
+    public void SetPlayerTag(string tag)
+    {
+        if (namePanel != null)
+        {
+            var textComponent = namePanel.GetComponentInChildren<TextMeshPro>();
+            if (textComponent != null)
+            {
+                textComponent.text = tag;
+            }
+            else
+            {
+                Debug.LogError("TextMeshPro component not found in namePanel.", this);
             }
         }
     }

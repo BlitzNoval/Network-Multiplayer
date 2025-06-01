@@ -2,6 +2,7 @@ using System.Collections;
 using Mirror;
 using UnityEngine;
 using System;
+using TMPro;
 
 [RequireComponent(typeof(PlayerMovement), typeof(Collider), typeof(Rigidbody))]
 public class PlayerLifeManager : NetworkBehaviour
@@ -19,10 +20,9 @@ public class PlayerLifeManager : NetworkBehaviour
     [SyncVar] public float TotalHoldTime;
     [SyncVar] public int   KnockbackHitCount;
 
-    [SyncVar] public int   PlayerNumber;
+    [SyncVar(hook = nameof(OnPlayerNumberChanged))] public int PlayerNumber;
 
-    [SyncVar(hook = nameof(OnCurrentLivesChanged))]
-    public int CurrentLives;
+    [SyncVar(hook = nameof(OnCurrentLivesChanged))] public int CurrentLives;
 
     [Header("Knockback Settings")]
     [SyncVar(hook = nameof(OnPercentageKnockbackChanged))] 
@@ -73,6 +73,7 @@ public class PlayerLifeManager : NetworkBehaviour
     public override void OnStartClient()
     {
         base.OnStartClient();
+        UpdateNameTag(); // Initial tag update
         if (PlayerUIManager.Instance != null)
             PlayerUIManager.Instance.Register(this);
     }
@@ -329,6 +330,21 @@ public class PlayerLifeManager : NetworkBehaviour
             rb.isKinematic = !alive;
             if (!rb.isKinematic)
                 rb.linearVelocity = Vector3.zero;
+        }
+    }
+
+    void OnPlayerNumberChanged(int oldNumber, int newNumber)
+    {
+        UpdateNameTag();
+    }
+
+    void UpdateNameTag()
+    {
+        var nameDisplay = GetComponent<PlayerNameDisplay>();
+        if (nameDisplay != null)
+        {
+            string playerTag = $"P{PlayerNumber}";
+            nameDisplay.SetPlayerTag(playerTag);
         }
     }
 }
