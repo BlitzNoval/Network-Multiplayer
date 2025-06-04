@@ -150,12 +150,12 @@ public class MyRoomManager : NetworkRoomManager
     }
 
     public override void OnStopHost()
-    {
-        base.OnStopHost();
-        if (GameManager.Instance != null)
-            GameManager.Instance.ResetState();
-        if (PlayerUIManager.Instance != null)
-            PlayerUIManager.Instance.ResetPanels();
-        Debug.Log("OnStopHost: Reset GameManager and PlayerUIManager", this);
-    }
+{
+    base.OnStopHost();
+    if (GameManager.Instance != null)
+        GameManager.Instance.ResetState();
+    if (PlayerUIManager.Instance != null)
+        PlayerUIManager.Instance.ResetPanels();
+    Debug.Log("OnStopHost: Reset GameManager and PlayerUIManager", this);
+}
 }
