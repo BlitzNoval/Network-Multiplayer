@@ -135,6 +135,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Elevation"",
+                    ""type"": ""Value"",
+                    ""id"": ""7f8e5d3c-2a1b-4c9d-8e6f-1a2b3c4d5e6f"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -291,6 +300,28 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""Throw"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""mouse-scroll-elevation"",
+                    ""path"": ""<Mouse>/scroll/y"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""Elevation"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""gamepad-stick-elevation"",
+                    ""path"": ""<Gamepad>/rightStick/y"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Elevation"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -332,6 +363,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_Aim = m_Player.FindAction("Aim", throwIfNotFound: true);
         m_Player_HoldAim = m_Player.FindAction("HoldAim", throwIfNotFound: true);
         m_Player_Throw = m_Player.FindAction("Throw", throwIfNotFound: true);
+        m_Player_Elevation = m_Player.FindAction("Elevation", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -417,6 +449,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Aim;
     private readonly InputAction m_Player_HoldAim;
     private readonly InputAction m_Player_Throw;
+    private readonly InputAction m_Player_Elevation;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -448,6 +481,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Throw".
         /// </summary>
         public InputAction @Throw => m_Wrapper.m_Player_Throw;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Elevation".
+        /// </summary>
+        public InputAction @Elevation => m_Wrapper.m_Player_Elevation;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -489,6 +526,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Throw.started += instance.OnThrow;
             @Throw.performed += instance.OnThrow;
             @Throw.canceled += instance.OnThrow;
+            @Elevation.started += instance.OnElevation;
+            @Elevation.performed += instance.OnElevation;
+            @Elevation.canceled += instance.OnElevation;
         }
 
         /// <summary>
@@ -515,6 +555,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Throw.started -= instance.OnThrow;
             @Throw.performed -= instance.OnThrow;
             @Throw.canceled -= instance.OnThrow;
+            @Elevation.started -= instance.OnElevation;
+            @Elevation.performed -= instance.OnElevation;
+            @Elevation.canceled -= instance.OnElevation;
         }
 
         /// <summary>
@@ -616,5 +659,12 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnThrow(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Elevation" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnElevation(InputAction.CallbackContext context);
     }
 }

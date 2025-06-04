@@ -23,6 +23,12 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] float controllerSensitivity = 5f;
     [SerializeField] float aimingRange = 10f;
     
+    [Header("Elevation Control")]
+    [SerializeField] float minElevationMultiplier = 0.5f;
+    [SerializeField] float maxElevationMultiplier = 2.0f;
+    [SerializeField] float elevationSensitivity = 1.0f;
+    [SerializeField] float mouseElevationSensitivity = 0.5f;
+    
     // Core components
     Bomb currentBomb;
     public Bomb CurrentBomb => currentBomb;
@@ -32,6 +38,7 @@ public class PlayerBombHandler : NetworkBehaviour
     // Aiming state
     bool isAiming;
     Vector3 aimDirection;
+    float currentElevationMultiplier = 1.0f;
     List<Vector3> trajectoryPoints = new();
     float timeStep;
     
@@ -40,7 +47,7 @@ public class PlayerBombHandler : NetworkBehaviour
     [SyncVar] ThrowType currentThrowType = ThrowType.Short;
     
     // Input
-    InputAction toggleThrowTypeAct, aimAct, holdAimAct, throwAct;
+    InputAction toggleThrowTypeAct, aimAct, holdAimAct, throwAct, elevationAct;
     PlayerInput playerInput;
     bool inputSubscribed;
     Vector2 currentAimInput;
@@ -65,8 +72,9 @@ public class PlayerBombHandler : NetworkBehaviour
         aimAct = playerInput.actions["Aim"];
         holdAimAct = playerInput.actions["HoldAim"];
         throwAct = playerInput.actions["Throw"];
+        elevationAct = playerInput.actions["Elevation"];
         
-        Debug.Log($"Awake: Input actions bound - ToggleThrowType: {toggleThrowTypeAct?.name}, Aim: {aimAct?.name}, HoldAim: {holdAimAct?.name}, Throw: {throwAct?.name}", this);
+        Debug.Log($"Awake: Input actions bound - ToggleThrowType: {toggleThrowTypeAct?.name}, Aim: {aimAct?.name}, HoldAim: {holdAimAct?.name}, Throw: {throwAct?.name}, Elevation: {elevationAct?.name}", this);
 
         playerAnimator = GetComponent<PlayerAnimator>();
         animator = GetComponent<Animator>();
@@ -158,10 +166,13 @@ public class PlayerBombHandler : NetworkBehaviour
         // Get aim input (mouse delta or right stick)
         Vector2 aimInput = aimAct.ReadValue<Vector2>();
         
+        // Get elevation input (mouse scroll or right stick Y)
+        float elevationInput = elevationAct.ReadValue<float>();
+        
         // Handle mouse input - only for players using KeyboardMouse control scheme
         if (playerInput.currentControlScheme == "KeyboardMouse")
         {
-            // Mouse input - convert screen space to world direction
+            // Mouse input - convert screen space to world direction (horizontal only)
             Vector3 mouseWorldPos = GetMouseWorldPosition();
             if (mouseWorldPos != Vector3.zero)
             {
@@ -170,10 +181,13 @@ public class PlayerBombHandler : NetworkBehaviour
                 if (directionToMouse.magnitude > 0.1f)
                     aimDirection = directionToMouse;
             }
+            
+            // Update elevation based on mouse scroll wheel
+            UpdateElevationFromInput(elevationInput, mouseElevationSensitivity);
         }
         else if (aimInput.magnitude > 0.1f)
         {
-            // Controller input - use right stick directly
+            // Controller input - use right stick X and Z for horizontal direction
             Vector3 inputDirection = new Vector3(aimInput.x, 0, aimInput.y).normalized;
             if (inputDirection.magnitude > 0.1f)
             {
@@ -195,6 +209,12 @@ public class PlayerBombHandler : NetworkBehaviour
                 }
             }
         }
+        
+        // Update elevation for both input types
+        if (elevationInput != 0)
+        {
+            UpdateElevationFromInput(elevationInput, elevationSensitivity);
+        }
     }
 
     Vector3 GetMouseWorldPosition()
@@ -211,6 +231,18 @@ public class PlayerBombHandler : NetworkBehaviour
         worldPos.y = playerWorldPos.y; // Keep on player's Y level
         
         return worldPos;
+    }
+    
+    void UpdateElevationFromInput(float inputValue, float sensitivity)
+    {
+        // Input value: positive = increase elevation, negative = decrease elevation
+        // For mouse scroll: scroll up = positive, scroll down = negative
+        // For controller: stick up = positive, stick down = negative
+        float elevationChange = inputValue * sensitivity * Time.deltaTime;
+        currentElevationMultiplier += elevationChange;
+        
+        // Clamp to elevation range
+        currentElevationMultiplier = Mathf.Clamp(currentElevationMultiplier, minElevationMultiplier, maxElevationMultiplier);
     }
 
     public void SetBomb(Bomb b)
@@ -267,6 +299,7 @@ public class PlayerBombHandler : NetworkBehaviour
         isAiming = true;
         isHoldingAim = true;
         aimDirection = transform.forward; // Initialize aim direction
+        currentElevationMultiplier = 1.0f; // Reset elevation to default
         
         Debug.Log($"StartAiming: Started aiming with {currentThrowType} throw type", this);
     }
@@ -302,9 +335,9 @@ public class PlayerBombHandler : NetworkBehaviour
             animator.SetTrigger("Throw");
         
         // Send throw command to server
-        CmdThrowBomb(aimDirection, currentThrowType);
+        CmdThrowBomb(aimDirection, currentThrowType, currentElevationMultiplier);
         
-        Debug.Log($"ExecuteThrow: Throwing bomb in direction {aimDirection} with {currentThrowType} throw type", this);
+        Debug.Log($"ExecuteThrow: Throwing bomb in direction {aimDirection} with {currentThrowType} throw type, elevation: {currentElevationMultiplier:F2}", this);
     }
 
     [Command]
@@ -315,17 +348,18 @@ public class PlayerBombHandler : NetworkBehaviour
     }
 
     [Command]
-    void CmdThrowBomb(Vector3 direction, ThrowType throwType)
+    void CmdThrowBomb(Vector3 direction, ThrowType throwType, float elevationMultiplier)
     {
-        Debug.Log($"CmdThrowBomb: Server received throw command - direction: {direction}, type: {throwType}", this);
+        Debug.Log($"CmdThrowBomb: Server received throw command - direction: {direction}, type: {throwType}, elevation: {elevationMultiplier:F2}", this);
         
         if (currentBomb && currentBomb.Holder == gameObject && currentBomb.CurrentTimer > 1.5f)
         {
             if (playerAnimator != null)
                 playerAnimator.OnBombThrow();
             
-            // Throw the bomb using existing method
-            currentBomb.ThrowBomb();
+            // Throw the bomb using new method with elevation control
+            bool useShortThrow = throwType == ThrowType.Short;
+            currentBomb.ThrowBomb(direction, useShortThrow, elevationMultiplier);
         }
     }
 
@@ -346,9 +380,10 @@ public class PlayerBombHandler : NetworkBehaviour
             return;
         }
 
-        // Get throw parameters based on current throw type
+        // Get throw parameters based on current throw type and elevation
         float speed = currentThrowType == ThrowType.Short ? shortThrowSpeed : lobThrowSpeed;
-        float upward = currentThrowType == ThrowType.Short ? shortThrowUpward : lobThrowUpward;
+        float baseUpward = currentThrowType == ThrowType.Short ? shortThrowUpward : lobThrowUpward;
+        float upward = baseUpward * currentElevationMultiplier;
 
         Vector3 startPos = origin.position;
         Vector3 velocity = aimDirection * speed + Vector3.up * upward;

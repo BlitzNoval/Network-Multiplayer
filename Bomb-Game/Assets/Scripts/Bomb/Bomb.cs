@@ -269,6 +269,35 @@ public class Bomb : NetworkBehaviour
 
         StartCoroutine(ReturnToThrowerAfterDelay());
     }
+    
+    [Server]
+    public void ThrowBomb(Vector3 direction, bool useShortThrow, float elevationMultiplier)
+    {
+        if (!isHeld || holder == null || Time.time < lastThrowTime + throwCooldown)
+            return;
+
+        lastThrower = holder;
+        transform.SetParent(null);
+        isHeld = false;
+        rb.isKinematic = false;
+        col.isTrigger = false;
+        rb.mass *= flightMassMultiplier;
+
+        // Use provided direction and parameters
+        float speed = useShortThrow ? normalThrowSpeed : lobThrowSpeed;
+        float baseUpward = useShortThrow ? normalThrowUpward : lobThrowUpward;
+        float upward = baseUpward * elevationMultiplier;
+        
+        Vector3 force = direction.normalized * speed + Vector3.up * upward;
+
+        rb.linearVelocity = Vector3.zero;
+        rb.AddForce(force, ForceMode.Impulse);
+
+        lastThrowTime = Time.time;
+        holder = null;
+
+        StartCoroutine(ReturnToThrowerAfterDelay());
+    }
 
     [Server]
     IEnumerator ReturnToThrowerAfterDelay()
