@@ -1169,6 +1169,13 @@ MonoBehaviour:
   collisionMask:
     serializedVersion: 2
     m_Bits: 0
+  shortThrowSpeed: 15
+  shortThrowUpward: 3
+  lobThrowSpeed: 8
+  lobThrowUpward: 8
+  mouseSensitivity: 2
+  controllerSensitivity: 5
+  aimingRange: 10
 --- !u!114 &1681993517388132433
 MonoBehaviour:
   m_ObjectHideFlags: 0
