@@ -5,16 +5,15 @@ public class AudioManager : MonoBehaviour
     public static AudioManager Instance { get; private set; }
 
     [SerializeField] private AudioSource audioSource;
-    [SerializeField] private AudioClip lifeLostSound1; // For 3 to 2 lives
-    [SerializeField] private AudioClip lifeLostSound2; // For 2 to 1 lives
-    [SerializeField] private AudioClip lifeLostSound3; // For 1 to 0 lives
+    [SerializeField] private AudioClip lifeLostSound1;
+    [SerializeField] private AudioClip lifeLostSound2;
+    [SerializeField] private AudioClip lifeLostSound3;
 
     private void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
         }
         else
         {

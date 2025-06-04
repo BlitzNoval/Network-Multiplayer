@@ -9,40 +9,75 @@ public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance { get; private set; }
 
+    /* ────────────────────────────  Inspector  ──────────────────────────── */
     [Header("Prefabs")]
     public GameObject bombPrefab;
 
     [Header("UI")]
     public GameUI ui;
 
-    [SyncVar] public bool GameActive;
-    [SyncVar(hook = nameof(OnPauseStateChanged))] public bool IsPaused;
-    [SyncVar(hook = nameof(OnPauserChanged))] public NetworkIdentity Pauser;
+    // Added method to register the UI for late binding
+    public void RegisterUI(GameUI newUI)
+    {
+        ui = newUI;
+    }
 
-    readonly List<GameObject> players = new();
+    /* ────────────────────────────  SyncVars  ──────────────────────────── */
+    [SyncVar] public bool GameActive;
+    [SyncVar(hook = nameof(OnPauseStateChanged))]
+    public bool IsPaused;
+    [SyncVar(hook = nameof(OnPauserChanged))]
+    public NetworkIdentity Pauser;
+
+    /* ────────────────────────────  Runtime  ───────────────────────────── */
+    private readonly List<GameObject> players = new();
     public IReadOnlyList<GameObject> ActivePlayers => players;
     private static int nextPlayerNumber = 1;
-    GameObject bomb;
+    private GameObject bomb;
 
-    public Dictionary<string, GameObject> playerObjects = new Dictionary<string, GameObject>();
+    public Dictionary<string, GameObject> playerObjects = new();
 
+    /* ────────────────────────────  Events  ────────────────────────────── */
     public event Action<bool, bool> IsPausedChanged;
     public event Action<NetworkIdentity, NetworkIdentity> PauserChanged;
 
+    /* ────────────────────────────  Setup & Teardown  ──────────────────── */
     void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
         }
         else
         {
             Destroy(gameObject);
             return;
         }
+
         Debug.Log("GameManager initialized", this);
+        // NOTE: Removed DontDestroyOnLoad(gameObject);
     }
+
+    // Updated method with safer UI location using a coroutine
+    public override void OnStartClient()
+{
+    base.OnStartClient();
+    StartCoroutine(LocateUI());
+}
+
+IEnumerator LocateUI()
+{
+    float t = 0f;
+    while (ui == null && t < 1f)        // keep trying for ~1 sec
+    {
+        ui = FindObjectOfType<GameUI>(); // may still be null on the first frame
+        t += Time.unscaledDeltaTime;
+        yield return null;               // wait one frame
+    }
+
+    if (ui == null)
+        Debug.LogError("GameUI not found – is it in the Online Scene?");
+}
 
     void OnEnable()
     {
@@ -60,9 +95,11 @@ public class GameManager : NetworkBehaviour
     {
         if (Instance == this)
             Instance = null;
+
         Debug.Log("GameManager destroyed", this);
     }
 
+    /* ────────────────────────────  Server Lifecycle  ──────────────────── */
     public override void OnStartServer()
     {
         ResetState();
@@ -80,9 +117,11 @@ public class GameManager : NetworkBehaviour
         IsPaused = false;
         Pauser = null;
         bomb = null;
+
         Debug.Log("ResetState: Cleared game state", this);
     }
 
+    /* ────────────────────────────  Round Flow  ────────────────────────── */
     [Server]
     IEnumerator RoundLoop()
     {
@@ -98,8 +137,8 @@ public class GameManager : NetworkBehaviour
             }
             yield return null;
         }
-        yield return new WaitForSeconds(5f);
 
+        yield return new WaitForSeconds(5f);
         NetworkManager.singleton.StopHost();
     }
 
@@ -112,14 +151,15 @@ public class GameManager : NetworkBehaviour
             RpcCountdown(i.ToString());
             yield return new WaitForSeconds(1f);
         }
+
         while (IsPaused) yield return null;
         RpcCountdown("GO!!!");
         yield return new WaitForSeconds(1f);
         RpcHideCountdown();
     }
 
-    [ClientRpc]
-    void RpcCountdown(string txt)
+    /* ────────────────────────────  UI RPCs  ───────────────────────────── */
+    [ClientRpc] void RpcCountdown(string txt)
     {
         if (ui == null)
         {
@@ -130,8 +170,7 @@ public class GameManager : NetworkBehaviour
         ui.ShowCountdown(txt);
     }
 
-    [ClientRpc]
-    void RpcHideCountdown()
+    [ClientRpc] void RpcHideCountdown()
     {
         if (ui == null)
         {
@@ -141,22 +180,25 @@ public class GameManager : NetworkBehaviour
         ui.HideCountdown();
     }
 
+    [ClientRpc] void RpcShowWinner(string name) => ui?.ShowWinner(name);
+
+    /* ────────────────────────────  Player Management  ─────────────────── */
     [Server]
     public void RegisterPlayer(GameObject player)
     {
         if (player == null || players.Contains(player))
         {
-            Debug.LogWarning($"RegisterPlayer: Player is null or already registered", this);
+            Debug.LogWarning("RegisterPlayer: Player is null or already registered", this);
             return;
         }
 
         players.Add(player);
+
         var lifeManager = player.GetComponent<PlayerLifeManager>();
         if (lifeManager != null)
         {
             lifeManager.PlayerNumber = nextPlayerNumber;
-            nextPlayerNumber++;
-            if (nextPlayerNumber > 4) nextPlayerNumber = 1;
+            nextPlayerNumber = nextPlayerNumber % 4 + 1; // cycle 1-4
             Debug.Log($"RegisterPlayer: Assigned PlayerNumber={lifeManager.PlayerNumber} to {player.name}", this);
         }
         else
@@ -180,15 +222,18 @@ public class GameManager : NetworkBehaviour
             var playerInfo = p.GetComponent<PlayerInfo>();
             if (playerInfo != null)
                 playerObjects.Remove(playerInfo.playerName);
+
             Debug.Log($"Unregistered player {p.name}, remaining players: {players.Count}", this);
             CheckWinner();
         }
     }
 
+    /* ────────────────────────────  Win Check  ─────────────────────────── */
     void CheckWinner()
     {
         int alive = 0;
         GameObject win = null;
+
         foreach (var p in players.ToArray())
         {
             if (p == null)
@@ -196,6 +241,7 @@ public class GameManager : NetworkBehaviour
                 players.Remove(p);
                 continue;
             }
+
             var life = p.GetComponent<PlayerLifeManager>();
             if (life && !life.IsDisconnected && life.CurrentLives > 0)
             {
@@ -203,9 +249,12 @@ public class GameManager : NetworkBehaviour
                 win = p;
             }
         }
+
         if (alive == 1 && win != null)
         {
-            string winnerName = win.GetComponent<PlayerInfo>()?.playerName ?? $"Player {win.GetComponent<PlayerLifeManager>().PlayerNumber}";
+            string winnerName = win.GetComponent<PlayerInfo>()?.playerName
+                                ?? $"Player {win.GetComponent<PlayerLifeManager>().PlayerNumber}";
+
             Debug.Log($"Winner determined: {winnerName}", this);
             RpcShowWinner(winnerName);
             GameActive = false;
@@ -216,6 +265,7 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    /* ────────────────────────────  Bomb Logic  ────────────────────────── */
     [Server]
     public void SpawnBomb()
     {
@@ -236,28 +286,24 @@ public class GameManager : NetworkBehaviour
         bomb = Instantiate(bombPrefab, target.transform.position + Vector3.up, Quaternion.identity);
         NetworkServer.Spawn(bomb);
         bomb.GetComponent<Bomb>().AssignToPlayer(target);
+
         Debug.Log($"SpawnBomb: Bomb assigned to {target.name}", this);
     }
 
-    [Server]
-    void HandleBombExploded()
+    [Server] void HandleBombExploded()
     {
         bomb = null;
         StartCoroutine(RespawnBombAfterDelay());
     }
 
-    [Server]
-    IEnumerator RespawnBombAfterDelay()
+    [Server] IEnumerator RespawnBombAfterDelay()
     {
         yield return new WaitForSeconds(2f);
         SpawnBomb();
     }
 
-    [ClientRpc]
-    void RpcShowWinner(string name) => ui?.ShowWinner(name);
-
-    [Server]
-    public void PauseGame(NetworkIdentity pauser)
+    /* ────────────────────────────  Pause / Resume  ────────────────────── */
+    [Server] public void PauseGame(NetworkIdentity pauser)
     {
         if (!IsPaused)
         {
@@ -267,8 +313,7 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    [Server]
-    public void ResumeGame(NetworkIdentity pauser)
+    [Server] public void ResumeGame(NetworkIdentity pauser)
     {
         if (IsPaused && (pauser == null || Pauser == pauser))
         {
@@ -278,18 +323,24 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    [Server]
-    void OnServerDisconnect(NetworkConnectionToClient conn)
+    void OnPauseStateChanged(bool oldValue, bool newValue) =>
+        IsPausedChanged?.Invoke(oldValue, newValue);
+
+    void OnPauserChanged(NetworkIdentity oldValue, NetworkIdentity newValue) =>
+        PauserChanged?.Invoke(oldValue, newValue);
+
+    /* ────────────────────────────  Connection Handling  ───────────────── */
+    [Server] void OnServerDisconnect(NetworkConnectionToClient conn)
     {
         Debug.Log($"OnServerDisconnect: Connection {conn.connectionId} disconnected", this);
+
         foreach (var player in players.ToArray())
         {
             var netId = player.GetComponent<NetworkIdentity>();
             if (netId != null && netId.connectionToClient == conn)
-            {
                 UnregisterPlayer(player);
-            }
         }
+
         if (NetworkServer.active && players.Count == 0)
         {
             ResetState();
@@ -297,8 +348,8 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    [ServerCallback]
-    void Update()
+    /* ────────────────────────────  Misc Helpers  ──────────────────────── */
+    [ServerCallback] void Update()
     {
         if (IsPaused && Pauser != null && Pauser.connectionToClient == null)
         {
@@ -307,27 +358,15 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    void OnPauseStateChanged(bool oldValue, bool newValue)
+    [Server] public GameObject GetNextPlayer(GameObject excludePlayer)
     {
-        IsPausedChanged?.Invoke(oldValue, newValue);
+        var alivePlayers = players.Where(p =>
+            p != excludePlayer &&
+            p.GetComponent<PlayerLifeManager>().CurrentLives > 0).ToList();
+
+        return alivePlayers.Count == 0 ? null
+                                       : alivePlayers[UnityEngine.Random.Range(0, alivePlayers.Count)];
     }
 
-    void OnPauserChanged(NetworkIdentity oldValue, NetworkIdentity newValue)
-    {
-        PauserChanged?.Invoke(oldValue, newValue);
-    }
-
-    [Server]
-    public GameObject GetNextPlayer(GameObject excludePlayer)
-    {
-        var alivePlayers = players.Where(p => p != excludePlayer && p.GetComponent<PlayerLifeManager>().CurrentLives > 0).ToList();
-        if (alivePlayers.Count == 0) return null;
-        return alivePlayers[UnityEngine.Random.Range(0, alivePlayers.Count)];
-    }
-
-    [Server]
-    public bool IsPlayerActive(GameObject player)
-    {
-        return players.Contains(player);
-    }
+    [Server] public bool IsPlayerActive(GameObject player) => players.Contains(player);
 }
