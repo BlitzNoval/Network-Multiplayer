@@ -231,7 +231,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""id"": ""fd11d148-e767-46e1-a8d9-6d9ed530821d"",
                     ""path"": ""<Mouse>/delta"",
                     ""interactions"": """",
-                    ""processors"": ""ScaleVector2(x=0.5,y=0.5)"",
+                    ""processors"": ""ScaleVector2(x=2,y=2)"",
                     ""groups"": "";KeyboardMouse"",
                     ""action"": ""Aim"",
                     ""isComposite"": false,
