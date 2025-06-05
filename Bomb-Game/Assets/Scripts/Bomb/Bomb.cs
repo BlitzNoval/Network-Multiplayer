@@ -112,38 +112,20 @@ public class Bomb : NetworkBehaviour
         knockbackCalculator.DrawDebugSectors(explosionPos);
 
         var potentialTargets = Physics.OverlapSphere(explosionPos, knockbackCalculator.GetComponent<KnockbackCalculator>() ? 5f : 5f);
-
+        
+        // Process holder first (as per spec: "they will be the first to receive a dose of knockback")
+        if (holder != null)
+        {
+            ProcessPlayerKnockback(holder, explosionPos, true);
+        }
+        
+        // Then process all other players in radius
         foreach (var hit in potentialTargets)
         {
             if (!hit.CompareTag(playerTag)) continue;
-
-            var lifeManager = hit.GetComponent<PlayerLifeManager>();
-            if (lifeManager == null) continue;
-
-            var rb = hit.GetComponent<Rigidbody>();
-            if (rb == null) continue;
-
-            bool isHolder = hit.gameObject == holder;
-            float percentageKnockback = lifeManager.PercentageKnockback;
-
-            var knockbackResult = knockbackCalculator.CalculateKnockback(
-                explosionPos,
-                hit.gameObject,
-                percentageKnockback,
-                isHolder
-            );
-
-            if (!knockbackResult.affected) continue;
-
-            rb.AddForce(knockbackResult.force * 0.2f, ForceMode.Impulse);
-
-            if (hit.TryGetComponent(out NetworkIdentity ni) && ni.connectionToClient != null)
-            {
-                lifeManager.TargetApplyKnockback(ni.connectionToClient, knockbackResult.force);
-            }
-
-            lifeManager.RegisterKnockbackHit();
-            lifeManager.AddExplosionKnockbackPercentage(knockbackResult.sector);
+            if (hit.gameObject == holder) continue; // Already processed holder
+            
+            ProcessPlayerKnockback(hit.gameObject, explosionPos, false);
         }
 
         holder?.GetComponent<PlayerBombHandler>()?.ClearBomb();
@@ -153,6 +135,42 @@ public class Bomb : NetworkBehaviour
         OnBombExplodedGlobal?.Invoke();
         RpcHideBombTimer();
         StartCoroutine(DestroyAfterDelay(1f));
+    }
+    
+    [Server]
+    void ProcessPlayerKnockback(GameObject player, Vector3 explosionPos, bool isHolder)
+    {
+        var lifeManager = player.GetComponent<PlayerLifeManager>();
+        if (lifeManager == null) return;
+
+        var rb = player.GetComponent<Rigidbody>();
+        if (rb == null) return;
+
+        float percentageKnockback = lifeManager.PercentageKnockback;
+
+        var knockbackResult = knockbackCalculator.CalculateKnockback(
+            explosionPos,
+            player,
+            percentageKnockback,
+            isHolder
+        );
+
+        if (!knockbackResult.affected) return;
+
+        // Apply physics knockback
+        rb.AddForce(knockbackResult.force * 0.2f, ForceMode.Impulse);
+
+        // Apply networked knockback for smooth client prediction
+        if (player.TryGetComponent(out NetworkIdentity ni) && ni.connectionToClient != null)
+        {
+            lifeManager.TargetApplyKnockback(ni.connectionToClient, knockbackResult.force);
+        }
+
+        // Update player stats
+        lifeManager.RegisterKnockbackHit();
+        lifeManager.AddExplosionKnockbackPercentage(knockbackResult.sector);
+        
+        Debug.Log($"Applied knockback to {player.name}: Force={knockbackResult.force.magnitude:F1}, Percentage={percentageKnockback:F1}%, Sector={knockbackResult.sector}, IsHolder={isHolder}");
     }
 
     [Server]
