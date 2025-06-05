@@ -13,11 +13,13 @@ public class KnockbackCalculator : MonoBehaviour
     [SerializeField] private float[] sectorMultipliers = { 1f, 0.75f, 0.5f, 0.1f }; // 100%, 75%, 50%, 10%
     
     [Header("Physics Settings")]
-    [SerializeField] private float baseUpwardBias = 0.3f; // Base upward force at 0%
-    [SerializeField] private float maxUpwardBias = 0.8f; // Maximum upward force at high %
-    [SerializeField] private float percentageCurveExponent = 1.2f; // How quickly upward bias increases
+    [SerializeField] private float baseUpwardBias = 0.15f; // Reduced base upward force
+    [SerializeField] private float maxUpwardBias = 0.4f; // Reduced maximum upward force
+    [SerializeField] private float percentageCurveExponent = 0.8f; // Slower increase in upward bias
     [SerializeField] private float massInfluence = 0.5f; // How much mass affects knockback
     [SerializeField] private AnimationCurve knockbackAngleCurve; // Custom curve for knockback angle
+    [SerializeField] private float horizontalKnockbackMultiplier = 1.5f; // Boost horizontal knockback
+    [SerializeField] private float verticalKnockbackReduction = 0.6f; // Reduce vertical knockback
     
     [Header("Debug Visualization")]
     [SerializeField] private bool showDebugSectors = false;
@@ -35,16 +37,16 @@ public class KnockbackCalculator : MonoBehaviour
             sectorFalloffCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
         }
         
-        // Initialize knockback angle curve if not set (More realistic bomb feel)
+        // Initialize knockback angle curve if not set (Multiversus/Brawlhalla style)
         if (knockbackAngleCurve == null || knockbackAngleCurve.keys.Length == 0)
         {
-            // 0% = mostly horizontal (0.25), 150% = balanced (0.45), 300%+ = more vertical but still realistic (0.6)
+            // Much more horizontal-focused like platform fighters
             knockbackAngleCurve = new AnimationCurve(
-                new Keyframe(0f, 0.25f),               // 0% knockback - mostly horizontal
-                new Keyframe(50f, 0.35f),              // 50% knockback
-                new Keyframe(150f, 0.45f),             // 150% knockback - balanced
-                new Keyframe(250f, 0.55f),             // 250% knockback
-                new Keyframe(350f, 0.6f)               // 350%+ knockback - vertical but realistic
+                new Keyframe(0f, 0.1f),                // 0% knockback - very horizontal
+                new Keyframe(50f, 0.15f),              // 50% knockback - still mostly horizontal
+                new Keyframe(100f, 0.2f),              // 100% knockback - slight angle
+                new Keyframe(200f, 0.25f),             // 200% knockback - moderate angle
+                new Keyframe(350f, 0.35f)              // 350%+ knockback - higher but still horizontal-focused
             );
         }
     }
@@ -69,8 +71,15 @@ public class KnockbackCalculator : MonoBehaviour
             return result;
         }
         
-        // Calculate percentage modifier with exponential scaling
-        float percentageModifier = 1f + Mathf.Pow(percentageKnockback / 100f, 1.5f);
+        // Progressive knockback scaling like platform fighters
+        float percentageModifier = 1f + Mathf.Pow(percentageKnockback / 100f, 1.2f);
+        
+        // Additional scaling for very high percentages (Multiversus style)
+        if (percentageKnockback > 200f)
+        {
+            float highPercentageBonus = (percentageKnockback - 200f) / 150f; // 0-1 for 200%-350%
+            percentageModifier *= 1f + (highPercentageBonus * 0.8f); // Up to 80% more knockback at max
+        }
         
         // Apply holder bonus
         float holderMultiplier = isHolder ? 1.5f : 1f;
@@ -86,22 +95,24 @@ public class KnockbackCalculator : MonoBehaviour
         // Calculate final knockback magnitude
         float knockbackMagnitude = baseKnockback * sectorMultiplier * percentageModifier * holderMultiplier * massModifier;
         
-        // Calculate unified knockback direction (realistic bomb explosion feel)
+        // Calculate knockback direction (Multiversus/Brawlhalla style)
         Vector3 horizontalDir = new Vector3(direction.x, 0, direction.z).normalized;
         
-        // Get launch angle from curve based on knockback percentage (in radians)
+        // Get launch angle from curve based on knockback percentage (much lower angles)
         float upwardRatio = knockbackAngleCurve.Evaluate(percentageKnockback);
-        float launchAngle = Mathf.Lerp(15f, 60f, upwardRatio) * Mathf.Deg2Rad; // 15-60 degree launch angle
+        float launchAngle = Mathf.Lerp(5f, 25f, upwardRatio) * Mathf.Deg2Rad; // 5-25 degree launch angle (much flatter)
         
-        // Create unified direction vector using spherical coordinates
-        float horizontalMagnitude = Mathf.Cos(launchAngle);
-        float verticalMagnitude = Mathf.Sin(launchAngle);
+        // Create direction vector with emphasis on horizontal movement
+        float horizontalMagnitude = Mathf.Cos(launchAngle) * horizontalKnockbackMultiplier;
+        float verticalMagnitude = Mathf.Sin(launchAngle) * verticalKnockbackReduction;
         
         Vector3 knockbackDirection = (horizontalDir * horizontalMagnitude + Vector3.up * verticalMagnitude).normalized;
         
-        // Add slight randomness for natural feel (very minimal)
-        float randomness = Mathf.Lerp(0.05f, 0.02f, percentageKnockback / 350f);
-        knockbackDirection += Random.insideUnitSphere * randomness;
+        // Very minimal randomness for consistent feel
+        float randomness = Mathf.Lerp(0.02f, 0.01f, percentageKnockback / 350f);
+        Vector3 randomOffset = Random.insideUnitSphere * randomness;
+        randomOffset.y *= 0.3f; // Reduce vertical randomness even more
+        knockbackDirection += randomOffset;
         knockbackDirection.Normalize();
         
         result.affected = true;

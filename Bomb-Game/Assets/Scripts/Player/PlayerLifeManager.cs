@@ -296,8 +296,13 @@ public class PlayerLifeManager : NetworkBehaviour
     public void TargetApplyKnockback(NetworkConnectionToClient _, Vector3 force)
     {
         movement.enabled = false;
+        
+        // Apply knockback with better physics for platform fighter feel
+        rb.linearVelocity = Vector3.zero; // Reset velocity for clean knockback
         rb.AddForce(force, ForceMode.Impulse);
-        StartCoroutine(ReEnableMovement(0.5f));
+        
+        // Shorter movement disable for more responsive feel
+        StartCoroutine(ReEnableMovement(0.3f));
     }
 
     IEnumerator ReEnableMovement(float delay)

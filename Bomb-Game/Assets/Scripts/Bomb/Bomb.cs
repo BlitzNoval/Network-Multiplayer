@@ -157,8 +157,8 @@ public class Bomb : NetworkBehaviour
 
         if (!knockbackResult.affected) return;
 
-        // Apply physics knockback
-        rb.AddForce(knockbackResult.force * 0.2f, ForceMode.Impulse);
+        // Apply physics knockback (reduced multiplier for less floaty feel)
+        rb.AddForce(knockbackResult.force * 0.12f, ForceMode.Impulse);
 
         // Apply networked knockback for smooth client prediction
         if (player.TryGetComponent(out NetworkIdentity ni) && ni.connectionToClient != null)

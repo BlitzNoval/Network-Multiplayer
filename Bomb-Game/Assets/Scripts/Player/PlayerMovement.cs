@@ -10,17 +10,22 @@ public class PlayerMovement : NetworkBehaviour
     [SyncVar] public float acceleration = 10f;
     [SyncVar] public float deceleration = 10f;
     [SyncVar] public float rotationSpeed = 10f;
+    
+    [Header("Bomb Holder Boost")]
+    [SerializeField] private float bombHolderSpeedMultiplier = 1.3f; // 30% speed boost when holding bomb
 
     Rigidbody  rb;
     InputAction moveAct;
     Vector2    moveInput;
     Vector3    horizVel;
+    PlayerBombHandler bombHandler;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         var pi = GetComponent<PlayerInput>();
         moveAct = pi.actions.FindAction("Move");
+        bombHandler = GetComponent<PlayerBombHandler>();
     }
 
     void OnEnable()  { if (isLocalPlayer) moveAct.Enable(); }
@@ -69,7 +74,15 @@ public class PlayerMovement : NetworkBehaviour
     void ApplyMovement()
     {
         if (moveInput.magnitude > 1f) moveInput.Normalize();
-        Vector3 target = new Vector3(moveInput.x, 0, moveInput.y) * speed;
+        
+        // Apply speed boost if holding bomb
+        float currentSpeed = speed;
+        if (bombHandler != null && bombHandler.CurrentBomb != null && bombHandler.CurrentBomb.Holder == gameObject)
+        {
+            currentSpeed *= bombHolderSpeedMultiplier;
+        }
+        
+        Vector3 target = new Vector3(moveInput.x, 0, moveInput.y) * currentSpeed;
 
         horizVel = Vector3.MoveTowards(
             horizVel,

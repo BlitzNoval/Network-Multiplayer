@@ -72,10 +72,14 @@ public class PlayerBombHandler : NetworkBehaviour
         playerAnimator = GetComponent<PlayerAnimator>();
         animator = GetComponent<Animator>();
         
-        // Find camera - try main camera first, then camera tagged as MainCamera
-        playerCamera = Camera.main;
+        // Find camera - prioritize per-player cameras for multiplayer
+        playerCamera = GetComponentInChildren<Camera>();
         if (playerCamera == null)
-            playerCamera = GameObject.FindGameObjectWithTag("MainCamera")?.GetComponent<Camera>();
+        {
+            playerCamera = Camera.main;
+            if (playerCamera == null)
+                playerCamera = GameObject.FindGameObjectWithTag("MainCamera")?.GetComponent<Camera>();
+        }
 
         timeStep = Time.fixedDeltaTime;
         
@@ -102,6 +106,13 @@ public class PlayerBombHandler : NetworkBehaviour
             yield break;
         }
 
+        // Ensure we have valid input actions before subscribing
+        if (toggleThrowTypeAct == null || holdAimAct == null || cancelAimAct == null || aimAct == null)
+        {
+            Debug.LogError($"SubscribeToInput: One or more input actions are null for {gameObject.name}", this);
+            yield break;
+        }
+
         // Subscribe to input events
         toggleThrowTypeAct.performed += ToggleThrowType;
         holdAimAct.started += StartAiming;
@@ -109,7 +120,7 @@ public class PlayerBombHandler : NetworkBehaviour
         cancelAimAct.performed += CancelAiming;
         
         inputSubscribed = true;
-        Debug.Log($"SubscribeToInput: Input subscribed for {gameObject.name}, isLocalPlayer={isLocalPlayer}", this);
+        Debug.Log($"SubscribeToInput: Input subscribed for {gameObject.name}, isLocalPlayer={isLocalPlayer}, scheme={playerInput.currentControlScheme}", this);
     }
 
     void OnDisable()
@@ -127,13 +138,31 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void Update()
     {
-        if (!isLocalPlayer || (GameManager.Instance != null && GameManager.Instance.IsPaused))
+        // Only process input for local player
+        if (!isLocalPlayer)
         {
             if (isAiming)
             {
                 HideTrajectory();
                 isAiming = false;
             }
+            return;
+        }
+        
+        // Pause check
+        if (GameManager.Instance != null && GameManager.Instance.IsPaused)
+        {
+            if (isAiming)
+            {
+                HideTrajectory();
+                isAiming = false;
+            }
+            return;
+        }
+
+        // Validate input system is ready
+        if (!inputSubscribed || aimAct == null)
+        {
             return;
         }
 
@@ -154,65 +183,77 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void UpdateAimDirection()
     {
-        if (!isAiming) return;
+        if (!isAiming || !isLocalPlayer) return;
 
-        // Get aim input (mouse delta or right stick)
-        Vector2 aimInput = aimAct.ReadValue<Vector2>();
-        
-        // Handle mouse input - only for players using KeyboardMouse control scheme
-        if (playerInput.currentControlScheme == "KeyboardMouse")
+        try
         {
-            // Mouse input - convert screen space to world direction
-            Vector3 mouseWorldPos = GetMouseWorldPosition();
-            if (mouseWorldPos != Vector3.zero)
+            // Get aim input (mouse delta or right stick) - with null check
+            Vector2 aimInput = aimAct?.ReadValue<Vector2>() ?? Vector2.zero;
+            
+            // Handle mouse input - only for players using KeyboardMouse control scheme
+            if (playerInput.currentControlScheme == "KeyboardMouse")
             {
-                Vector3 directionToMouse = (mouseWorldPos - transform.position).normalized;
-                directionToMouse.y = 0; // Keep aim on horizontal plane
-                if (directionToMouse.magnitude > 0.1f)
-                    aimDirection = directionToMouse;
-            }
-        }
-        else if (aimInput.magnitude > 0.1f)
-        {
-            // Controller input - use right stick directly
-            Vector3 inputDirection = new Vector3(aimInput.x, 0, aimInput.y).normalized;
-            if (inputDirection.magnitude > 0.1f)
-            {
-                // Convert local input to world space relative to camera
-                if (playerCamera != null)
+                // Mouse input - use delta for smooth relative aiming
+                if (aimInput.magnitude > 0.01f) // Lower threshold for mouse sensitivity
                 {
-                    Vector3 cameraForward = playerCamera.transform.forward;
-                    Vector3 cameraRight = playerCamera.transform.right;
-                    cameraForward.y = 0;
-                    cameraRight.y = 0;
-                    cameraForward.Normalize();
-                    cameraRight.Normalize();
+                    // Apply mouse sensitivity and convert to world direction
+                    Vector3 deltaDirection = new Vector3(aimInput.x, 0, aimInput.y) * mouseSensitivity * Time.deltaTime;
                     
-                    aimDirection = (cameraForward * inputDirection.z + cameraRight * inputDirection.x).normalized;
+                    // Convert relative to camera space
+                    if (playerCamera != null)
+                    {
+                        Vector3 cameraForward = playerCamera.transform.forward;
+                        Vector3 cameraRight = playerCamera.transform.right;
+                        cameraForward.y = 0;
+                        cameraRight.y = 0;
+                        cameraForward.Normalize();
+                        cameraRight.Normalize();
+                        
+                        Vector3 worldDelta = (cameraRight * deltaDirection.x + cameraForward * deltaDirection.z);
+                        aimDirection = (aimDirection + worldDelta).normalized;
+                    }
+                    else
+                    {
+                        aimDirection = (aimDirection + deltaDirection).normalized;
+                    }
                 }
-                else
+            }
+            else if (aimInput.magnitude > 0.1f)
+            {
+                // Controller input - use right stick directly
+                Vector3 inputDirection = new Vector3(aimInput.x, 0, aimInput.y);
+                if (inputDirection.magnitude > 0.1f)
                 {
-                    aimDirection = inputDirection;
+                    // Apply controller sensitivity
+                    inputDirection *= controllerSensitivity;
+                    inputDirection.Normalize();
+                    
+                    // Convert local input to world space relative to camera
+                    if (playerCamera != null)
+                    {
+                        Vector3 cameraForward = playerCamera.transform.forward;
+                        Vector3 cameraRight = playerCamera.transform.right;
+                        cameraForward.y = 0;
+                        cameraRight.y = 0;
+                        cameraForward.Normalize();
+                        cameraRight.Normalize();
+                        
+                        aimDirection = (cameraForward * inputDirection.z + cameraRight * inputDirection.x).normalized;
+                    }
+                    else
+                    {
+                        aimDirection = inputDirection;
+                    }
                 }
             }
         }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"UpdateAimDirection error for {gameObject.name}: {e.Message}", this);
+        }
     }
 
-    Vector3 GetMouseWorldPosition()
-    {
-        if (playerCamera == null) return Vector3.zero;
-        
-        Vector3 mousePos = Mouse.current.position.ReadValue();
-        
-        // For orthographic camera, use the player's world Y position for screen-to-world conversion
-        Vector3 playerWorldPos = transform.position;
-        mousePos.z = playerCamera.WorldToScreenPoint(playerWorldPos).z;
-        
-        Vector3 worldPos = playerCamera.ScreenToWorldPoint(mousePos);
-        worldPos.y = playerWorldPos.y; // Keep on player's Y level
-        
-        return worldPos;
-    }
+    // Removed GetMouseWorldPosition - now using delta movement instead
     
 
     public void SetBomb(Bomb b)
