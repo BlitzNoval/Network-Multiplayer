@@ -271,7 +271,7 @@ public class Bomb : NetworkBehaviour
     }
     
     [Server]
-    public void ThrowBomb(Vector3 direction, bool useShortThrow, float elevationMultiplier)
+    public void ThrowBomb(Vector3 direction, bool useShortThrow)
     {
         if (!isHeld || holder == null || Time.time < lastThrowTime + throwCooldown)
             return;
@@ -283,11 +283,9 @@ public class Bomb : NetworkBehaviour
         col.isTrigger = false;
         rb.mass *= flightMassMultiplier;
 
-        // Use provided direction and parameters
+        // Use provided direction and throw type
         float speed = useShortThrow ? normalThrowSpeed : lobThrowSpeed;
-        float baseUpward = useShortThrow ? normalThrowUpward : lobThrowUpward;
-        float upward = baseUpward * elevationMultiplier;
-        
+        float upward = useShortThrow ? normalThrowUpward : lobThrowUpward;
         Vector3 force = direction.normalized * speed + Vector3.up * upward;
 
         rb.linearVelocity = Vector3.zero;

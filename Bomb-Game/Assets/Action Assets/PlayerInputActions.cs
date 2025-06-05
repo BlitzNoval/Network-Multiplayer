@@ -128,22 +128,13 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""Throw"",
+                    ""name"": ""CancelAim"",
                     ""type"": ""Button"",
                     ""id"": ""4cd51b53-033e-4607-846f-1d071ce38adc"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
-                },
-                {
-                    ""name"": ""Elevation"",
-                    ""type"": ""Value"",
-                    ""id"": ""7f8e5d3c-2a1b-4c9d-8e6f-1a2b3c4d5e6f"",
-                    ""expectedControlType"": ""Axis"",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -260,7 +251,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""a0649f15-5499-4c3c-8b63-26beca389836"",
-                    ""path"": ""<Mouse>/rightButton"",
+                    ""path"": ""<Mouse>/leftButton"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": "";KeyboardMouse"",
@@ -282,44 +273,22 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""c81b8ad8-13af-4cc0-b8d6-641265116c7e"",
-                    ""path"": ""<Mouse>/leftButton"",
+                    ""path"": ""<Mouse>/rightButton"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": "";KeyboardMouse"",
-                    ""action"": ""Throw"",
+                    ""action"": ""CancelAim"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
                 {
                     ""name"": """",
                     ""id"": ""5ae992e7-588c-4dca-9d78-70d3b40eba86"",
-                    ""path"": ""<Gamepad>/rightTrigger"",
+                    ""path"": ""<Gamepad>/buttonEast"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": "";Gamepad"",
-                    ""action"": ""Throw"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
-                    ""id"": ""mouse-scroll-elevation"",
-                    ""path"": ""<Mouse>/scroll/y"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": "";KeyboardMouse"",
-                    ""action"": ""Elevation"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
-                    ""id"": ""gamepad-stick-elevation"",
-                    ""path"": ""<Gamepad>/rightStick/y"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": "";Gamepad"",
-                    ""action"": ""Elevation"",
+                    ""action"": ""CancelAim"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -362,8 +331,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_ToggleThrowTypes = m_Player.FindAction("ToggleThrowTypes", throwIfNotFound: true);
         m_Player_Aim = m_Player.FindAction("Aim", throwIfNotFound: true);
         m_Player_HoldAim = m_Player.FindAction("HoldAim", throwIfNotFound: true);
-        m_Player_Throw = m_Player.FindAction("Throw", throwIfNotFound: true);
-        m_Player_Elevation = m_Player.FindAction("Elevation", throwIfNotFound: true);
+        m_Player_CancelAim = m_Player.FindAction("CancelAim", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -448,8 +416,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_ToggleThrowTypes;
     private readonly InputAction m_Player_Aim;
     private readonly InputAction m_Player_HoldAim;
-    private readonly InputAction m_Player_Throw;
-    private readonly InputAction m_Player_Elevation;
+    private readonly InputAction m_Player_CancelAim;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -478,13 +445,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @HoldAim => m_Wrapper.m_Player_HoldAim;
         /// <summary>
-        /// Provides access to the underlying input action "Player/Throw".
+        /// Provides access to the underlying input action "Player/CancelAim".
         /// </summary>
-        public InputAction @Throw => m_Wrapper.m_Player_Throw;
-        /// <summary>
-        /// Provides access to the underlying input action "Player/Elevation".
-        /// </summary>
-        public InputAction @Elevation => m_Wrapper.m_Player_Elevation;
+        public InputAction @CancelAim => m_Wrapper.m_Player_CancelAim;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -523,12 +486,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @HoldAim.started += instance.OnHoldAim;
             @HoldAim.performed += instance.OnHoldAim;
             @HoldAim.canceled += instance.OnHoldAim;
-            @Throw.started += instance.OnThrow;
-            @Throw.performed += instance.OnThrow;
-            @Throw.canceled += instance.OnThrow;
-            @Elevation.started += instance.OnElevation;
-            @Elevation.performed += instance.OnElevation;
-            @Elevation.canceled += instance.OnElevation;
+            @CancelAim.started += instance.OnCancelAim;
+            @CancelAim.performed += instance.OnCancelAim;
+            @CancelAim.canceled += instance.OnCancelAim;
         }
 
         /// <summary>
@@ -552,12 +512,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @HoldAim.started -= instance.OnHoldAim;
             @HoldAim.performed -= instance.OnHoldAim;
             @HoldAim.canceled -= instance.OnHoldAim;
-            @Throw.started -= instance.OnThrow;
-            @Throw.performed -= instance.OnThrow;
-            @Throw.canceled -= instance.OnThrow;
-            @Elevation.started -= instance.OnElevation;
-            @Elevation.performed -= instance.OnElevation;
-            @Elevation.canceled -= instance.OnElevation;
+            @CancelAim.started -= instance.OnCancelAim;
+            @CancelAim.performed -= instance.OnCancelAim;
+            @CancelAim.canceled -= instance.OnCancelAim;
         }
 
         /// <summary>
@@ -653,18 +610,11 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnHoldAim(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "Throw" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "CancelAim" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnThrow(InputAction.CallbackContext context);
-        /// <summary>
-        /// Method invoked when associated input action "Elevation" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnElevation(InputAction.CallbackContext context);
+        void OnCancelAim(InputAction.CallbackContext context);
     }
 }

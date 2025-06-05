@@ -42,22 +42,13 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Throw",
+                    "name": "CancelAim",
                     "type": "Button",
                     "id": "4cd51b53-033e-4607-846f-1d071ce38adc",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
-                },
-                {
-                    "name": "Elevation",
-                    "type": "Value",
-                    "id": "7f8e5d3c-2a1b-4c9d-8e6f-1a2b3c4d5e6f",
-                    "expectedControlType": "Axis",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -174,7 +165,7 @@
                 {
                     "name": "",
                     "id": "a0649f15-5499-4c3c-8b63-26beca389836",
-                    "path": "<Mouse>/rightButton",
+                    "path": "<Mouse>/leftButton",
                     "interactions": "",
                     "processors": "",
                     "groups": ";KeyboardMouse",
@@ -196,44 +187,22 @@
                 {
                     "name": "",
                     "id": "c81b8ad8-13af-4cc0-b8d6-641265116c7e",
-                    "path": "<Mouse>/leftButton",
+                    "path": "<Mouse>/rightButton",
                     "interactions": "",
                     "processors": "",
                     "groups": ";KeyboardMouse",
-                    "action": "Throw",
+                    "action": "CancelAim",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
                 {
                     "name": "",
                     "id": "5ae992e7-588c-4dca-9d78-70d3b40eba86",
-                    "path": "<Gamepad>/rightTrigger",
+                    "path": "<Gamepad>/buttonEast",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
-                    "action": "Throw",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "mouse-scroll-elevation",
-                    "path": "<Mouse>/scroll/y",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";KeyboardMouse",
-                    "action": "Elevation",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "gamepad-stick-elevation",
-                    "path": "<Gamepad>/rightStick/y",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Gamepad",
-                    "action": "Elevation",
+                    "action": "CancelAim",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
