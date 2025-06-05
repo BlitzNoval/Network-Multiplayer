@@ -1,157 +1,101 @@
 using Mirror;
-using System.Collections;
 using UnityEngine;
 
-[RequireComponent(typeof(Animator), typeof(PlayerMovement), typeof(PlayerBombHandler))]
+[RequireComponent(typeof(Animator))]
+[RequireComponent(typeof(NetworkAnimator))]
+[RequireComponent(typeof(PlayerMovement))]
+[RequireComponent(typeof(PlayerBombHandler))]
 public class PlayerAnimator : NetworkBehaviour
 {
-    private static readonly int ActiveHandParam = Animator.StringToHash("activeHand");
-    private static readonly int IsMovingParam = Animator.StringToHash("isMoving");
-    private static readonly int ThrowParam = Animator.StringToHash("Throw");
-    private static readonly int StunnedParam = Animator.StringToHash("Stunned");
-    private static readonly int LandingParam = Animator.StringToHash("Landing");
+    // Animator parameters
+    private const string ActiveHandName = "activeHand";
+    private const string IsMovingName   = "isMoving";
+    private const string ThrowName      = "Throw";
+    private const string StunnedName    = "Stunned";
+    private const string LandingName    = "Landing";
 
-    private Animator animator;
-    private PlayerMovement movement;
+    private static readonly int ActiveHandHash = Animator.StringToHash(ActiveHandName);
+    private static readonly int IsMovingHash   = Animator.StringToHash(IsMovingName);
+
+    [Header("Tuning")]
+    [SerializeField] private float movementThreshold     = 0.1f;
+    [SerializeField] private float fallThreshold         = -2f;
+    [SerializeField] private float landingVelocityThresh = -3f;
+
+    private Animator          animator;
+    private NetworkAnimator   netAnimator;
+    private PlayerMovement    movement;
     private PlayerBombHandler bombHandler;
-    private PlayerLifeManager lifeManager;
-    private Rigidbody rb;
+    private Rigidbody         rb;
 
-    [SerializeField] private float movementThreshold = 0.1f;
-    
-    [SerializeField] private float fallThreshold = -2f;
-    [SerializeField] private float landingVelocityThreshold = -3f;
-    private bool wasFalling = false;
+    private bool wasFalling;
 
-    [SyncVar(hook = nameof(OnActiveHandChanged))]
-    private int activeHand = 0;
+    /* ───────────────────────────────────────────── */
 
-    [SyncVar(hook = nameof(OnIsMovingChanged))]
-    private bool isMoving = false;
-
-    private void Awake()
+    void Awake()
     {
-        animator = GetComponent<Animator>();
-        movement = GetComponent<PlayerMovement>();
-        bombHandler = GetComponent<PlayerBombHandler>();
-        lifeManager = GetComponent<PlayerLifeManager>();
-        rb = GetComponent<Rigidbody>();
+        animator     = GetComponent<Animator>();
+        netAnimator  = GetComponent<NetworkAnimator>();
+        movement     = GetComponent<PlayerMovement>();
+        bombHandler  = GetComponent<PlayerBombHandler>();
+        rb           = GetComponent<Rigidbody>();
+
+        if (netAnimator.animator == null)
+            netAnimator.animator = animator;
     }
 
-    private void Start()
+    /* run only on the owner */
+    public override void OnStartAuthority() => enabled = true;
+    public override void OnStopAuthority()  => enabled = false;
+
+    void Update()
     {
-        animator.SetInteger(ActiveHandParam, 0);
-        animator.SetBool(IsMovingParam, false);
+        if (!isOwned) return;               // <─ NEW property
+
+        UpdateActiveHand();
+        UpdateMovementState();
+        CheckLanding();
     }
 
-    private void Update()
+    /* ───────── helpers ───────── */
+
+    void UpdateActiveHand()
     {
-        if (!isLocalPlayer && !isServer) return;
-
-        if (isServer)
-        {
-            UpdateActiveHand();
-
-            UpdateMovementState();
-        }
-
-        if (isLocalPlayer)
-        {
-            CheckForLanding();
-        }
-    }
-
-    [Server]
-    private void UpdateActiveHand()
-    {
-        int newActiveHand = 0;
-        
-        if (bombHandler && bombHandler.CurrentBomb != null && 
+        int hand = 0;
+        if (bombHandler.CurrentBomb &&
             bombHandler.CurrentBomb.Holder == gameObject)
-        {
-            newActiveHand = bombHandler.CurrentBomb.IsOnRight ? 2 : 1;
-        }
-        
-        if (activeHand != newActiveHand)
-        {
-            activeHand = newActiveHand;
-        }
+            hand = bombHandler.CurrentBomb.IsOnRight ? 2 : 1;
+
+        animator.SetInteger(ActiveHandHash, hand);
     }
 
-    [Server]
-    private void UpdateMovementState()
+    void UpdateMovementState()
     {
-        if (movement)
-        {
-            Vector3 horizVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
-            bool newIsMoving = horizVelocity.magnitude > movementThreshold;
-            
-            if (isMoving != newIsMoving)
-            {
-                isMoving = newIsMoving;
-            }
-        }
+        Vector3 horiz = new(rb.linearVelocity.x, 0, rb.linearVelocity.z);
+        animator.SetBool(IsMovingHash, horiz.magnitude > movementThreshold);
     }
 
-    private void CheckForLanding()
+    void CheckLanding()
     {
-        if (rb)
-        {
-            bool isFalling = rb.linearVelocity.y < fallThreshold;
+        bool falling = rb.linearVelocity.y < fallThreshold;
 
-            if (wasFalling && !isFalling && rb.linearVelocity.y > landingVelocityThreshold)
-            {
-                TriggerLandingAnimation();
-            }
+        if (wasFalling && !falling && rb.linearVelocity.y > landingVelocityThresh)
+            netAnimator.SetTrigger(LandingName);
 
-            wasFalling = isFalling;
-        }
+        wasFalling = falling;
     }
 
-
-    [Client]
-    public void TriggerThrowAnimation()
-    {
-        animator.SetTrigger(ThrowParam);
-    }
-
-    [Client]
-    public void TriggerStunnedAnimation()
-    {
-        animator.SetTrigger(StunnedParam);
-    }
-
-    [Client]
-    private void TriggerLandingAnimation()
-    {
-        animator.SetTrigger(LandingParam);
-    }
-
-
-    private void OnActiveHandChanged(int oldValue, int newValue)
-    {
-        animator.SetInteger(ActiveHandParam, newValue);
-    }
-
-    private void OnIsMovingChanged(bool oldValue, bool newValue)
-    {
-        animator.SetBool(IsMovingParam, newValue);
-    }
-
+    /* ───────── public API ───────── */
 
     public void OnBombThrow()
     {
-        if (isLocalPlayer)
-        {
-            TriggerThrowAnimation();
-        }
+        if (!isOwned) return;
+        netAnimator.SetTrigger(ThrowName);
     }
 
     public void OnPlayerStunned()
     {
-        if (isLocalPlayer)
-        {
-            TriggerStunnedAnimation();
-        }
+        if (!isOwned) return;
+        netAnimator.SetTrigger(StunnedName);
     }
 }

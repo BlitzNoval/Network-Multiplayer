@@ -66,10 +66,10 @@ public class MainMenuUI : MonoBehaviour
         }
 
         // Force reset: stop host if server or client is active
-        if (NetworkServer.active || NetworkClient.isConnected)
-        {
-            NetworkManager.singleton.StopHost();
-        }
+     //   if (NetworkServer.active || NetworkClient.isConnected)
+     //   {
+      //      NetworkManager.singleton.StopHost();
+      //  }
 
         var rm = MyRoomManager.Singleton;
         if (rm == null)
