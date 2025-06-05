@@ -22535,6 +22535,67 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1762227791}
   m_CullTransparentMesh: 1
+--- !u!1001 &1794141665
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 14.737513
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.5000002
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 22.114834
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.000000037748947
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 5bf7e499a44e12148859bf15a596d879, type: 2}
+    - target: {fileID: 919132149155446097, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
+      propertyPath: m_Name
+      value: GlassBridgeNew
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0d9121f84477d104686e7ea118946f26, type: 3}
 --- !u!1 &1799983218
 GameObject:
   m_ObjectHideFlags: 0
@@ -29042,3 +29103,4 @@ SceneRoots:
   - {fileID: 1931506684}
   - {fileID: 48936095}
   - {fileID: 169765864}
+  - {fileID: 1794141665}
