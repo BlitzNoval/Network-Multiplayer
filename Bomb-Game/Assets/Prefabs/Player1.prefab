@@ -1006,6 +1006,7 @@ GameObject:
   - component: {fileID: 2686077938419556723}
   - component: {fileID: 4835206928586335650}
   - component: {fileID: 1434385717377194075}
+  - component: {fileID: 4916754609639730981}
   m_Layer: 0
   m_Name: Player1
   m_TagString: Player
@@ -1176,6 +1177,10 @@ MonoBehaviour:
   mouseSensitivity: 2
   controllerSensitivity: 5
   aimingRange: 10
+  minElevationMultiplier: 0.5
+  maxElevationMultiplier: 2
+  elevationSensitivity: 1
+  mouseElevationSensitivity: 0.5
 --- !u!114 &1681993517388132433
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1437,7 +1442,7 @@ MonoBehaviour:
   syncInterval: 0
   movementThreshold: 0.1
   fallThreshold: -2
-  landingVelocityThreshold: -3
+  landingVelocityThresh: -3
 --- !u!114 &1739599954661421427
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1511,6 +1516,23 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   outline: {fileID: 4835206928586335650}
+--- !u!114 &4916754609639730981
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8593366603179590309}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f6f3bf89aa97405989c802ba270f815, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  syncDirection: 1
+  syncMode: 0
+  syncInterval: 0
+  clientAuthority: 1
+  animator: {fileID: 6115396542742235922}
 --- !u!1 &8797558435830226598
 GameObject:
   m_ObjectHideFlags: 0
