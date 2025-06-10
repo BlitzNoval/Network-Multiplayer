@@ -1174,13 +1174,10 @@ MonoBehaviour:
   shortThrowUpward: 3
   lobThrowSpeed: 8
   lobThrowUpward: 8
-  mouseSensitivity: 2
+  mouseSensitivity: 3
   controllerSensitivity: 5
   aimingRange: 10
-  minElevationMultiplier: 0.5
-  maxElevationMultiplier: 2
-  elevationSensitivity: 1
-  mouseElevationSensitivity: 0.5
+  aimSmoothSpeed: 8
 --- !u!114 &1681993517388132433
 MonoBehaviour:
   m_ObjectHideFlags: 0
