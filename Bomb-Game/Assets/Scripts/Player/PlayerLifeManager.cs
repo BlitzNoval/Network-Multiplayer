@@ -29,7 +29,7 @@ public class PlayerLifeManager : NetworkBehaviour
     private float percentageKnockback = 0f;
     [SerializeField] private float baseKnockbackIncreaseRate = 10f; // Base rate per second
     [SerializeField] private float maxKnockbackPercentage = 350f; // Increased to 350%
-    [SerializeField] private float[] milestoneMultipliers = { 1f, 1.5f, 2f, 2.5f }; // At 0%, 100%, 200%, 300%
+    [SerializeField] private float[] milestoneMultipliers = { 1f, 1.2f, 1.4f, 1.6f }; // At 0%, 100%, 200%, 300% - reduced from 1.5, 2, 2.5
     
     // Properties
     public float KnockbackMultiplier => 1f + (percentageKnockback / 100f);

@@ -65,6 +65,12 @@ public class MainMenuUI : MonoBehaviour
             return;
         }
 
+        // Force reset: stop host if server or client is active
+     //   if (NetworkServer.active || NetworkClient.isConnected)
+     //   {
+      //      NetworkManager.singleton.StopHost();
+      //  }
+
         var rm = MyRoomManager.Singleton;
         if (rm == null)
         {
@@ -106,6 +112,16 @@ public class MainMenuUI : MonoBehaviour
             ShowInvalidRoomPanel();
             Debug.LogWarning("Join room failed: Invalid input fields");
             return;
+        }
+
+        // Force reset: stop server and client if active
+        if (NetworkServer.active)
+        {
+            NetworkManager.singleton.StopServer();
+        }
+        if (NetworkClient.isConnected)
+        {
+            NetworkManager.singleton.StopClient();
         }
 
         var rm = MyRoomManager.Singleton;

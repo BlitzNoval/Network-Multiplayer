@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 public class PlayerUIManager : MonoBehaviour
 {
@@ -15,17 +16,19 @@ public class PlayerUIManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
+
             foreach (var panel in panels)
-            {
                 if (panel != null)
                     panel.gameObject.SetActive(false);
-            }
         }
         else
         {
             Destroy(gameObject);
+            return;
         }
+
+        if (panels == null || panels.Length == 0 || panels.All(p => p == null))
+            panels = GetComponentsInChildren<PlayerUIPanel>(true);
     }
 
     void OnDestroy()
@@ -36,19 +39,18 @@ public class PlayerUIManager : MonoBehaviour
 
     public void Register(PlayerLifeManager lifeManager)
     {
-        if (lifeManager == null)
-            return;
+        if (lifeManager == null) return;
 
         int idx = lifeManager.PlayerNumber - 1;
-        if (idx < 0 || idx >= panels.Length)
-            return;
+        if (idx < 0 || idx >= panels.Length) return;
 
         var panel = panels[idx];
-        if (panel == null)
-            return;
+        if (panel == null) return;
 
         var playerInfo = lifeManager.GetComponent<PlayerInfo>();
-        string playerName = playerInfo != null ? playerInfo.playerName : $"P{lifeManager.PlayerNumber}";
+        string playerName = playerInfo != null
+            ? playerInfo.playerName
+            : $"P{lifeManager.PlayerNumber}";
 
         panel.gameObject.SetActive(true);
         panel.Initialize(lifeManager.PlayerNumber);
@@ -56,23 +58,22 @@ public class PlayerUIManager : MonoBehaviour
         panel.SetLives(lifeManager.CurrentLives, lifeManager.CurrentLives);
         panel.SetKnockback(0f, lifeManager.PercentageKnockback);
 
-        lifeManager.OnLivesChanged += panel.SetLives;
-        lifeManager.OnKnockbackPercentageChanged += panel.SetKnockback;
+        lifeManager.OnLivesChanged                += panel.SetLives;
+        lifeManager.OnKnockbackPercentageChanged  += panel.SetKnockback;
 
         activePanels[lifeManager.PlayerNumber] = panel;
     }
 
     public void Unregister(PlayerLifeManager lifeManager)
     {
-        if (lifeManager == null)
-            return;
+        if (lifeManager == null) return;
 
         if (activePanels.TryGetValue(lifeManager.PlayerNumber, out var panel))
         {
             if (panel != null)
             {
                 panel.gameObject.SetActive(false);
-                lifeManager.OnLivesChanged -= panel.SetLives;
+                lifeManager.OnLivesChanged               -= panel.SetLives;
                 lifeManager.OnKnockbackPercentageChanged -= panel.SetKnockback;
             }
             activePanels.Remove(lifeManager.PlayerNumber);
@@ -82,10 +83,9 @@ public class PlayerUIManager : MonoBehaviour
     public void ResetPanels()
     {
         foreach (var panel in activePanels.Values)
-        {
             if (panel != null)
                 panel.gameObject.SetActive(false);
-        }
+
         activePanels.Clear();
     }
 }

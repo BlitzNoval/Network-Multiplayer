@@ -24,6 +24,13 @@ public class GameUI : MonoBehaviour
     public GameObject timerPanel;
     public TMP_Text   timerText;
 
+     void Awake()
+    {
+        // Tell the active GameManager we're alive
+        if (GameManager.Instance != null)
+            GameManager.Instance.RegisterUI(this);
+    }
+
     void Start()
     {
         if (NetworkClient.isConnected)

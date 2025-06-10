@@ -10,17 +10,22 @@ public class KnockbackCalculator : MonoBehaviour
     
     [Header("Sector Configuration")]
     [SerializeField] private float[] sectorRadii = { 1f, 2f, 3.5f, 5f }; // Percentage of explosion radius
-    [SerializeField] private float[] sectorMultipliers = { 1f, 0.8f, 0.5f, 0.2f };
+    [SerializeField] private float[] sectorMultipliers = { 1f, 0.75f, 0.5f, 0.1f }; // 100%, 75%, 50%, 10%
     
     [Header("Physics Settings")]
-    [SerializeField] private float upwardBias = 0.15f; // 15% of force goes upward
-    [SerializeField] private float horizontalBias = 0.85f; // 85% goes horizontal
+    [SerializeField] private float baseUpwardBias = 0.3f; // Base upward force at 0%
+    [SerializeField] private float maxUpwardBias = 0.8f; // Maximum upward force at high %
+    [SerializeField] private float percentageCurveExponent = 1.2f; // How quickly upward bias increases
     [SerializeField] private float massInfluence = 0.5f; // How much mass affects knockback
+    [SerializeField] private AnimationCurve knockbackAngleCurve; // Custom curve for knockback angle
     
     [Header("Debug Visualization")]
     [SerializeField] private bool showDebugSectors = false;
     [SerializeField] private float debugDisplayDuration = 2f;
     [SerializeField] private Color[] sectorColors = { Color.red, new Color(1f, 0.5f, 0f), Color.yellow, Color.green };
+    
+    // Global debug toggle
+    public static bool GlobalDebugEnabled = false;
     
     private void Awake()
     {
@@ -28,6 +33,19 @@ public class KnockbackCalculator : MonoBehaviour
         if (sectorFalloffCurve == null || sectorFalloffCurve.keys.Length == 0)
         {
             sectorFalloffCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
+        }
+        
+        // Initialize knockback angle curve if not set (More realistic bomb feel)
+        if (knockbackAngleCurve == null || knockbackAngleCurve.keys.Length == 0)
+        {
+            // 0% = mostly horizontal (0.25), 150% = balanced (0.45), 300%+ = more vertical but still realistic (0.6)
+            knockbackAngleCurve = new AnimationCurve(
+                new Keyframe(0f, 0.25f),               // 0% knockback - mostly horizontal
+                new Keyframe(50f, 0.35f),              // 50% knockback
+                new Keyframe(150f, 0.45f),             // 150% knockback - balanced
+                new Keyframe(250f, 0.55f),             // 250% knockback
+                new Keyframe(350f, 0.6f)               // 350%+ knockback - vertical but realistic
+            );
         }
     }
     
@@ -68,12 +86,22 @@ public class KnockbackCalculator : MonoBehaviour
         // Calculate final knockback magnitude
         float knockbackMagnitude = baseKnockback * sectorMultiplier * percentageModifier * holderMultiplier * massModifier;
         
-        // Calculate knockback direction with upward bias
+        // Calculate unified knockback direction (realistic bomb explosion feel)
         Vector3 horizontalDir = new Vector3(direction.x, 0, direction.z).normalized;
-        Vector3 knockbackDirection = (horizontalDir * horizontalBias + Vector3.up * upwardBias).normalized;
         
-        // Add slight randomness for more natural feel
-        knockbackDirection += Random.insideUnitSphere * 0.1f;
+        // Get launch angle from curve based on knockback percentage (in radians)
+        float upwardRatio = knockbackAngleCurve.Evaluate(percentageKnockback);
+        float launchAngle = Mathf.Lerp(15f, 60f, upwardRatio) * Mathf.Deg2Rad; // 15-60 degree launch angle
+        
+        // Create unified direction vector using spherical coordinates
+        float horizontalMagnitude = Mathf.Cos(launchAngle);
+        float verticalMagnitude = Mathf.Sin(launchAngle);
+        
+        Vector3 knockbackDirection = (horizontalDir * horizontalMagnitude + Vector3.up * verticalMagnitude).normalized;
+        
+        // Add slight randomness for natural feel (very minimal)
+        float randomness = Mathf.Lerp(0.05f, 0.02f, percentageKnockback / 350f);
+        knockbackDirection += Random.insideUnitSphere * randomness;
         knockbackDirection.Normalize();
         
         result.affected = true;
@@ -83,7 +111,7 @@ public class KnockbackCalculator : MonoBehaviour
         result.direction = knockbackDirection;
         
         // Debug visualization
-        if (showDebugSectors)
+        if (GlobalDebugEnabled || showDebugSectors)
         {
             DrawDebugSector(explosionPos, targetPos, result.sector);
         }
@@ -139,7 +167,7 @@ public class KnockbackCalculator : MonoBehaviour
     
     public void DrawDebugSectors(Vector3 center)
     {
-        if (!showDebugSectors) return;
+        if (!GlobalDebugEnabled && !showDebugSectors) return;
         
         for (int i = 0; i < sectorRadii.Length; i++)
         {
@@ -164,7 +192,7 @@ public class KnockbackCalculator : MonoBehaviour
     
     void OnDrawGizmos()
     {
-        if (!showDebugSectors) return;
+        if (!GlobalDebugEnabled && !showDebugSectors) return;
         
         // Draw sector circles as gizmos
         Vector3 center = transform.position;
@@ -193,8 +221,15 @@ public class KnockbackCalculator : MonoBehaviour
     
     void Update()
     {
+        // Handle F1 debug toggle
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            GlobalDebugEnabled = !GlobalDebugEnabled;
+            Debug.Log($"Knockback Debug Visualization: {(GlobalDebugEnabled ? "ENABLED" : "DISABLED")}");
+        }
+        
         // Draw runtime debug circles if enabled
-        if (showDebugSectors)
+        if (GlobalDebugEnabled || showDebugSectors)
         {
             DrawRuntimeDebugSectors();
         }

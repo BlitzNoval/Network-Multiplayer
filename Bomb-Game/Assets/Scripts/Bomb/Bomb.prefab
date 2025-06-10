@@ -416,20 +416,13 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   initialTimer: 10
-  returnPauseDuration: 0.2
   normalThrowSpeed: 20
   normalThrowUpward: 2.5
   lobThrowSpeed: 15
   lobThrowUpward: 6
   throwCooldown: 0.5
   flightMassMultiplier: 1
-  maxBounces: 2
-  groundExplosionDelay: 1
-  mapLayerMask:
-    serializedVersion: 2
-    m_Bits: 0
   playerTag: Player
-  mapOutTag: MapOut
 --- !u!82 &7643978913182226198
 AudioSource:
   m_ObjectHideFlags: 0
@@ -591,7 +584,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   baseKnockback: 10
-  explosionRadius: 5
+  explosionRadius: 10
   sectorFalloffCurve:
     serializedVersion: 2
     m_Curve:
@@ -626,9 +619,34 @@ MonoBehaviour:
   - 0.8
   - 0.5
   - 0.2
-  upwardBias: 0.3
-  horizontalBias: 0.7
+  baseUpwardBias: 0.3
+  maxUpwardBias: 0.2
+  percentageCurveExponent: 0.5
   massInfluence: 0.5
+  knockbackAngleCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   showDebugSectors: 1
   debugDisplayDuration: 2
   sectorColors:

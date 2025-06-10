@@ -59,34 +59,7 @@ public class MyRoomManager : NetworkRoomManager
         Debug.Log($"OnServerAddPlayer: Added new player {playerName}", this);
     }
 
-    public override void OnServerDisconnect(NetworkConnectionToClient conn)
-    {
-        if (conn.identity != null)
-        {
-            var roomPlayer = conn.identity.GetComponent<MyRoomPlayer>();
-            if (roomPlayer != null && GameManager.Instance != null)
-            {
-                var playerName = roomPlayer.playerName;
-                Debug.Log($"OnServerDisconnect: PlayerName={playerName}, ConnId={conn.connectionId}", this);
-                if (GameManager.Instance.playerObjects.TryGetValue(playerName, out GameObject gamePlayer))
-                {
-                    var netId = gamePlayer.GetComponent<NetworkIdentity>();
-                    if (netId != null && netId.connectionToClient == conn)
-                    {
-                        netId.RemoveClientAuthority();
-                        Debug.Log($"Removed authority from {playerName}, netId={netId.netId}", this);
-                    }
-                    var lifeManager = gamePlayer.GetComponent<PlayerLifeManager>();
-                    if (lifeManager != null)
-                    {
-                        lifeManager.IsDisconnected = true;
-                        Debug.Log($"Marked {playerName} as disconnected", this);
-                    }
-                }
-            }
-        }
-        base.OnServerDisconnect(conn);
-    }
+    
 
     public override bool OnRoomServerSceneLoadedForPlayer(NetworkConnectionToClient conn,
                                                           GameObject roomPlayer,
@@ -150,12 +123,12 @@ public class MyRoomManager : NetworkRoomManager
     }
 
     public override void OnStopHost()
-    {
-        base.OnStopHost();
-        if (GameManager.Instance != null)
-            GameManager.Instance.ResetState();
-        if (PlayerUIManager.Instance != null)
-            PlayerUIManager.Instance.ResetPanels();
-        Debug.Log("OnStopHost: Reset GameManager and PlayerUIManager", this);
-    }
+{
+    base.OnStopHost();
+    if (GameManager.Instance != null)
+        GameManager.Instance.ResetState();
+    if (PlayerUIManager.Instance != null)
+        PlayerUIManager.Instance.ResetPanels();
+    Debug.Log("OnStopHost: Reset GameManager and PlayerUIManager", this);
+}
 }
