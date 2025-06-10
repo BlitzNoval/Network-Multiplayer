@@ -33,8 +33,10 @@ public class PlayerBombHandler : NetworkBehaviour
     // Aiming state
     bool isAiming;
     Vector3 aimDirection;
+    Vector3 targetAimDirection; // For smooth aiming
     List<Vector3> trajectoryPoints = new();
     float timeStep;
+    [SerializeField] float aimSmoothSpeed = 8f; // Adjustable smoothing speed
     
     // Throw type state
     public enum ThrowType { Short, Lob }
@@ -141,7 +143,12 @@ public class PlayerBombHandler : NetworkBehaviour
         if (isAiming)
         {
             UpdateAimDirection();
-            DrawTrajectory();
+            
+            // Smooth trajectory updates for better responsiveness
+            if (Time.frameCount % 2 == 0) // Update every other frame for performance
+            {
+                DrawTrajectory();
+            }
         }
 
         // Clear bomb reference if bomb is no longer held
@@ -158,6 +165,7 @@ public class PlayerBombHandler : NetworkBehaviour
 
         // Get aim input (mouse delta or right stick)
         Vector2 aimInput = aimAct.ReadValue<Vector2>();
+        Vector3 newTargetDirection = targetAimDirection;
         
         // Handle mouse input - only for players using KeyboardMouse control scheme
         if (playerInput.currentControlScheme == "KeyboardMouse")
@@ -169,7 +177,7 @@ public class PlayerBombHandler : NetworkBehaviour
                 Vector3 directionToMouse = (mouseWorldPos - transform.position).normalized;
                 directionToMouse.y = 0; // Keep aim on horizontal plane
                 if (directionToMouse.magnitude > 0.1f)
-                    aimDirection = directionToMouse;
+                    newTargetDirection = directionToMouse;
             }
         }
         else if (aimInput.magnitude > 0.1f)
@@ -188,14 +196,18 @@ public class PlayerBombHandler : NetworkBehaviour
                     cameraForward.Normalize();
                     cameraRight.Normalize();
                     
-                    aimDirection = (cameraForward * inputDirection.z + cameraRight * inputDirection.x).normalized;
+                    newTargetDirection = (cameraForward * inputDirection.z + cameraRight * inputDirection.x).normalized;
                 }
                 else
                 {
-                    aimDirection = inputDirection;
+                    newTargetDirection = inputDirection;
                 }
             }
         }
+        
+        // Smooth interpolation for better feel
+        targetAimDirection = newTargetDirection;
+        aimDirection = Vector3.Slerp(aimDirection, targetAimDirection, aimSmoothSpeed * Time.deltaTime);
     }
 
     Vector3 GetMouseWorldPosition()
@@ -269,6 +281,7 @@ public class PlayerBombHandler : NetworkBehaviour
         isAiming = true;
         isHoldingAim = true;
         aimDirection = transform.forward; // Initialize aim direction
+        targetAimDirection = transform.forward; // Initialize target direction
         
         Debug.Log($"StartAiming: Started aiming with {currentThrowType} throw type", this);
     }
@@ -294,6 +307,10 @@ public class PlayerBombHandler : NetworkBehaviour
             return;
         }
         
+        // Store throw parameters for prediction
+        Vector3 throwDirection = aimDirection;
+        ThrowType throwType = currentThrowType;
+        
         // Stop aiming
         isAiming = false;
         isHoldingAim = false;
@@ -303,10 +320,16 @@ public class PlayerBombHandler : NetworkBehaviour
         if (animator != null)
             animator.SetTrigger("Throw");
         
-        // Send throw command to server
-        CmdThrowBomb(aimDirection, currentThrowType);
+        // Immediate client-side prediction for smoother experience
+        if (!isServer)
+        {
+            PredictThrowVisually(throwDirection, throwType);
+        }
         
-        Debug.Log($"ExecuteThrow: Throwing bomb in direction {aimDirection} with {currentThrowType} throw type", this);
+        // Send throw command to server
+        CmdThrowBomb(throwDirection, throwType);
+        
+        Debug.Log($"ExecuteThrow: Throwing bomb in direction {throwDirection} with {throwType} throw type", this);
     }
 
     [Command]
@@ -399,5 +422,49 @@ public class PlayerBombHandler : NetworkBehaviour
     public Vector3 GetAimDirection()
     {
         return aimDirection;
+    }
+
+    // Client-side prediction method to provide immediate visual feedback
+    void PredictThrowVisually(Vector3 direction, ThrowType throwType)
+    {
+        if (currentBomb == null) return;
+        
+        // Immediately unparent the bomb for visual feedback
+        Transform bombTransform = currentBomb.transform;
+        Transform origin = transform.Find("RightHoldPoint");
+        
+        if (origin != null)
+        {
+            // Set bomb to origin position before "throwing"
+            bombTransform.SetParent(null);
+            bombTransform.position = origin.position;
+            bombTransform.rotation = origin.rotation;
+            
+            // Get throw parameters
+            float speed = throwType == ThrowType.Short ? shortThrowSpeed : lobThrowSpeed;
+            float upward = throwType == ThrowType.Short ? shortThrowUpward : lobThrowUpward;
+            
+            // Calculate predicted velocity
+            Vector3 predictedVelocity = direction.normalized * speed + Vector3.up * upward;
+            
+            // Apply visual prediction (this will be corrected by server)
+            Rigidbody bombRb = currentBomb.GetComponent<Rigidbody>();
+            if (bombRb != null)
+            {
+                bombRb.linearVelocity = predictedVelocity * 0.3f; // Reduced for smoothness
+            }
+        }
+        
+        // Start a coroutine to reset prediction after server correction
+        StartCoroutine(ResetPredictionAfterDelay());
+    }
+    
+    // Reset client prediction after server takes over
+    System.Collections.IEnumerator ResetPredictionAfterDelay()
+    {
+        yield return new WaitForSeconds(0.1f); // Small delay for server correction
+        
+        // The server state will override our prediction automatically
+        // This just ensures we don't interfere with server authority
     }
 }
