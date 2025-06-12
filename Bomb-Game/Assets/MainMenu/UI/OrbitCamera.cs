@@ -97,8 +97,13 @@ public class OrbitCamera : MonoBehaviour
                     initialOrbitAngle = currentAngle;
                     angleSinceStart = 0f;
 
-                    if (introCompleteCanvas != null)
-                        introCompleteCanvas.enabled = true; // 👈 Show UI here
+                   if (introCompleteCanvas != null)
+                    introCompleteCanvas.enabled = true;
+
+            
+                UIMenuHub uiHub = FindObjectOfType<UIMenuHub>();
+                if (uiHub != null)
+                    uiHub.OnIntroComplete();
 
                     state = CameraState.Pause;
                 }
