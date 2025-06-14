@@ -516,8 +516,8 @@ MonoBehaviour:
   initialTimer: 10
   normalThrowSpeed: 20
   normalThrowUpward: 5
-  lobThrowSpeed: 25
-  lobThrowUpward: 5
+  lobThrowSpeed: 10
+  lobThrowUpward: 8
   throwCooldown: 0.01
   flightMassMultiplier: 1
   playerTag: Player
