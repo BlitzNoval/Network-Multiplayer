@@ -12,11 +12,6 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField, Range(10,300)] int maxPoints = 100;
     [SerializeField] LayerMask collisionMask;
     
-    [Header("Throw Types")]
-    [SerializeField] float shortThrowSpeed = 15f;
-    [SerializeField] float shortThrowUpward = 3f;
-    [SerializeField] float lobThrowSpeed = 8f;
-    [SerializeField] float lobThrowUpward = 8f;
     
     [Header("Aiming")]
     [SerializeField] float mouseSensitivity = 1.5f;
@@ -388,9 +383,11 @@ public class PlayerBombHandler : NetworkBehaviour
             return;
         }
 
-        // Get throw parameters based on current throw type
-        float speed = currentThrowType == ThrowType.Short ? shortThrowSpeed : lobThrowSpeed;
-        float upward = currentThrowType == ThrowType.Short ? shortThrowUpward : lobThrowUpward;
+        // Get throw parameters from the bomb itself
+        if (currentBomb == null) return;
+        
+        float speed = currentThrowType == ThrowType.Short ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
+        float upward = currentThrowType == ThrowType.Short ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
 
         Vector3 startPos = origin.position;
         Vector3 velocity = smoothedAimDirection * speed + Vector3.up * upward;
