@@ -19,10 +19,11 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] float lobThrowUpward = 8f;
     
     [Header("Aiming")]
-    [SerializeField] float mouseSensitivity = 1.5f; // Simple and consistent
-    [SerializeField] float controllerSensitivity = 3f; // Simple and consistent
+    [SerializeField] float mouseSensitivity = 1.5f;
+    [SerializeField] float controllerSensitivity = 3f;
     [SerializeField] float aimingRange = 10f;
-    
+    [SerializeField] float aimSmoothSpeed = 8f;
+    [SerializeField] float networkSyncRate = 0.05f; // How often to sync aim direction
     
     // Core components
     Bomb currentBomb;
@@ -30,13 +31,20 @@ public class PlayerBombHandler : NetworkBehaviour
     LineRenderer lr;
     Camera playerCamera;
     
-    // Aiming state
+    // Aiming state - Now properly synchronized
+    [SyncVar(hook = nameof(OnNetworkAimDirectionChanged))]
+    Vector3 networkAimDirection;
+    
+    [SyncVar]
+    bool networkIsAiming;
+    
+    Vector3 localAimDirection;
+    Vector3 smoothedAimDirection;
     bool isAiming;
-    Vector3 aimDirection;
-    Vector3 targetAimDirection; // For smooth aiming
+    
     List<Vector3> trajectoryPoints = new();
     float timeStep;
-    [SerializeField] float aimSmoothSpeed = 8f; // Simple, not too fast or slow
+    float lastNetworkSync;
     
     // Throw type state
     public enum ThrowType { Short, Lob }
@@ -59,59 +67,67 @@ public class PlayerBombHandler : NetworkBehaviour
         lr.positionCount = 0;
         lr.startWidth = lr.endWidth = 0.1f;
         lr.material = new Material(Shader.Find("Sprites/Default"));
-
-        playerInput = GetComponent<PlayerInput>();
-        playerInput.notificationBehavior = PlayerNotifications.InvokeCSharpEvents;
-
-        // Get new input actions
-        toggleThrowTypeAct = playerInput.actions["ToggleThrowTypes"];
-        aimAct = playerInput.actions["Aim"];
-        holdAimAct = playerInput.actions["HoldAim"];
-        cancelAimAct = playerInput.actions["CancelAim"];
+        lr.material.color = new Color(1f, 1f, 1f, 0.7f);
+        timeStep = 0.02f;
         
-        Debug.Log($"Awake: Input actions bound - ToggleThrowType: {toggleThrowTypeAct?.name}, Aim: {aimAct?.name}, HoldAim: {holdAimAct?.name}, CancelAim: {cancelAimAct?.name}", this);
-
+        playerInput = GetComponent<PlayerInput>();
+        playerCamera = Camera.main;
+        
+        // Initialize aim directions
+        localAimDirection = transform.forward;
+        smoothedAimDirection = transform.forward;
+        networkAimDirection = transform.forward;
+        
+        // Get animation components
         playerAnimator = GetComponent<PlayerAnimator>();
         animator = GetComponent<Animator>();
-        
-        // Find camera - try main camera first, then camera tagged as MainCamera
-        playerCamera = Camera.main;
-        if (playerCamera == null)
-            playerCamera = GameObject.FindGameObjectWithTag("MainCamera")?.GetComponent<Camera>();
-
-        timeStep = Time.fixedDeltaTime;
-        
-        // Initialize aim direction to forward
-        aimDirection = transform.forward;
     }
 
-    void Start()
+    public override void OnStartAuthority()
     {
-        StartCoroutine(SubscribeToInput());
+        base.OnStartAuthority();
+        Debug.Log($"OnStartAuthority: PlayerBombHandler started for {gameObject.name}", this);
+        SubscribeToInput();
     }
 
-    IEnumerator SubscribeToInput()
+    void OnEnable()
     {
-        while (!isLocalPlayer)
+        if (isLocalPlayer)
         {
-            Debug.Log($"SubscribeToInput: Waiting for isLocalPlayer to be true for {gameObject.name}", this);
-            yield return new WaitForSeconds(0.1f);
+            SubscribeToInput();
         }
+    }
 
-        if (inputSubscribed)
-        {
-            Debug.Log($"SubscribeToInput: Input already subscribed for {gameObject.name}", this);
-            yield break;
-        }
-
-        // Subscribe to input events
-        toggleThrowTypeAct.performed += ToggleThrowType;
-        holdAimAct.started += StartAiming;
-        holdAimAct.canceled += ExecuteThrow;
-        cancelAimAct.performed += CancelAiming;
+    void SubscribeToInput()
+    {
+        if (!isLocalPlayer || inputSubscribed) return;
         
-        inputSubscribed = true;
-        Debug.Log($"SubscribeToInput: Input subscribed for {gameObject.name}, isLocalPlayer={isLocalPlayer}", this);
+        try
+        {
+            // Get actions directly from playerInput.actions using the indexer
+            toggleThrowTypeAct = playerInput.actions["ToggleThrowTypes"]; // Note: "ToggleThrowTypes" with 's' based on your code
+            aimAct = playerInput.actions["Aim"];
+            holdAimAct = playerInput.actions["HoldAim"];
+            cancelAimAct = playerInput.actions["CancelAim"];
+            
+            if (toggleThrowTypeAct == null || aimAct == null || holdAimAct == null || cancelAimAct == null)
+            {
+                Debug.LogError($"SubscribeToInput: One or more actions not found - Toggle: {toggleThrowTypeAct?.name}, Aim: {aimAct?.name}, HoldAim: {holdAimAct?.name}, CancelAim: {cancelAimAct?.name}", this);
+                return;
+            }
+            
+            toggleThrowTypeAct.performed += ToggleThrowType;
+            holdAimAct.started += StartAiming;
+            holdAimAct.canceled += ExecuteThrow;
+            cancelAimAct.performed += CancelAiming;
+            
+            inputSubscribed = true;
+            Debug.Log($"SubscribeToInput: Input subscribed for {gameObject.name}, isLocalPlayer={isLocalPlayer}", this);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"SubscribeToInput: Failed to subscribe to input actions - {e.Message}", this);
+        }
     }
 
     void OnDisable()
@@ -129,7 +145,7 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void Update()
     {
-        if (!isLocalPlayer || (GameManager.Instance != null && GameManager.Instance.IsPaused))
+        if (GameManager.Instance != null && GameManager.Instance.IsPaused)
         {
             if (isAiming)
             {
@@ -139,81 +155,117 @@ public class PlayerBombHandler : NetworkBehaviour
             return;
         }
 
-        // Update aim input if we're aiming
-        if (isAiming)
+        if (isLocalPlayer)
         {
-            UpdateAimDirection();
-            
-            // Ultra-responsive trajectory updates for perfect feel
-            DrawTrajectory(); // Update every frame for maximum responsiveness
-        }
+            // Update aim direction locally for smooth control
+            if (isAiming)
+            {
+                UpdateLocalAimDirection();
+                
+                // Sync to network periodically
+                if (Time.time - lastNetworkSync > networkSyncRate)
+                {
+                    CmdUpdateAimDirection(localAimDirection);
+                    lastNetworkSync = Time.time;
+                }
+                
+                // Draw trajectory using smoothed direction
+                DrawTrajectory();
+            }
 
-        // Clear bomb reference if bomb is no longer held
-        if (currentBomb == null && isAiming)
+            // Clear bomb reference if bomb is no longer held
+            if (currentBomb == null && isAiming)
+            {
+                HideTrajectory();
+                isAiming = false;
+                CmdSetAiming(false);
+            }
+        }
+        else
         {
-            HideTrajectory();
-            isAiming = false;
+            // Non-local players: smooth between network updates
+            if (networkIsAiming)
+            {
+                smoothedAimDirection = Vector3.Slerp(smoothedAimDirection, networkAimDirection, Time.deltaTime * aimSmoothSpeed * 2f);
+                DrawTrajectory();
+            }
+            else
+            {
+                HideTrajectory();
+            }
         }
     }
 
-    void UpdateAimDirection()
+    void UpdateLocalAimDirection()
     {
         if (!isAiming) return;
 
         // Get aim input (mouse delta or right stick)
         Vector2 aimInput = aimAct.ReadValue<Vector2>();
-        Vector3 newTargetDirection = targetAimDirection;
         
-        // SIMPLE input handling - same for everyone
         if (aimInput.magnitude > 0.1f)
         {
             Vector3 inputDirection = new Vector3(aimInput.x, 0, aimInput.y);
             
-            // Simple sensitivity scaling
-            float sensitivity = playerInput.currentControlScheme == "KeyboardMouse" ? mouseSensitivity : controllerSensitivity;
+            // Apply sensitivity
+            float sensitivity = playerInput.currentControlScheme == "KeyboardMouse" ? 
+                mouseSensitivity : controllerSensitivity;
+            
             inputDirection *= sensitivity * Time.deltaTime;
             
-            // Simple direction update - no complex camera math
-            newTargetDirection = (targetAimDirection + inputDirection).normalized;
+            // Convert to world space relative to camera
+            if (playerCamera != null)
+            {
+                Vector3 forward = playerCamera.transform.forward;
+                Vector3 right = playerCamera.transform.right;
+                forward.y = 0;
+                right.y = 0;
+                forward.Normalize();
+                right.Normalize();
+                
+                localAimDirection += right * inputDirection.x + forward * inputDirection.z;
+            }
+            else
+            {
+                localAimDirection += inputDirection;
+            }
+            
+            // Normalize and clamp to range
+            if (localAimDirection.magnitude > aimingRange)
+            {
+                localAimDirection = localAimDirection.normalized * aimingRange;
+            }
+            
+            localAimDirection.y = 0;
+            if (localAimDirection.magnitude < 0.1f)
+            {
+                localAimDirection = transform.forward;
+            }
+            localAimDirection.Normalize();
         }
         
-        // Simple interpolation
-        targetAimDirection = newTargetDirection;
-        aimDirection = Vector3.Slerp(aimDirection, targetAimDirection, aimSmoothSpeed * Time.deltaTime);
+        // Smooth the aim direction locally
+        smoothedAimDirection = Vector3.Slerp(smoothedAimDirection, localAimDirection, Time.deltaTime * aimSmoothSpeed);
     }
 
-    
-
-    public void SetBomb(Bomb b)
+    [Command]
+    void CmdUpdateAimDirection(Vector3 direction)
     {
-        currentBomb = b;
-        Debug.Log($"SetBomb called for {gameObject.name}, bomb: {b}, IsHeld={b?.IsHeld}", this);
-        UpdateHandAnimationState();
+        networkAimDirection = direction;
     }
 
-    public void ClearBomb()
+    [Command]
+    void CmdSetAiming(bool aiming)
     {
-        if (isAiming)
-        {
-            HideTrajectory();
-            isAiming = false;
-        }
-        
-        currentBomb = null;
-        Debug.Log($"ClearBomb called for {gameObject.name}", this);
-        UpdateHandAnimationState();
+        networkIsAiming = aiming;
     }
 
-    void UpdateHandAnimationState()
+    void OnNetworkAimDirectionChanged(Vector3 oldValue, Vector3 newValue)
     {
-        if (animator != null && currentBomb != null)
+        // Smooth transition on non-local clients
+        if (!isLocalPlayer)
         {
-            // Always use right hand for consistency with new system
-            animator.SetInteger("activeHand", 2);
-        }
-        else if (animator != null)
-        {
-            animator.SetInteger("activeHand", 0);
+            smoothedAimDirection = Vector3.Slerp(smoothedAimDirection, newValue, 0.5f);
         }
     }
 
@@ -222,7 +274,7 @@ public class PlayerBombHandler : NetworkBehaviour
         if (!isLocalPlayer) return;
         
         CmdToggleThrowType();
-        Debug.Log($"ToggleThrowType: Switched to {(currentThrowType == ThrowType.Short ? "Lob" : "Short")} throw type", this);
+        Debug.Log($"ToggleThrowType: Switched to {(currentThrowType == ThrowType.Lob ? "Lob" : "Short")} throw type", this);
     }
 
     void StartAiming(InputAction.CallbackContext context)
@@ -237,8 +289,10 @@ public class PlayerBombHandler : NetworkBehaviour
         
         isAiming = true;
         isHoldingAim = true;
-        aimDirection = transform.forward; // Initialize aim direction
-        targetAimDirection = transform.forward; // Initialize target direction
+        localAimDirection = transform.forward;
+        smoothedAimDirection = transform.forward;
+        
+        CmdSetAiming(true);
         
         Debug.Log($"StartAiming: Started aiming with {currentThrowType} throw type", this);
     }
@@ -250,6 +304,8 @@ public class PlayerBombHandler : NetworkBehaviour
         isAiming = false;
         isHoldingAim = false;
         HideTrajectory();
+        
+        CmdSetAiming(false);
         
         Debug.Log("CancelAiming: Cancelled aiming", this);
     }
@@ -264,8 +320,8 @@ public class PlayerBombHandler : NetworkBehaviour
             return;
         }
         
-        // Store throw parameters for prediction
-        Vector3 throwDirection = aimDirection;
+        // Use the smoothed aim direction for the throw
+        Vector3 throwDirection = smoothedAimDirection;
         ThrowType throwType = currentThrowType;
         
         // Stop aiming
@@ -273,13 +329,13 @@ public class PlayerBombHandler : NetworkBehaviour
         isHoldingAim = false;
         HideTrajectory();
         
+        CmdSetAiming(false);
+        
         // Trigger throw animation
         if (animator != null)
             animator.SetTrigger("Throw");
         
-        // No prediction - keep it simple and identical for everyone
-        
-        // Send throw command to server
+        // Send throw command to server with final direction
         CmdThrowBomb(throwDirection, throwType);
         
         Debug.Log($"ExecuteThrow: Throwing bomb in direction {throwDirection} with {throwType} throw type", this);
@@ -297,15 +353,17 @@ public class PlayerBombHandler : NetworkBehaviour
     {
         Debug.Log($"CmdThrowBomb: Server received throw command - direction: {direction}, type: {throwType}", this);
         
-        // More lenient timing check for better client responsiveness
         if (currentBomb && currentBomb.Holder == gameObject && currentBomb.CurrentTimer > 1.0f)
         {
             if (playerAnimator != null)
                 playerAnimator.OnBombThrow();
             
-            // Throw the bomb using new method with direction
+            // Throw the bomb using the direction from client
             bool useShortThrow = throwType == ThrowType.Short;
             currentBomb.ThrowBomb(direction, useShortThrow);
+            
+            // Clear network aiming state
+            networkIsAiming = false;
         }
         else
         {
@@ -316,13 +374,13 @@ public class PlayerBombHandler : NetworkBehaviour
     void DrawTrajectory()
     {
         trajectoryPoints.Clear();
-        if (currentBomb == null || !isAiming)
+        if (currentBomb == null || (!isAiming && !networkIsAiming))
         {
             HideTrajectory();
             return;
         }
 
-        // Always use right hand hold point for consistency
+        // Use right hand hold point for consistency
         Transform origin = transform.Find("RightHoldPoint");
         if (!origin)
         {
@@ -335,7 +393,7 @@ public class PlayerBombHandler : NetworkBehaviour
         float upward = currentThrowType == ThrowType.Short ? shortThrowUpward : lobThrowUpward;
 
         Vector3 startPos = origin.position;
-        Vector3 velocity = aimDirection * speed + Vector3.up * upward;
+        Vector3 velocity = smoothedAimDirection * speed + Vector3.up * upward;
         Vector3 lastPos = startPos;
         trajectoryPoints.Add(lastPos);
 
@@ -360,26 +418,35 @@ public class PlayerBombHandler : NetworkBehaviour
         lr.SetPositions(trajectoryPoints.ToArray());
         
         // Color based on throw type: Blue for short, Yellow for lob
-        Color trajectoryColor = currentThrowType == ThrowType.Short ? Color.blue : Color.yellow;
+        Color trajectoryColor = currentThrowType == ThrowType.Short ? 
+            new Color(0.3f, 0.6f, 1f, 0.8f) : new Color(1f, 0.9f, 0.3f, 0.8f);
         lr.startColor = lr.endColor = trajectoryColor;
     }
 
     void HideTrajectory()
     {
-        if (lr != null)
-            lr.positionCount = 0;
+        lr.positionCount = 0;
+        trajectoryPoints.Clear();
     }
 
-    // Public method to get current throw type for UI display
-    public ThrowType GetCurrentThrowType()
+    public void SetBomb(Bomb b)
     {
-        return currentThrowType;
+        currentBomb = b;
+        Debug.Log($"SetBomb: Bomb assigned to {gameObject.name}", this);
     }
 
-    // Public method to get aim direction for debugging
-    public Vector3 GetAimDirection()
+    public void ClearBomb()
     {
-        return aimDirection;
+        currentBomb = null;
+        if (isAiming)
+        {
+            isAiming = false;
+            HideTrajectory();
+            if (isLocalPlayer)
+            {
+                CmdSetAiming(false);
+            }
+        }
+        Debug.Log($"ClearBomb: Bomb cleared from {gameObject.name}", this);
     }
-
 }
