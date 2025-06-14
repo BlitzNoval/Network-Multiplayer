@@ -223,19 +223,17 @@ public class Bomb : NetworkBehaviour
         if (newH)
         {
             newH.GetComponent<PlayerBombHandler>()?.SetBomb(this);
-            Transform grip = newH.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
-            if (grip)
-            {
-                transform.SetParent(grip);
-                transform.localPosition = Vector3.zero;
-            }
+            lastThrower = newH;
             rb.isKinematic = true;
             col.isTrigger = true;
-            lastThrower = newH;
+            
+            // Use RPC to synchronize bomb positioning on all clients
+            RpcUpdateBombPosition(newH, isOnRight);
         }
         else
         {
-            transform.SetParent(null);
+            // Use RPC to synchronize bomb release on all clients  
+            RpcReleaseBomb();
             rb.isKinematic = false;
             col.isTrigger = false;
         }
@@ -258,6 +256,26 @@ public class Bomb : NetworkBehaviour
             transform.SetParent(grip);
             transform.localPosition = Vector3.zero;
         }
+    }
+
+    [ClientRpc]
+    void RpcUpdateBombPosition(GameObject newHolder, bool useRightHand)
+    {
+        if (newHolder == null) return;
+        
+        Transform grip = newHolder.transform.Find(useRightHand ? "RightHoldPoint" : "LeftHoldPoint");
+        if (grip)
+        {
+            transform.SetParent(grip);
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = Quaternion.identity;
+        }
+    }
+
+    [ClientRpc]
+    void RpcReleaseBomb()
+    {
+        transform.SetParent(null);
     }
 
     [Server]

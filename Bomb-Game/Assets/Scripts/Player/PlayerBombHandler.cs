@@ -19,8 +19,8 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] float lobThrowUpward = 8f;
     
     [Header("Aiming")]
-    [SerializeField] float mouseSensitivity = 2f;
-    [SerializeField] float controllerSensitivity = 5f;
+    [SerializeField] float mouseSensitivity = 1.5f; // Simple and consistent
+    [SerializeField] float controllerSensitivity = 3f; // Simple and consistent
     [SerializeField] float aimingRange = 10f;
     
     
@@ -33,8 +33,10 @@ public class PlayerBombHandler : NetworkBehaviour
     // Aiming state
     bool isAiming;
     Vector3 aimDirection;
+    Vector3 targetAimDirection; // For smooth aiming
     List<Vector3> trajectoryPoints = new();
     float timeStep;
+    [SerializeField] float aimSmoothSpeed = 8f; // Simple, not too fast or slow
     
     // Throw type state
     public enum ThrowType { Short, Lob }
@@ -141,7 +143,9 @@ public class PlayerBombHandler : NetworkBehaviour
         if (isAiming)
         {
             UpdateAimDirection();
-            DrawTrajectory();
+            
+            // Ultra-responsive trajectory updates for perfect feel
+            DrawTrajectory(); // Update every frame for maximum responsiveness
         }
 
         // Clear bomb reference if bomb is no longer held
@@ -158,61 +162,26 @@ public class PlayerBombHandler : NetworkBehaviour
 
         // Get aim input (mouse delta or right stick)
         Vector2 aimInput = aimAct.ReadValue<Vector2>();
+        Vector3 newTargetDirection = targetAimDirection;
         
-        // Handle mouse input - only for players using KeyboardMouse control scheme
-        if (playerInput.currentControlScheme == "KeyboardMouse")
+        // SIMPLE input handling - same for everyone
+        if (aimInput.magnitude > 0.1f)
         {
-            // Mouse input - convert screen space to world direction
-            Vector3 mouseWorldPos = GetMouseWorldPosition();
-            if (mouseWorldPos != Vector3.zero)
-            {
-                Vector3 directionToMouse = (mouseWorldPos - transform.position).normalized;
-                directionToMouse.y = 0; // Keep aim on horizontal plane
-                if (directionToMouse.magnitude > 0.1f)
-                    aimDirection = directionToMouse;
-            }
+            Vector3 inputDirection = new Vector3(aimInput.x, 0, aimInput.y);
+            
+            // Simple sensitivity scaling
+            float sensitivity = playerInput.currentControlScheme == "KeyboardMouse" ? mouseSensitivity : controllerSensitivity;
+            inputDirection *= sensitivity * Time.deltaTime;
+            
+            // Simple direction update - no complex camera math
+            newTargetDirection = (targetAimDirection + inputDirection).normalized;
         }
-        else if (aimInput.magnitude > 0.1f)
-        {
-            // Controller input - use right stick directly
-            Vector3 inputDirection = new Vector3(aimInput.x, 0, aimInput.y).normalized;
-            if (inputDirection.magnitude > 0.1f)
-            {
-                // Convert local input to world space relative to camera
-                if (playerCamera != null)
-                {
-                    Vector3 cameraForward = playerCamera.transform.forward;
-                    Vector3 cameraRight = playerCamera.transform.right;
-                    cameraForward.y = 0;
-                    cameraRight.y = 0;
-                    cameraForward.Normalize();
-                    cameraRight.Normalize();
-                    
-                    aimDirection = (cameraForward * inputDirection.z + cameraRight * inputDirection.x).normalized;
-                }
-                else
-                {
-                    aimDirection = inputDirection;
-                }
-            }
-        }
+        
+        // Simple interpolation
+        targetAimDirection = newTargetDirection;
+        aimDirection = Vector3.Slerp(aimDirection, targetAimDirection, aimSmoothSpeed * Time.deltaTime);
     }
 
-    Vector3 GetMouseWorldPosition()
-    {
-        if (playerCamera == null) return Vector3.zero;
-        
-        Vector3 mousePos = Mouse.current.position.ReadValue();
-        
-        // For orthographic camera, use the player's world Y position for screen-to-world conversion
-        Vector3 playerWorldPos = transform.position;
-        mousePos.z = playerCamera.WorldToScreenPoint(playerWorldPos).z;
-        
-        Vector3 worldPos = playerCamera.ScreenToWorldPoint(mousePos);
-        worldPos.y = playerWorldPos.y; // Keep on player's Y level
-        
-        return worldPos;
-    }
     
 
     public void SetBomb(Bomb b)
@@ -269,6 +238,7 @@ public class PlayerBombHandler : NetworkBehaviour
         isAiming = true;
         isHoldingAim = true;
         aimDirection = transform.forward; // Initialize aim direction
+        targetAimDirection = transform.forward; // Initialize target direction
         
         Debug.Log($"StartAiming: Started aiming with {currentThrowType} throw type", this);
     }
@@ -294,6 +264,10 @@ public class PlayerBombHandler : NetworkBehaviour
             return;
         }
         
+        // Store throw parameters for prediction
+        Vector3 throwDirection = aimDirection;
+        ThrowType throwType = currentThrowType;
+        
         // Stop aiming
         isAiming = false;
         isHoldingAim = false;
@@ -303,10 +277,12 @@ public class PlayerBombHandler : NetworkBehaviour
         if (animator != null)
             animator.SetTrigger("Throw");
         
-        // Send throw command to server
-        CmdThrowBomb(aimDirection, currentThrowType);
+        // No prediction - keep it simple and identical for everyone
         
-        Debug.Log($"ExecuteThrow: Throwing bomb in direction {aimDirection} with {currentThrowType} throw type", this);
+        // Send throw command to server
+        CmdThrowBomb(throwDirection, throwType);
+        
+        Debug.Log($"ExecuteThrow: Throwing bomb in direction {throwDirection} with {throwType} throw type", this);
     }
 
     [Command]
@@ -321,7 +297,8 @@ public class PlayerBombHandler : NetworkBehaviour
     {
         Debug.Log($"CmdThrowBomb: Server received throw command - direction: {direction}, type: {throwType}", this);
         
-        if (currentBomb && currentBomb.Holder == gameObject && currentBomb.CurrentTimer > 1.5f)
+        // More lenient timing check for better client responsiveness
+        if (currentBomb && currentBomb.Holder == gameObject && currentBomb.CurrentTimer > 1.0f)
         {
             if (playerAnimator != null)
                 playerAnimator.OnBombThrow();
@@ -329,6 +306,10 @@ public class PlayerBombHandler : NetworkBehaviour
             // Throw the bomb using new method with direction
             bool useShortThrow = throwType == ThrowType.Short;
             currentBomb.ThrowBomb(direction, useShortThrow);
+        }
+        else
+        {
+            Debug.LogWarning($"CmdThrowBomb: Rejected throw - bomb: {currentBomb != null}, holder: {currentBomb?.Holder == gameObject}, timer: {currentBomb?.CurrentTimer}", this);
         }
     }
 
@@ -400,4 +381,5 @@ public class PlayerBombHandler : NetworkBehaviour
     {
         return aimDirection;
     }
+
 }

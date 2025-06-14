@@ -323,6 +323,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: d2589f58036e101428826eab029e9689, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4160194393448048763}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: d2589f58036e101428826eab029e9689, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -1438879320385655406}
   m_SourcePrefab: {fileID: 100100000, guid: d2589f58036e101428826eab029e9689, type: 3}
 --- !u!4 &6931229046574634843 stripped
 Transform:
@@ -416,11 +419,11 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   initialTimer: 10
-  normalThrowSpeed: 20
-  normalThrowUpward: 2.5
-  lobThrowSpeed: 15
-  lobThrowUpward: 6
-  throwCooldown: 0.5
+  normalThrowSpeed: 25
+  normalThrowUpward: 4
+  lobThrowSpeed: 20
+  lobThrowUpward: 8
+  throwCooldown: 0.2
   flightMassMultiplier: 1
   playerTag: Player
 --- !u!82 &7643978913182226198
@@ -619,18 +622,18 @@ MonoBehaviour:
   - 0.8
   - 0.5
   - 0.2
-  baseUpwardBias: 0.3
-  maxUpwardBias: 0.2
+  baseUpwardBias: 0.1
+  maxUpwardBias: 0.1
   percentageCurveExponent: 0.5
-  massInfluence: 0.5
+  massInfluence: 0.2
   knockbackAngleCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
       value: 0
-      inSlope: 2
-      outSlope: 2
+      inSlope: 0
+      outSlope: 0
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
@@ -638,8 +641,8 @@ MonoBehaviour:
     - serializedVersion: 3
       time: 1
       value: 1
-      inSlope: 0
-      outSlope: 0
+      inSlope: 2
+      outSlope: 2
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
@@ -654,3 +657,37 @@ MonoBehaviour:
   - {r: 1, g: 0.5, b: 0, a: 1}
   - {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   - {r: 0, g: 1, b: 0, a: 1}
+--- !u!114 &-1438879320385655406
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7744921099468738017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ff3ba0becae47b8b9381191598957c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  syncDirection: 1
+  syncMode: 0
+  syncInterval: 0
+  target: {fileID: 6931229046574634843}
+  syncPosition: 1
+  syncRotation: 1
+  syncScale: 0
+  onlySyncOnChange: 1
+  compressRotation: 1
+  interpolatePosition: 1
+  interpolateRotation: 1
+  interpolateScale: 1
+  coordinateSpace: 0
+  timelineOffset: 1
+  showGizmos: 0
+  showOverlay: 0
+  overlayColor: {r: 0, g: 0, b: 0, a: 0.5}
+  onlySyncOnChangeCorrectionMultiplier: 2
+  useFixedUpdate: 0
+  rotationSensitivity: 0.01
+  positionPrecision: 0.01
+  scalePrecision: 0.01
