@@ -358,6 +358,7 @@ GameObject:
   - component: {fileID: 4002284443604104080}
   - component: {fileID: 6049661001868269297}
   - component: {fileID: 1722947946795985453}
+  - component: {fileID: -6705395686488376420}
   - component: {fileID: 6085821998421801923}
   - component: {fileID: 3039373420667251137}
   - component: {fileID: 3875619885219601610}
@@ -514,18 +515,104 @@ MonoBehaviour:
   syncInterval: 0
   initialTimer: 10
   normalThrowSpeed: 20
-  normalThrowUpward: 2.5
-  lobThrowSpeed: 15
-  lobThrowUpward: 6
-  throwCooldown: 0.5
+  normalThrowUpward: 5
+  lobThrowSpeed: 25
+  lobThrowUpward: 5
+  throwCooldown: 0.01
   flightMassMultiplier: 1
-  maxBounces: 2
-  groundExplosionDelay: 1
-  mapLayerMask:
-    serializedVersion: 2
-    m_Bits: 0
   playerTag: Player
-  mapOutTag: MapOut
+--- !u!114 &-6705395686488376420
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5032718245858861815}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31d3361528923924da0a5bbe85562ef3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  baseKnockback: 5
+  explosionRadius: 10
+  sectorFalloffCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  sectorRadii:
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1
+  sectorMultipliers:
+  - 1
+  - 0.8
+  - 0.5
+  - 0.2
+  baseUpwardBias: 0.1
+  maxUpwardBias: 0.1
+  percentageCurveExponent: 0.5
+  massInfluence: 0.2
+  knockbackAngleCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.3253997
+      value: 0.43105647
+      inSlope: 0.37776405
+      outSlope: 0.37776405
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.6670761
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0.5047188
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  showDebugSectors: 1
+  debugDisplayDuration: 2
+  sectorColors:
+  - {r: 1, g: 0, b: 0, a: 1}
+  - {r: 1, g: 0.5, b: 0, a: 1}
+  - {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  - {r: 0, g: 1, b: 0, a: 1}
 --- !u!82 &6085821998421801923
 AudioSource:
   m_ObjectHideFlags: 0
