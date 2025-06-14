@@ -65,6 +65,8 @@ public class Bomb : NetworkBehaviour
         {
             knockbackCalculator = gameObject.AddComponent<KnockbackCalculator>();
         }
+        
+        Debug.Log($"Bomb Awake: throwCooldown={throwCooldown}, lastThrowTime={lastThrowTime}");
     }
 
     void Update()
@@ -309,8 +311,13 @@ public class Bomb : NetworkBehaviour
     [Server]
     public void ThrowBomb(Vector3 direction, bool useShortThrow)
     {
+        Debug.Log($"ThrowBomb: Called with direction={direction}, useShortThrow={useShortThrow}, isHeld={isHeld}, holder={(holder != null ? holder.name : "null")}, Time.time={Time.time}, lastThrowTime={lastThrowTime}, throwCooldown={throwCooldown}, cooldownCheck={Time.time < lastThrowTime + throwCooldown}");
+        
         if (!isHeld || holder == null || Time.time < lastThrowTime + throwCooldown)
+        {
+            Debug.LogWarning($"ThrowBomb: REJECTED - isHeld={isHeld}, holder={(holder != null ? holder.name : "null")}, cooldownRemaining={Mathf.Max(0, (lastThrowTime + throwCooldown) - Time.time)}");
             return;
+        }
 
         lastThrower = holder;
         transform.SetParent(null);
@@ -329,8 +336,45 @@ public class Bomb : NetworkBehaviour
 
         lastThrowTime = Time.time;
         holder = null;
+        
+        Debug.Log($"ThrowBomb: SUCCESS - Bomb thrown with force={force}, speed={speed}, upward={upward}");
 
         StartCoroutine(ReturnToThrowerAfterDelay());
+    }
+
+    [Server]
+    public bool TryThrowBomb(Vector3 direction, bool useShortThrow)
+    {
+        Debug.Log($"TryThrowBomb: Called with direction={direction}, useShortThrow={useShortThrow}, isHeld={isHeld}, holder={(holder != null ? holder.name : "null")}, Time.time={Time.time}, lastThrowTime={lastThrowTime}, throwCooldown={throwCooldown}, cooldownCheck={Time.time < lastThrowTime + throwCooldown}");
+        
+        if (!isHeld || holder == null || Time.time < lastThrowTime + throwCooldown)
+        {
+            Debug.LogWarning($"TryThrowBomb: REJECTED - isHeld={isHeld}, holder={(holder != null ? holder.name : "null")}, cooldownRemaining={Mathf.Max(0, (lastThrowTime + throwCooldown) - Time.time)}");
+            return false;
+        }
+
+        lastThrower = holder;
+        transform.SetParent(null);
+        isHeld = false;
+        rb.isKinematic = false;
+        col.isTrigger = false;
+        rb.mass *= flightMassMultiplier;
+
+        // Use provided direction and throw type
+        float speed = useShortThrow ? normalThrowSpeed : lobThrowSpeed;
+        float upward = useShortThrow ? normalThrowUpward : lobThrowUpward;
+        Vector3 force = direction.normalized * speed + Vector3.up * upward;
+
+        rb.linearVelocity = Vector3.zero;
+        rb.AddForce(force, ForceMode.Impulse);
+
+        lastThrowTime = Time.time;
+        holder = null;
+        
+        Debug.Log($"TryThrowBomb: SUCCESS - Bomb thrown with force={force}, speed={speed}, upward={upward}");
+
+        StartCoroutine(ReturnToThrowerAfterDelay());
+        return true;
     }
 
     [Server]

@@ -326,11 +326,7 @@ public class PlayerBombHandler : NetworkBehaviour
         
         CmdSetAiming(false);
         
-        // Trigger throw animation
-        if (animator != null)
-            animator.SetTrigger("Throw");
-        
-        // Send throw command to server with final direction
+        // Send throw command to server with final direction - animation will trigger from server
         CmdThrowBomb(throwDirection, throwType);
         
         Debug.Log($"ExecuteThrow: Throwing bomb in direction {throwDirection} with {throwType} throw type", this);
@@ -350,15 +346,23 @@ public class PlayerBombHandler : NetworkBehaviour
         
         if (currentBomb && currentBomb.Holder == gameObject && currentBomb.CurrentTimer > 1.0f)
         {
-            if (playerAnimator != null)
-                playerAnimator.OnBombThrow();
-            
-            // Throw the bomb using the direction from client
+            // Try to throw the bomb - only trigger animation if it succeeds
             bool useShortThrow = throwType == ThrowType.Short;
-            currentBomb.ThrowBomb(direction, useShortThrow);
+            bool throwSuccessful = currentBomb.TryThrowBomb(direction, useShortThrow);
             
-            // Clear network aiming state
-            networkIsAiming = false;
+            if (throwSuccessful)
+            {
+                // Only trigger animation if throw was successful
+                if (playerAnimator != null)
+                    playerAnimator.OnBombThrow();
+                
+                // Clear network aiming state
+                networkIsAiming = false;
+            }
+            else
+            {
+                Debug.LogWarning($"CmdThrowBomb: Throw failed due to cooldown or other validation", this);
+            }
         }
         else
         {
