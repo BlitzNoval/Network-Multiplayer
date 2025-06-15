@@ -1182,6 +1182,8 @@ MonoBehaviour:
   controllerSensitivity: 5
   aimingRange: 10
   aimSmoothSpeed: 8
+  trajectoryUpdateRate: 30
+  aimDirectionThreshold: 0.05
 --- !u!114 &1681993517388132433
 MonoBehaviour:
   m_ObjectHideFlags: 0

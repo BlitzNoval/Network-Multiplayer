@@ -35,6 +35,7 @@ public class PlayerBombHandler : NetworkBehaviour
     
     // Trajectory visualization
     private List<GameObject> trajectoryDots = new List<GameObject>();
+    private List<Material> trajectoryDotMaterials = new List<Material>(); // Pre-created materials for performance
     private GameObject landingMarker;
     private List<GameObject> bounceMarkers = new List<GameObject>();
     private int activeDotCount = 0;
@@ -46,6 +47,15 @@ public class PlayerBombHandler : NetworkBehaviour
     List<Vector3> trajectoryPoints = new();
     float timeStep = 0.02f; // Smaller timestep for more accurate trajectory calculation
     [SerializeField] float aimSmoothSpeed = 8f;
+    
+    // Performance optimization for trajectory calculation
+    [Header("Performance")]
+    [SerializeField] float trajectoryUpdateRate = 10f; // Updates per second
+    [SerializeField] float aimDirectionThreshold = 0.05f; // Minimum change to trigger recalculation
+    private float lastTrajectoryUpdate = 0f;
+    private Vector3 lastCachedAimDirection = Vector3.zero;
+    private ThrowType lastCachedThrowType = ThrowType.Short;
+    private bool trajectoryNeedsUpdate = true;
     
     // Throw type state
     public enum ThrowType { Short, Lob }
@@ -154,12 +164,18 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void OnDestroy()
     {
-        // Clean up trajectory dots
+        // Clean up trajectory dots and materials
         foreach (var dot in trajectoryDots)
         {
             if (dot != null) Destroy(dot);
         }
         trajectoryDots.Clear();
+        
+        foreach (var material in trajectoryDotMaterials)
+        {
+            if (material != null) Destroy(material);
+        }
+        trajectoryDotMaterials.Clear();
         
         // Clean up bounce markers
         foreach (var marker in bounceMarkers)
@@ -222,7 +238,20 @@ public class PlayerBombHandler : NetworkBehaviour
         if (isAiming)
         {
             UpdateAimDirection();
-            DrawTrajectory();
+            
+            // Check if trajectory needs updating based on aim direction changes and update rate
+            bool aimChanged = Vector3.Distance(aimDirection, lastCachedAimDirection) > aimDirectionThreshold;
+            bool throwTypeChanged = currentThrowType != lastCachedThrowType;
+            bool timeForUpdate = Time.time - lastTrajectoryUpdate >= (1f / trajectoryUpdateRate);
+            
+            if (trajectoryNeedsUpdate || aimChanged || throwTypeChanged || timeForUpdate)
+            {
+                DrawTrajectory();
+                lastTrajectoryUpdate = Time.time;
+                lastCachedAimDirection = aimDirection;
+                lastCachedThrowType = currentThrowType;
+                trajectoryNeedsUpdate = false;
+            }
         }
 
         if (currentBomb == null && isAiming)
@@ -293,6 +322,7 @@ public class PlayerBombHandler : NetworkBehaviour
         // Update visual feedback when throw type changes
         if (isAiming)
         {
+            trajectoryNeedsUpdate = true; // Force recalculation on throw type change
             UpdateTrajectoryColors();
         }
     }
@@ -431,6 +461,8 @@ public class PlayerBombHandler : NetworkBehaviour
         while (trajectoryDots.Count < trajectoryPoints.Count)
         {
             GameObject dot;
+            Material dotMaterial = null;
+            
             if (trajectoryPointPrefab != null)
             {
                 dot = Instantiate(trajectoryPointPrefab);
@@ -443,8 +475,26 @@ public class PlayerBombHandler : NetworkBehaviour
                 Destroy(dot.GetComponent<Collider>());
             }
             
+            // Pre-create and configure material for transparency
+            Renderer renderer = dot.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                dotMaterial = new Material(renderer.material);
+                // Configure material for transparency once
+                dotMaterial.SetFloat("_Mode", 3);
+                dotMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                dotMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                dotMaterial.SetInt("_ZWrite", 0);
+                dotMaterial.DisableKeyword("_ALPHATEST_ON");
+                dotMaterial.EnableKeyword("_ALPHABLEND_ON");
+                dotMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                dotMaterial.renderQueue = 3000;
+                renderer.material = dotMaterial;
+            }
+            
             dot.SetActive(false);
             trajectoryDots.Add(dot);
+            trajectoryDotMaterials.Add(dotMaterial);
         }
 
         // Reset active count
@@ -468,24 +518,14 @@ public class PlayerBombHandler : NetworkBehaviour
                     dot.SetActive(true);
                     dot.transform.position = currentPoint;
                     
-                    // Update color with fade
-                    Renderer renderer = dot.GetComponent<Renderer>();
-                    if (renderer != null)
+                    // Update color with fade - material properties already configured
+                    if (activeDotCount < trajectoryDotMaterials.Count && trajectoryDotMaterials[activeDotCount] != null)
                     {
                         Color baseColor = currentThrowType == ThrowType.Short ? shortThrowColor : lobThrowColor;
                         float fadeFactor = 1f - (i / (float)trajectoryPoints.Count) * trajectoryFadeDistance;
                         baseColor.a *= fadeFactor;
                         
-                        renderer.material.color = baseColor;
-                        // Enable transparency
-                        renderer.material.SetFloat("_Mode", 3);
-                        renderer.material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                        renderer.material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                        renderer.material.SetInt("_ZWrite", 0);
-                        renderer.material.DisableKeyword("_ALPHATEST_ON");
-                        renderer.material.EnableKeyword("_ALPHABLEND_ON");
-                        renderer.material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                        renderer.material.renderQueue = 3000;
+                        trajectoryDotMaterials[activeDotCount].color = baseColor;
                     }
                     
                     activeDotCount++;
@@ -507,13 +547,12 @@ public class PlayerBombHandler : NetworkBehaviour
         // Update colors of active dots when throw type changes
         for (int i = 0; i < activeDotCount; i++)
         {
-            Renderer renderer = trajectoryDots[i].GetComponent<Renderer>();
-            if (renderer != null)
+            if (i < trajectoryDotMaterials.Count && trajectoryDotMaterials[i] != null)
             {
                 Color baseColor = currentThrowType == ThrowType.Short ? shortThrowColor : lobThrowColor;
                 float fadeFactor = 1f - (i / (float)activeDotCount) * trajectoryFadeDistance;
                 baseColor.a *= fadeFactor;
-                renderer.material.color = baseColor;
+                trajectoryDotMaterials[i].color = baseColor;
             }
         }
     }
@@ -633,6 +672,7 @@ public class PlayerBombHandler : NetworkBehaviour
         isHoldingAim = true;
         aimDirection = transform.forward;
         targetAimDirection = transform.forward;
+        trajectoryNeedsUpdate = true; // Force initial calculation
     }
 
     void CancelAiming(InputAction.CallbackContext context)

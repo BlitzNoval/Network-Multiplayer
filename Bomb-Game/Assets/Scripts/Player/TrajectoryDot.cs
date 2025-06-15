@@ -10,6 +10,9 @@ public class TrajectoryDot : MonoBehaviour
     [SerializeField] private float baseSize = 0.3f;
     [SerializeField] private bool billboardToCamera = true;
     
+    private Camera cachedCamera;
+    private Quaternion lastCameraRotation;
+    
     void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
@@ -30,10 +33,21 @@ public class TrajectoryDot : MonoBehaviour
     
     void Update()
     {
-        if (billboardToCamera && Camera.main != null)
+        if (billboardToCamera)
         {
-            // Make the dot always face the camera
-            transform.rotation = Camera.main.transform.rotation;
+            // Cache camera reference
+            if (cachedCamera == null)
+                cachedCamera = Camera.main;
+                
+            if (cachedCamera != null)
+            {
+                // Only update rotation if camera rotation changed significantly
+                if (Quaternion.Angle(lastCameraRotation, cachedCamera.transform.rotation) > 1f)
+                {
+                    transform.rotation = cachedCamera.transform.rotation;
+                    lastCameraRotation = cachedCamera.transform.rotation;
+                }
+            }
         }
     }
     

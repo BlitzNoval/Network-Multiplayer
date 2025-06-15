@@ -518,7 +518,7 @@ MonoBehaviour:
   normalThrowUpward: 1
   lobThrowSpeed: 1
   lobThrowUpward: 1
-  throwCooldown: 0.01
+  throwCooldown: 0.00001
   flightMassMultiplier: 1
   playerTag: Player
 --- !u!114 &-6705395686488376420
