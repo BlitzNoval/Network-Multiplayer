@@ -5,48 +5,58 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Linq;
 
-[RequireComponent(typeof(LineRenderer), typeof(PlayerInput))]
+[RequireComponent(typeof(PlayerInput))]
 public class PlayerBombHandler : NetworkBehaviour
 {
     [Header("Trajectory")]
     [SerializeField, Range(10,300)] int maxPoints = 100;
     [SerializeField] LayerMask collisionMask;
+    [SerializeField] private GameObject trajectoryPointPrefab; // Prefab for dotted line points
+    [SerializeField] private float trajectoryPointSpacing = 0.5f; // Space between dots
+    [SerializeField] private Sprite landingMarkerSprite; // Sprite for landing indicator
+    [SerializeField] private GameObject landingMarkerPrefab; // Prefab with SpriteRenderer
+    [SerializeField] private string landingMarkerLayer = "UI"; // Layer for landing marker
     
+    
+    [Header("Visual Settings")]
+    [SerializeField] private Color shortThrowColor = Color.white;
+    [SerializeField] private Color lobThrowColor = new Color(1f, 1f, 1f, 0.6f); // Slightly transparent white
+    [SerializeField] private float trajectoryFadeDistance = 0.8f; // Fade dots over distance
     
     [Header("Aiming")]
     [SerializeField] float mouseSensitivity = 1.5f;
     [SerializeField] float controllerSensitivity = 3f;
     [SerializeField] float aimingRange = 10f;
-    [SerializeField] float aimSmoothSpeed = 8f;
-    [SerializeField] float networkSyncRate = 0.05f; // How often to sync aim direction
     
     // Core components
     Bomb currentBomb;
     public Bomb CurrentBomb => currentBomb;
-    LineRenderer lr;
     Camera playerCamera;
     
-    // Aiming state - Now properly synchronized
-    [SyncVar(hook = nameof(OnNetworkAimDirectionChanged))]
-    Vector3 networkAimDirection;
+    // Trajectory visualization
+    private List<GameObject> trajectoryDots = new List<GameObject>();
+    private GameObject landingMarker;
+    private List<GameObject> bounceMarkers = new List<GameObject>();
+    private int activeDotCount = 0;
     
-    [SyncVar]
-    bool networkIsAiming;
-    
-    Vector3 localAimDirection;
-    Vector3 smoothedAimDirection;
+    // Aiming state
     bool isAiming;
-    
+    Vector3 aimDirection;
+    Vector3 targetAimDirection;
     List<Vector3> trajectoryPoints = new();
-    float timeStep;
-    float lastNetworkSync;
+    float timeStep = 0.02f; // Smaller timestep for more accurate trajectory calculation
+    [SerializeField] float aimSmoothSpeed = 8f;
     
     // Throw type state
     public enum ThrowType { Short, Lob }
-    [SyncVar] ThrowType currentThrowType = ThrowType.Short;
+    [SyncVar(hook = nameof(OnThrowTypeChanged))] ThrowType currentThrowType = ThrowType.Short;
+    
+    // Local landing marker (only visible to this player)
+    Vector3 localLandingPosition = Vector3.zero;
+    bool showLocalLandingMarker = false;
     
     // Input
-    InputAction toggleThrowTypeAct, aimAct, holdAimAct, cancelAimAct;
+    InputAction toggleThrowTypesAct, aimAct, holdAimAct, cancelAimAct;
     PlayerInput playerInput;
     bool inputSubscribed;
     Vector2 currentAimInput;
@@ -58,89 +68,148 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void Awake()
     {
-        lr = GetComponent<LineRenderer>();
-        lr.positionCount = 0;
-        lr.startWidth = lr.endWidth = 0.1f;
-        lr.material = new Material(Shader.Find("Sprites/Default"));
-        lr.material.color = new Color(1f, 1f, 1f, 0.7f);
-        timeStep = 0.02f;
-        
         playerInput = GetComponent<PlayerInput>();
         playerCamera = Camera.main;
         
-        // Initialize aim directions
-        localAimDirection = transform.forward;
-        smoothedAimDirection = transform.forward;
-        networkAimDirection = transform.forward;
-        
-        // Get animation components
         playerAnimator = GetComponent<PlayerAnimator>();
         animator = GetComponent<Animator>();
+        
+        InitializeTrajectoryVisualization();
     }
 
-    public override void OnStartAuthority()
+    void InitializeTrajectoryVisualization()
     {
-        base.OnStartAuthority();
-        Debug.Log($"OnStartAuthority: PlayerBombHandler started for {gameObject.name}", this);
-        SubscribeToInput();
-    }
-
-    void OnEnable()
-    {
-        if (isLocalPlayer)
+        // Create landing marker
+        if (landingMarkerPrefab != null)
         {
-            SubscribeToInput();
+            landingMarker = Instantiate(landingMarkerPrefab);
+            landingMarker.SetActive(false);
+            
+            // Set the sprite if provided
+            if (landingMarkerSprite != null)
+            {
+                var spriteRenderer = landingMarker.GetComponent<SpriteRenderer>();
+                if (spriteRenderer != null)
+                {
+                    spriteRenderer.sprite = landingMarkerSprite;
+                    spriteRenderer.sortingLayerName = landingMarkerLayer;
+                    spriteRenderer.sortingOrder = 10; // Ensure it's on top
+                }
+            }
         }
+        else
+        {
+            // Create a simple landing marker if no prefab provided
+            landingMarker = new GameObject("LandingMarker");
+            var spriteRenderer = landingMarker.AddComponent<SpriteRenderer>();
+            if (landingMarkerSprite != null)
+            {
+                spriteRenderer.sprite = landingMarkerSprite;
+            }
+            else
+            {
+                // Create a simple circle sprite if none provided
+                spriteRenderer.sprite = CreateCircleSprite();
+            }
+            spriteRenderer.sortingLayerName = landingMarkerLayer;
+            spriteRenderer.sortingOrder = 10;
+            landingMarker.transform.localScale = Vector3.one * 2f; // Adjust size
+            landingMarker.SetActive(false);
+        }
+    }
+
+    Sprite CreateCircleSprite()
+    {
+        // Create a simple circle texture for the landing marker
+        Texture2D tex = new Texture2D(64, 64);
+        Vector2 center = new Vector2(32, 32);
+        float radius = 30;
+        
+        for (int x = 0; x < 64; x++)
+        {
+            for (int y = 0; y < 64; y++)
+            {
+                float dist = Vector2.Distance(new Vector2(x, y), center);
+                if (dist <= radius)
+                {
+                    float alpha = 1f - (dist / radius);
+                    tex.SetPixel(x, y, new Color(1, 1, 1, alpha * 0.8f));
+                }
+                else
+                {
+                    tex.SetPixel(x, y, Color.clear);
+                }
+            }
+        }
+        
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f));
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        // Landing marker is now only local - no need for network sync
+    }
+
+    void OnDestroy()
+    {
+        // Clean up trajectory dots
+        foreach (var dot in trajectoryDots)
+        {
+            if (dot != null) Destroy(dot);
+        }
+        trajectoryDots.Clear();
+        
+        // Clean up bounce markers
+        foreach (var marker in bounceMarkers)
+        {
+            if (marker != null) Destroy(marker);
+        }
+        bounceMarkers.Clear();
+        
+        // Clean up landing marker
+        if (landingMarker != null) Destroy(landingMarker);
+    }
+
+    public override void OnStartLocalPlayer()
+    {
+        base.OnStartLocalPlayer();
+        SubscribeToInput();
     }
 
     void SubscribeToInput()
     {
-        if (!isLocalPlayer || inputSubscribed) return;
-        
-        try
-        {
-            // Get actions directly from playerInput.actions using the indexer
-            toggleThrowTypeAct = playerInput.actions["ToggleThrowTypes"]; // Note: "ToggleThrowTypes" with 's' based on your code
-            aimAct = playerInput.actions["Aim"];
-            holdAimAct = playerInput.actions["HoldAim"];
-            cancelAimAct = playerInput.actions["CancelAim"];
-            
-            if (toggleThrowTypeAct == null || aimAct == null || holdAimAct == null || cancelAimAct == null)
-            {
-                Debug.LogError($"SubscribeToInput: One or more actions not found - Toggle: {toggleThrowTypeAct?.name}, Aim: {aimAct?.name}, HoldAim: {holdAimAct?.name}, CancelAim: {cancelAimAct?.name}", this);
-                return;
-            }
-            
-            toggleThrowTypeAct.performed += ToggleThrowType;
-            holdAimAct.started += StartAiming;
-            holdAimAct.canceled += ExecuteThrow;
-            cancelAimAct.performed += CancelAiming;
-            
-            inputSubscribed = true;
-            Debug.Log($"SubscribeToInput: Input subscribed for {gameObject.name}, isLocalPlayer={isLocalPlayer}", this);
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"SubscribeToInput: Failed to subscribe to input actions - {e.Message}", this);
-        }
+        if (inputSubscribed) return;
+
+        toggleThrowTypesAct = playerInput.actions["ToggleThrowTypes"];
+        aimAct = playerInput.actions["Aim"];
+        holdAimAct = playerInput.actions["HoldAim"];
+        cancelAimAct = playerInput.actions["CancelAim"];
+
+        toggleThrowTypesAct.performed += ToggleThrowTypes;
+        holdAimAct.started += StartAiming;
+        holdAimAct.canceled += ExecuteThrow;
+        cancelAimAct.performed += CancelAiming;
+
+        inputSubscribed = true;
     }
 
     void OnDisable()
     {
         if (!isLocalPlayer || !inputSubscribed) return;
         
-        toggleThrowTypeAct.performed -= ToggleThrowType;
+        toggleThrowTypesAct.performed -= ToggleThrowTypes;
         holdAimAct.started -= StartAiming;
         holdAimAct.canceled -= ExecuteThrow;
         cancelAimAct.performed -= CancelAiming;
         
         inputSubscribed = false;
-        Debug.Log($"PlayerBombHandler disabled for {gameObject.name}, input unsubscribed", this);
     }
 
     void Update()
     {
-        if (GameManager.Instance != null && GameManager.Instance.IsPaused)
+        if (!isLocalPlayer || (GameManager.Instance != null && GameManager.Instance.IsPaused))
         {
             if (isAiming)
             {
@@ -150,126 +219,405 @@ public class PlayerBombHandler : NetworkBehaviour
             return;
         }
 
-        if (isLocalPlayer)
+        if (isAiming)
         {
-            // Update aim direction locally for smooth control
-            if (isAiming)
-            {
-                UpdateLocalAimDirection();
-                
-                // Sync to network periodically
-                if (Time.time - lastNetworkSync > networkSyncRate)
-                {
-                    CmdUpdateAimDirection(localAimDirection);
-                    lastNetworkSync = Time.time;
-                }
-                
-                // Draw trajectory using smoothed direction
-                DrawTrajectory();
-            }
-
-            // Clear bomb reference if bomb is no longer held
-            if (currentBomb == null && isAiming)
-            {
-                HideTrajectory();
-                isAiming = false;
-                CmdSetAiming(false);
-            }
+            UpdateAimDirection();
+            DrawTrajectory();
         }
-        else
+
+        if (currentBomb == null && isAiming)
         {
-            // Non-local players: smooth between network updates
-            if (networkIsAiming)
-            {
-                smoothedAimDirection = Vector3.Slerp(smoothedAimDirection, networkAimDirection, Time.deltaTime * aimSmoothSpeed * 2f);
-                DrawTrajectory();
-            }
-            else
-            {
-                HideTrajectory();
-            }
+            HideTrajectory();
+            isAiming = false;
         }
     }
 
-    void UpdateLocalAimDirection()
+    void UpdateAimDirection()
     {
         if (!isAiming) return;
 
-        // Get aim input (mouse delta or right stick)
         Vector2 aimInput = aimAct.ReadValue<Vector2>();
+        Vector3 newTargetDirection = targetAimDirection;
         
         if (aimInput.magnitude > 0.1f)
         {
             Vector3 inputDirection = new Vector3(aimInput.x, 0, aimInput.y);
-            
-            // Apply sensitivity
             float sensitivity = playerInput.currentControlScheme == "KeyboardMouse" ? 
                 mouseSensitivity : controllerSensitivity;
-            
             inputDirection *= sensitivity * Time.deltaTime;
+            newTargetDirection = (targetAimDirection + inputDirection).normalized;
+        }
+        
+        targetAimDirection = newTargetDirection;
+        aimDirection = Vector3.Slerp(aimDirection, targetAimDirection, aimSmoothSpeed * Time.deltaTime);
+    }
+
+    public void SetBomb(Bomb b)
+    {
+        currentBomb = b;
+        UpdateHandAnimationState();
+    }
+
+    public void ClearBomb()
+    {
+        if (isAiming)
+        {
+            HideTrajectory();
+            isAiming = false;
+        }
+        
+        currentBomb = null;
+        UpdateHandAnimationState();
+    }
+
+    void UpdateHandAnimationState()
+    {
+        if (animator != null && currentBomb != null)
+        {
+            animator.SetInteger("activeHand", 2); // Right hand
+        }
+        else if (animator != null)
+        {
+            animator.SetInteger("activeHand", 0);
+        }
+    }
+
+    void ToggleThrowTypes(InputAction.CallbackContext context)
+    {
+        if (!isLocalPlayer) return;
+        CmdToggleThrowTypes();
+    }
+
+    void OnThrowTypeChanged(ThrowType oldType, ThrowType newType)
+    {
+        // Update visual feedback when throw type changes
+        if (isAiming)
+        {
+            UpdateTrajectoryColors();
+        }
+    }
+
+    [Command]
+    void CmdToggleThrowTypes()
+    {
+        currentThrowType = currentThrowType == ThrowType.Short ? ThrowType.Lob : ThrowType.Short;
+    }
+
+    [Command]
+    void CmdThrowBomb(Vector3 direction, ThrowType throwType)
+    {
+        if (currentBomb && currentBomb.Holder == gameObject && currentBomb.CurrentTimer > 1.0f)
+        {
+            if (playerAnimator != null)
+                playerAnimator.OnBombThrow();
             
-            // Convert to world space relative to camera
-            if (playerCamera != null)
+            bool useShortThrow = throwType == ThrowType.Short;
+            currentBomb.ThrowBomb(direction, useShortThrow);
+            
+            // Landing marker will be hidden locally when aiming stops
+        }
+    }
+
+
+    void DrawTrajectory()
+    {
+        trajectoryPoints.Clear();
+        if (currentBomb == null || !isAiming)
+        {
+            HideTrajectory();
+            return;
+        }
+
+        Transform origin = transform.Find("RightHoldPoint");
+        if (!origin)
+        {
+            HideTrajectory();
+            return;
+        }
+
+        // Get throw parameters from the bomb itself to match exact physics
+        float speed = currentThrowType == ThrowType.Short ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
+        float upward = currentThrowType == ThrowType.Short ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
+
+        Vector3 startPos = origin.position;
+        
+        // Calculate initial velocity using the same physics as the bomb
+        // The bomb uses AddForce with ForceMode.Impulse, which applies force directly as velocity change
+        // Since the bomb's initial mass is 1f and gets multiplied by flightMassMultiplier during throw,
+        // and ForceMode.Impulse applies force as velocity change, we can directly use the force as velocity
+        Vector3 force = aimDirection * speed + Vector3.up * upward;
+        Vector3 velocity = force; // ForceMode.Impulse with mass=1 means force equals velocity
+        
+        Vector3 lastPos = startPos;
+        Vector3 landingPos = Vector3.zero;
+        bool foundLanding = false;
+
+        trajectoryPoints.Add(lastPos);
+
+        float t = 0f;
+        Vector3 currentVelocity = velocity;
+        Vector3 currentPos = startPos;
+        List<Vector3> bouncePoints = new List<Vector3>();
+        int maxBounces = 3; // Limit bounces to prevent infinite loops
+        int bounceCount = 0;
+        
+        for (int i = 0; i < maxPoints; ++i)
+        {
+            t += timeStep;
+            
+            // Apply gravity to velocity
+            currentVelocity += Physics.gravity * timeStep;
+            
+            // Calculate next position
+            Vector3 next = currentPos + currentVelocity * timeStep;
+            
+            if (Physics.Raycast(lastPos, next - lastPos, out RaycastHit hit,
+                                (next - lastPos).magnitude, collisionMask))
             {
-                Vector3 forward = playerCamera.transform.forward;
-                Vector3 right = playerCamera.transform.right;
-                forward.y = 0;
-                right.y = 0;
-                forward.Normalize();
-                right.Normalize();
+                trajectoryPoints.Add(hit.point);
                 
-                localAimDirection += right * inputDirection.x + forward * inputDirection.z;
+                // Check if this is a bounce or final landing
+                Vector3 surfaceNormal = hit.normal;
+                float dotProduct = Vector3.Dot(currentVelocity.normalized, -surfaceNormal);
+                
+                // If hitting at a shallow angle and haven't exceeded max bounces, treat as bounce
+                if (dotProduct < 0.7f && bounceCount < maxBounces && currentVelocity.magnitude > 5f)
+                {
+                    // This is a bounce
+                    bouncePoints.Add(hit.point);
+                    bounceCount++;
+                    
+                    // Calculate bounce velocity (simplified physics)
+                    Vector3 bounceVelocity = Vector3.Reflect(currentVelocity, surfaceNormal);
+                    bounceVelocity *= 0.6f; // Energy loss on bounce
+                    
+                    // Continue trajectory from bounce point
+                    currentVelocity = bounceVelocity;
+                    currentPos = hit.point + surfaceNormal * 0.01f; // Slightly offset from surface
+                    lastPos = currentPos;
+                    
+                    continue;
+                }
+                else
+                {
+                    // This is the final landing
+                    landingPos = hit.point;
+                    foundLanding = true;
+                    break;
+                }
+            }
+            
+            trajectoryPoints.Add(next);
+            lastPos = next;
+            currentPos = next;
+        }
+        
+        // Update bounce markers
+        UpdateBounceMarkers(bouncePoints);
+
+        // Update dotted line trajectory
+        UpdateDottedTrajectory();
+        
+        // Update landing marker (local only)
+        if (foundLanding && isLocalPlayer)
+        {
+            UpdateLocalLandingMarker(landingPos);
+        }
+    }
+
+    void UpdateDottedTrajectory()
+    {
+        // Ensure we have enough dots
+        while (trajectoryDots.Count < trajectoryPoints.Count)
+        {
+            GameObject dot;
+            if (trajectoryPointPrefab != null)
+            {
+                dot = Instantiate(trajectoryPointPrefab);
             }
             else
             {
-                localAimDirection += inputDirection;
+                // Create simple sphere dots if no prefab
+                dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                dot.transform.localScale = Vector3.one * 0.2f;
+                Destroy(dot.GetComponent<Collider>());
             }
             
-            // Normalize and clamp to range
-            if (localAimDirection.magnitude > aimingRange)
-            {
-                localAimDirection = localAimDirection.normalized * aimingRange;
-            }
+            dot.SetActive(false);
+            trajectoryDots.Add(dot);
+        }
+
+        // Reset active count
+        activeDotCount = 0;
+        
+        // Position dots along trajectory with spacing
+        float accumulatedDistance = 0f;
+        Vector3 lastDotPos = trajectoryPoints[0];
+        
+        for (int i = 1; i < trajectoryPoints.Count; i++)
+        {
+            Vector3 currentPoint = trajectoryPoints[i];
+            float segmentDistance = Vector3.Distance(trajectoryPoints[i-1], currentPoint);
+            accumulatedDistance += segmentDistance;
             
-            localAimDirection.y = 0;
-            if (localAimDirection.magnitude < 0.1f)
+            if (accumulatedDistance >= trajectoryPointSpacing)
             {
-                localAimDirection = transform.forward;
+                if (activeDotCount < trajectoryDots.Count)
+                {
+                    GameObject dot = trajectoryDots[activeDotCount];
+                    dot.SetActive(true);
+                    dot.transform.position = currentPoint;
+                    
+                    // Update color with fade
+                    Renderer renderer = dot.GetComponent<Renderer>();
+                    if (renderer != null)
+                    {
+                        Color baseColor = currentThrowType == ThrowType.Short ? shortThrowColor : lobThrowColor;
+                        float fadeFactor = 1f - (i / (float)trajectoryPoints.Count) * trajectoryFadeDistance;
+                        baseColor.a *= fadeFactor;
+                        
+                        renderer.material.color = baseColor;
+                        // Enable transparency
+                        renderer.material.SetFloat("_Mode", 3);
+                        renderer.material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        renderer.material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        renderer.material.SetInt("_ZWrite", 0);
+                        renderer.material.DisableKeyword("_ALPHATEST_ON");
+                        renderer.material.EnableKeyword("_ALPHABLEND_ON");
+                        renderer.material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                        renderer.material.renderQueue = 3000;
+                    }
+                    
+                    activeDotCount++;
+                    accumulatedDistance = 0f;
+                    lastDotPos = currentPoint;
+                }
             }
-            localAimDirection.Normalize();
         }
         
-        // Smooth the aim direction locally
-        smoothedAimDirection = Vector3.Slerp(smoothedAimDirection, localAimDirection, Time.deltaTime * aimSmoothSpeed);
-    }
-
-    [Command]
-    void CmdUpdateAimDirection(Vector3 direction)
-    {
-        networkAimDirection = direction;
-    }
-
-    [Command]
-    void CmdSetAiming(bool aiming)
-    {
-        networkIsAiming = aiming;
-    }
-
-    void OnNetworkAimDirectionChanged(Vector3 oldValue, Vector3 newValue)
-    {
-        // Smooth transition on non-local clients
-        if (!isLocalPlayer)
+        // Hide unused dots
+        for (int i = activeDotCount; i < trajectoryDots.Count; i++)
         {
-            smoothedAimDirection = Vector3.Slerp(smoothedAimDirection, newValue, 0.5f);
+            trajectoryDots[i].SetActive(false);
         }
     }
 
-    void ToggleThrowType(InputAction.CallbackContext context)
+    void UpdateTrajectoryColors()
+    {
+        // Update colors of active dots when throw type changes
+        for (int i = 0; i < activeDotCount; i++)
+        {
+            Renderer renderer = trajectoryDots[i].GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                Color baseColor = currentThrowType == ThrowType.Short ? shortThrowColor : lobThrowColor;
+                float fadeFactor = 1f - (i / (float)activeDotCount) * trajectoryFadeDistance;
+                baseColor.a *= fadeFactor;
+                renderer.material.color = baseColor;
+            }
+        }
+    }
+
+    void UpdateBounceMarkers(List<Vector3> bouncePoints)
     {
         if (!isLocalPlayer) return;
         
-        CmdToggleThrowType();
-        Debug.Log($"ToggleThrowType: Switched to {(currentThrowType == ThrowType.Lob ? "Lob" : "Short")} throw type", this);
+        // Hide all existing bounce markers first
+        foreach (var marker in bounceMarkers)
+        {
+            if (marker != null) marker.SetActive(false);
+        }
+        
+        // Ensure we have enough bounce markers
+        while (bounceMarkers.Count < bouncePoints.Count)
+        {
+            GameObject bounceMarker;
+            if (landingMarkerPrefab != null)
+            {
+                bounceMarker = Instantiate(landingMarkerPrefab);
+            }
+            else
+            {
+                // Create simple bounce marker if no prefab
+                bounceMarker = new GameObject("BounceMarker");
+                var spriteRenderer = bounceMarker.AddComponent<SpriteRenderer>();
+                spriteRenderer.sprite = CreateCircleSprite();
+                spriteRenderer.sortingLayerName = landingMarkerLayer;
+                spriteRenderer.sortingOrder = 9; // Slightly below landing marker
+                bounceMarker.transform.localScale = Vector3.one * 1.5f; // Smaller than landing marker
+            }
+            
+            bounceMarker.SetActive(false);
+            bounceMarkers.Add(bounceMarker);
+        }
+        
+        // Position and show bounce markers
+        for (int i = 0; i < bouncePoints.Count; i++)
+        {
+            if (i < bounceMarkers.Count)
+            {
+                GameObject marker = bounceMarkers[i];
+                marker.SetActive(true);
+                marker.transform.position = bouncePoints[i] + Vector3.up * 0.05f; // Slightly above ground
+                
+                // Color bounce markers differently (orange-ish)
+                var spriteRenderer = marker.GetComponent<SpriteRenderer>();
+                if (spriteRenderer != null)
+                {
+                    spriteRenderer.color = new Color(1f, 0.7f, 0.3f, 0.7f); // Orange with transparency
+                }
+            }
+        }
+    }
+
+    void UpdateLocalLandingMarker(Vector3 position)
+    {
+        localLandingPosition = position;
+        showLocalLandingMarker = true;
+        UpdateLandingMarkerVisual(position);
+    }
+
+    void UpdateLandingMarkerVisual(Vector3 position)
+    {
+        if (landingMarker != null && isLocalPlayer)
+        {
+            landingMarker.SetActive(showLocalLandingMarker);
+            landingMarker.transform.position = position + Vector3.up * 0.1f; // Slightly above ground
+            
+            // Add visual feedback based on throw type
+            var spriteRenderer = landingMarker.GetComponent<SpriteRenderer>();
+            if (spriteRenderer != null)
+            {
+                Color markerColor = currentThrowType == ThrowType.Short ? 
+                    new Color(1f, 1f, 1f, 0.8f) : new Color(1f, 1f, 0.8f, 0.8f);
+                spriteRenderer.color = markerColor;
+            }
+        }
+    }
+
+    void HideTrajectory()
+    {
+        // Hide all trajectory dots
+        foreach (var dot in trajectoryDots)
+        {
+            if (dot != null)
+                dot.SetActive(false);
+        }
+        activeDotCount = 0;
+        
+        // Hide landing marker (local only)
+        if (isLocalPlayer)
+        {
+            showLocalLandingMarker = false;
+            if (landingMarker != null)
+                landingMarker.SetActive(false);
+                
+            // Hide bounce markers
+            foreach (var marker in bounceMarkers)
+            {
+                if (marker != null) marker.SetActive(false);
+            }
+        }
     }
 
     void StartAiming(InputAction.CallbackContext context)
@@ -278,18 +626,13 @@ public class PlayerBombHandler : NetworkBehaviour
         
         if (!currentBomb.IsHeld || currentBomb.Holder != gameObject)
         {
-            Debug.LogWarning($"StartAiming: Bomb is not properly held by this player.", this);
             return;
         }
         
         isAiming = true;
         isHoldingAim = true;
-        localAimDirection = transform.forward;
-        smoothedAimDirection = transform.forward;
-        
-        CmdSetAiming(true);
-        
-        Debug.Log($"StartAiming: Started aiming with {currentThrowType} throw type", this);
+        aimDirection = transform.forward;
+        targetAimDirection = transform.forward;
     }
 
     void CancelAiming(InputAction.CallbackContext context)
@@ -299,10 +642,6 @@ public class PlayerBombHandler : NetworkBehaviour
         isAiming = false;
         isHoldingAim = false;
         HideTrajectory();
-        
-        CmdSetAiming(false);
-        
-        Debug.Log("CancelAiming: Cancelled aiming", this);
     }
 
     void ExecuteThrow(InputAction.CallbackContext context)
@@ -311,143 +650,29 @@ public class PlayerBombHandler : NetworkBehaviour
         
         if (!currentBomb.IsHeld || currentBomb.Holder != gameObject)
         {
-            Debug.LogWarning($"ExecuteThrow: Cannot throw - bomb not properly held", this);
             return;
         }
         
-        // Use the smoothed aim direction for the throw
-        Vector3 throwDirection = smoothedAimDirection;
+        Vector3 throwDirection = aimDirection;
         ThrowType throwType = currentThrowType;
         
-        // Stop aiming
         isAiming = false;
         isHoldingAim = false;
         HideTrajectory();
         
-        CmdSetAiming(false);
+        if (animator != null)
+            animator.SetTrigger("Throw");
         
-        // Send throw command to server with final direction - animation will trigger from server
         CmdThrowBomb(throwDirection, throwType);
-        
-        Debug.Log($"ExecuteThrow: Throwing bomb in direction {throwDirection} with {throwType} throw type", this);
     }
 
-    [Command]
-    void CmdToggleThrowType()
+    public ThrowType GetCurrentThrowType()
     {
-        currentThrowType = currentThrowType == ThrowType.Short ? ThrowType.Lob : ThrowType.Short;
-        Debug.Log($"CmdToggleThrowType: Server switched to {currentThrowType} throw type", this);
+        return currentThrowType;
     }
 
-    [Command]
-    void CmdThrowBomb(Vector3 direction, ThrowType throwType)
+    public Vector3 GetAimDirection()
     {
-        Debug.Log($"CmdThrowBomb: Server received throw command - direction: {direction}, type: {throwType}", this);
-        
-        if (currentBomb && currentBomb.Holder == gameObject && currentBomb.CurrentTimer > 1.0f)
-        {
-            // Try to throw the bomb - only trigger animation if it succeeds
-            bool useShortThrow = throwType == ThrowType.Short;
-            bool throwSuccessful = currentBomb.TryThrowBomb(direction, useShortThrow);
-            
-            if (throwSuccessful)
-            {
-                // Only trigger animation if throw was successful
-                if (playerAnimator != null)
-                    playerAnimator.OnBombThrow();
-                
-                // Clear network aiming state
-                networkIsAiming = false;
-            }
-            else
-            {
-                Debug.LogWarning($"CmdThrowBomb: Throw failed due to cooldown or other validation", this);
-            }
-        }
-        else
-        {
-            Debug.LogWarning($"CmdThrowBomb: Rejected throw - bomb: {currentBomb != null}, holder: {currentBomb?.Holder == gameObject}, timer: {currentBomb?.CurrentTimer}", this);
-        }
-    }
-
-    void DrawTrajectory()
-    {
-        trajectoryPoints.Clear();
-        if (currentBomb == null || (!isAiming && !networkIsAiming))
-        {
-            HideTrajectory();
-            return;
-        }
-
-        // Use right hand hold point for consistency
-        Transform origin = transform.Find("RightHoldPoint");
-        if (!origin)
-        {
-            HideTrajectory();
-            return;
-        }
-
-        // Get throw parameters from the bomb itself
-        if (currentBomb == null) return;
-        
-        float speed = currentThrowType == ThrowType.Short ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
-        float upward = currentThrowType == ThrowType.Short ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
-
-        Vector3 startPos = origin.position;
-        Vector3 velocity = smoothedAimDirection * speed + Vector3.up * upward;
-        Vector3 lastPos = startPos;
-        trajectoryPoints.Add(lastPos);
-
-        float t = 0f;
-        for (int i = 0; i < maxPoints; ++i)
-        {
-            t += timeStep;
-            Vector3 next = startPos + velocity * t + 0.5f * Physics.gravity * t * t;
-            
-            if (Physics.Raycast(lastPos, next - lastPos, out RaycastHit hit,
-                                (next - lastPos).magnitude, collisionMask))
-            {
-                trajectoryPoints.Add(hit.point);
-                break;
-            }
-            
-            trajectoryPoints.Add(next);
-            lastPos = next;
-        }
-
-        lr.positionCount = trajectoryPoints.Count;
-        lr.SetPositions(trajectoryPoints.ToArray());
-        
-        // Color based on throw type: Blue for short, Yellow for lob
-        Color trajectoryColor = currentThrowType == ThrowType.Short ? 
-            new Color(0.3f, 0.6f, 1f, 0.8f) : new Color(1f, 0.9f, 0.3f, 0.8f);
-        lr.startColor = lr.endColor = trajectoryColor;
-    }
-
-    void HideTrajectory()
-    {
-        lr.positionCount = 0;
-        trajectoryPoints.Clear();
-    }
-
-    public void SetBomb(Bomb b)
-    {
-        currentBomb = b;
-        Debug.Log($"SetBomb: Bomb assigned to {gameObject.name}", this);
-    }
-
-    public void ClearBomb()
-    {
-        currentBomb = null;
-        if (isAiming)
-        {
-            isAiming = false;
-            HideTrajectory();
-            if (isLocalPlayer)
-            {
-                CmdSetAiming(false);
-            }
-        }
-        Debug.Log($"ClearBomb: Bomb cleared from {gameObject.name}", this);
+        return aimDirection;
     }
 }

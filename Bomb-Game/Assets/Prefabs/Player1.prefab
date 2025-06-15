@@ -1166,14 +1166,18 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  maxPoints: 100
+  maxPoints: 35
   collisionMask:
     serializedVersion: 2
-    m_Bits: 0
-  shortThrowSpeed: 15
-  shortThrowUpward: 3
-  lobThrowSpeed: 8
-  lobThrowUpward: 8
+    m_Bits: 32
+  trajectoryPointPrefab: {fileID: 2099609217344523891, guid: 4e7d68d73902c934ba5ec28509229ac2, type: 3}
+  trajectoryPointSpacing: 0.5
+  landingMarkerSprite: {fileID: 21300000, guid: d2cf800f70bfa8c42ab228a1e5ddd511, type: 3}
+  landingMarkerPrefab: {fileID: 347459730655445168, guid: 147f2a7c4f02c7f47ac891e080c5be93, type: 3}
+  landingMarkerLayer: UI
+  shortThrowColor: {r: 1, g: 1, b: 1, a: 1}
+  lobThrowColor: {r: 0, g: 1, b: 0.1481998, a: 0.6}
+  trajectoryFadeDistance: 0.8
   mouseSensitivity: 3
   controllerSensitivity: 5
   aimingRange: 10

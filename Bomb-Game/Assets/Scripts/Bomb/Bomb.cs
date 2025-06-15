@@ -52,6 +52,7 @@ public class Bomb : NetworkBehaviour
     public float NormalThrowUpward => normalThrowUpward;
     public float LobThrowSpeed => lobThrowSpeed;
     public float LobThrowUpward => lobThrowUpward;
+    public float FlightMassMultiplier => flightMassMultiplier;
 
     void Awake()
     {
@@ -229,13 +230,35 @@ public class Bomb : NetworkBehaviour
             rb.isKinematic = true;
             col.isTrigger = true;
             
-            // Use RPC to synchronize bomb positioning on all clients
-            RpcUpdateBombPosition(newH, isOnRight);
+            // Only call RPC from server
+            if (isServer)
+            {
+                RpcUpdateBombPosition(newH, isOnRight);
+            }
+            else
+            {
+                // On clients, directly position the bomb
+                Transform grip = newH.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
+                if (grip)
+                {
+                    transform.SetParent(grip);
+                    transform.localPosition = Vector3.zero;
+                    transform.localRotation = Quaternion.identity;
+                }
+            }
         }
         else
         {
-            // Use RPC to synchronize bomb release on all clients  
-            RpcReleaseBomb();
+            // Only call RPC from server
+            if (isServer)
+            {
+                RpcReleaseBomb();
+            }
+            else
+            {
+                // On clients, directly release the bomb
+                transform.SetParent(null);
+            }
             rb.isKinematic = false;
             col.isTrigger = false;
         }

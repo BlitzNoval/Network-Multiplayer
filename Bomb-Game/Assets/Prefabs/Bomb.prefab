@@ -513,11 +513,11 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  initialTimer: 10
+  initialTimer: 100
   normalThrowSpeed: 20
-  normalThrowUpward: 5
-  lobThrowSpeed: 10
-  lobThrowUpward: 8
+  normalThrowUpward: 1
+  lobThrowSpeed: 1
+  lobThrowUpward: 1
   throwCooldown: 0.01
   flightMassMultiplier: 1
   playerTag: Player
