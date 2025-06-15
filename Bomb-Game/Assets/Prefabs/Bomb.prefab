@@ -516,7 +516,7 @@ MonoBehaviour:
   initialTimer: 100
   normalThrowSpeed: 20
   normalThrowUpward: 1
-  lobThrowSpeed: 1
+  lobThrowSpeed: 20
   lobThrowUpward: 1
   throwCooldown: 0.00001
   flightMassMultiplier: 1

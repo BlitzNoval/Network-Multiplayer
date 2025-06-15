@@ -1176,7 +1176,7 @@ MonoBehaviour:
   landingMarkerPrefab: {fileID: 347459730655445168, guid: 147f2a7c4f02c7f47ac891e080c5be93, type: 3}
   landingMarkerLayer: UI
   shortThrowColor: {r: 1, g: 1, b: 1, a: 1}
-  lobThrowColor: {r: 0, g: 1, b: 0.1481998, a: 0.6}
+  lobThrowColor: {r: 1, g: 1, b: 1, a: 1}
   trajectoryFadeDistance: 0.8
   mouseSensitivity: 3
   controllerSensitivity: 5
