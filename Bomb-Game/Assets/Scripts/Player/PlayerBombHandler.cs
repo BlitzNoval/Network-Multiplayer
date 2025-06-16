@@ -8,21 +8,28 @@ using System.Linq;
 [RequireComponent(typeof(PlayerInput))]
 public class PlayerBombHandler : NetworkBehaviour
 {
-    [Header("Trajectory")]
-    [SerializeField, Range(10,300)] int maxPoints = 100;
+    [Header("Trajectory - Normal Throw")]
+    [SerializeField, Range(10,500)] int normalThrowMaxPoints = 200;
+    [SerializeField] private float normalThrowPointSpacing = 0.4f; // Space between dots
+    [SerializeField] private float normalThrowFadeDistance = 0.7f; // Fade dots over distance
+    [SerializeField] private Color normalThrowColor = Color.white;
+    
+    [Header("Trajectory - Lob Throw")]
+    [SerializeField, Range(10,500)] int lobThrowMaxPoints = 400;
+    [SerializeField] private float lobThrowPointSpacing = 0.6f; // Space between dots
+    [SerializeField] private float lobThrowFadeDistance = 0.9f; // Fade dots over distance
+    [SerializeField] private Color lobThrowColor = new Color(1f, 1f, 0.2f, 0.8f); // Yellow for lob
+    
+    [Header("Trajectory General")]
     [SerializeField] LayerMask collisionMask;
     [SerializeField] private GameObject trajectoryPointPrefab; // Prefab for dotted line points
-    [SerializeField] private float trajectoryPointSpacing = 0.5f; // Space between dots
-    [SerializeField] private Sprite landingMarkerSprite; // Sprite for landing indicator
-    [SerializeField] private GameObject landingMarkerPrefab; // Prefab with SpriteRenderer for short throws
-    [SerializeField] private GameObject lobLandingMarkerPrefab; // Prefab with SpriteRenderer for lob throws
-    [SerializeField] private string landingMarkerLayer = "UI"; // Layer for landing marker
     
-    
-    [Header("Visual Settings")]
-    [SerializeField] private Color shortThrowColor = Color.white;
-    [SerializeField] private Color lobThrowColor = new Color(1f, 1f, 1f, 0.6f); // Slightly transparent white
-    [SerializeField] private float trajectoryFadeDistance = 0.8f; // Fade dots over distance
+    [Header("Landing Markers")]
+    [SerializeField] private GameObject normalThrowMarkerPrefab; // Prefab for normal throw landing marker
+    [SerializeField] private GameObject lobThrowMarkerPrefab; // Prefab for lob throw landing marker
+    [SerializeField] private GameObject bounceMarkerPrefab; // Prefab for bounce points (shared)
+    [SerializeField] private Sprite landingMarkerSprite; // Fallback sprite for landing indicators
+    [SerializeField] private string landingMarkerLayer = "UI"; // Layer for landing markers
     
     [Header("Aiming")]
     [SerializeField] float mouseSensitivity = 1.5f;
@@ -37,8 +44,8 @@ public class PlayerBombHandler : NetworkBehaviour
     // Trajectory visualization
     private List<GameObject> trajectoryDots = new List<GameObject>();
     private List<Material> trajectoryDotMaterials = new List<Material>(); // Pre-created materials for performance
-    private GameObject landingMarker;
-    private GameObject lobLandingMarker;
+    private GameObject normalThrowMarker;
+    private GameObject lobThrowMarker;
     private List<GameObject> bounceMarkers = new List<GameObject>();
     private int activeDotCount = 0;
     
@@ -47,7 +54,7 @@ public class PlayerBombHandler : NetworkBehaviour
     Vector3 aimDirection;
     Vector3 targetAimDirection;
     List<Vector3> trajectoryPoints = new();
-    float timeStep = 0.02f; // Smaller timestep for more accurate trajectory calculation
+    float timeStep = 0.01f; // Smaller timestep for more accurate trajectory calculation
     [SerializeField] float aimSmoothSpeed = 8f;
     
     // Performance optimization for trajectory calculation
@@ -56,12 +63,12 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] float aimDirectionThreshold = 0.05f; // Minimum change to trigger recalculation
     private float lastTrajectoryUpdate = 0f;
     private Vector3 lastCachedAimDirection = Vector3.zero;
-    private ThrowType lastCachedThrowType = ThrowType.Short;
+    private ThrowType lastCachedThrowType = ThrowType.Normal;
     private bool trajectoryNeedsUpdate = true;
     
     // Throw type state
-    public enum ThrowType { Short, Lob }
-    [SyncVar(hook = nameof(OnThrowTypeChanged))] ThrowType currentThrowType = ThrowType.Short;
+    public enum ThrowType { Normal, Lob }
+    [SyncVar(hook = nameof(OnThrowTypeChanged))] ThrowType currentThrowType = ThrowType.Normal;
     
     // Local landing marker (only visible to this player)
     Vector3 localLandingPosition = Vector3.zero;
@@ -91,16 +98,17 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void InitializeTrajectoryVisualization()
     {
-        // Create regular (short throw) landing marker
-        if (landingMarkerPrefab != null)
+        // Create normal throw landing marker
+        if (normalThrowMarkerPrefab != null)
         {
-            landingMarker = Instantiate(landingMarkerPrefab);
-            landingMarker.SetActive(false);
+            normalThrowMarker = Instantiate(normalThrowMarkerPrefab);
+            normalThrowMarker.name = "NormalThrowMarker";
+            normalThrowMarker.SetActive(false);
             
             // Set the sprite if provided
             if (landingMarkerSprite != null)
             {
-                var spriteRenderer = landingMarker.GetComponent<SpriteRenderer>();
+                var spriteRenderer = normalThrowMarker.GetComponent<SpriteRenderer>();
                 if (spriteRenderer != null)
                 {
                     spriteRenderer.sprite = landingMarkerSprite;
@@ -111,9 +119,9 @@ public class PlayerBombHandler : NetworkBehaviour
         }
         else
         {
-            // Create a simple landing marker if no prefab provided
-            landingMarker = new GameObject("LandingMarker");
-            var spriteRenderer = landingMarker.AddComponent<SpriteRenderer>();
+            // Create a simple normal throw marker if no prefab provided
+            normalThrowMarker = new GameObject("NormalThrowMarker");
+            var spriteRenderer = normalThrowMarker.AddComponent<SpriteRenderer>();
             if (landingMarkerSprite != null)
             {
                 spriteRenderer.sprite = landingMarkerSprite;
@@ -125,20 +133,22 @@ public class PlayerBombHandler : NetworkBehaviour
             }
             spriteRenderer.sortingLayerName = landingMarkerLayer;
             spriteRenderer.sortingOrder = 10;
-            landingMarker.transform.localScale = Vector3.one * 2f; // Adjust size
-            landingMarker.SetActive(false);
+            spriteRenderer.color = new Color(1f, 1f, 1f, 0.9f); // White for normal
+            normalThrowMarker.transform.localScale = Vector3.one * 2f; // Standard size
+            normalThrowMarker.SetActive(false);
         }
         
         // Create lob throw landing marker
-        if (lobLandingMarkerPrefab != null)
+        if (lobThrowMarkerPrefab != null)
         {
-            lobLandingMarker = Instantiate(lobLandingMarkerPrefab);
-            lobLandingMarker.SetActive(false);
+            lobThrowMarker = Instantiate(lobThrowMarkerPrefab);
+            lobThrowMarker.name = "LobThrowMarker";
+            lobThrowMarker.SetActive(false);
             
             // Set the sprite if provided
             if (landingMarkerSprite != null)
             {
-                var spriteRenderer = lobLandingMarker.GetComponent<SpriteRenderer>();
+                var spriteRenderer = lobThrowMarker.GetComponent<SpriteRenderer>();
                 if (spriteRenderer != null)
                 {
                     spriteRenderer.sprite = landingMarkerSprite;
@@ -150,8 +160,8 @@ public class PlayerBombHandler : NetworkBehaviour
         else
         {
             // Create a simple lob landing marker if no prefab provided
-            lobLandingMarker = new GameObject("LobLandingMarker");
-            var spriteRenderer = lobLandingMarker.AddComponent<SpriteRenderer>();
+            lobThrowMarker = new GameObject("LobThrowMarker");
+            var spriteRenderer = lobThrowMarker.AddComponent<SpriteRenderer>();
             if (landingMarkerSprite != null)
             {
                 spriteRenderer.sprite = landingMarkerSprite;
@@ -163,9 +173,9 @@ public class PlayerBombHandler : NetworkBehaviour
             }
             spriteRenderer.sortingLayerName = landingMarkerLayer;
             spriteRenderer.sortingOrder = 10;
-            spriteRenderer.color = new Color(1f, 1f, 0.2f, 0.9f); // Yellow-ish color for lob
-            lobLandingMarker.transform.localScale = Vector3.one * 2.5f; // Larger size for lob
-            lobLandingMarker.SetActive(false);
+            spriteRenderer.color = new Color(1f, 1f, 0.2f, 0.9f); // Yellow for lob
+            lobThrowMarker.transform.localScale = Vector3.one * 2.5f; // Larger size for lob
+            lobThrowMarker.SetActive(false);
         }
     }
 
@@ -226,8 +236,8 @@ public class PlayerBombHandler : NetworkBehaviour
         bounceMarkers.Clear();
         
         // Clean up landing markers
-        if (landingMarker != null) Destroy(landingMarker);
-        if (lobLandingMarker != null) Destroy(lobLandingMarker);
+        if (normalThrowMarker != null) Destroy(normalThrowMarker);
+        if (lobThrowMarker != null) Destroy(lobThrowMarker);
     }
 
     public override void OnStartLocalPlayer()
@@ -372,7 +382,7 @@ public class PlayerBombHandler : NetworkBehaviour
     [Command]
     void CmdToggleThrowTypes()
     {
-        currentThrowType = currentThrowType == ThrowType.Short ? ThrowType.Lob : ThrowType.Short;
+        currentThrowType = currentThrowType == ThrowType.Normal ? ThrowType.Lob : ThrowType.Normal;
     }
 
     [Command]
@@ -383,8 +393,8 @@ public class PlayerBombHandler : NetworkBehaviour
             if (playerAnimator != null)
                 playerAnimator.OnBombThrow();
             
-            bool useShortThrow = throwType == ThrowType.Short;
-            currentBomb.ThrowBomb(direction, useShortThrow);
+            bool useNormalThrow = throwType == ThrowType.Normal;
+            currentBomb.ThrowBomb(direction, useNormalThrow);
             
             // Landing marker will be hidden locally when aiming stops
         }
@@ -408,17 +418,22 @@ public class PlayerBombHandler : NetworkBehaviour
         }
 
         // Get throw parameters from the bomb itself to match exact physics
-        float speed = currentThrowType == ThrowType.Short ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
-        float upward = currentThrowType == ThrowType.Short ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
+        float speed = currentThrowType == ThrowType.Normal ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
+        float upward = currentThrowType == ThrowType.Normal ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
+        
+        // Get trajectory settings based on throw type
+        int maxPoints = currentThrowType == ThrowType.Normal ? normalThrowMaxPoints : lobThrowMaxPoints;
+        float pointSpacing = currentThrowType == ThrowType.Normal ? normalThrowPointSpacing : lobThrowPointSpacing;
+        float fadeDistance = currentThrowType == ThrowType.Normal ? normalThrowFadeDistance : lobThrowFadeDistance;
 
         Vector3 startPos = origin.position;
         
-        // Calculate initial velocity using the same physics as the bomb
-        // The bomb uses AddForce with ForceMode.Impulse, which applies force directly as velocity change
-        // Since the bomb's initial mass is 1f and gets multiplied by flightMassMultiplier during throw,
-        // and ForceMode.Impulse applies force as velocity change, we can directly use the force as velocity
-        Vector3 force = aimDirection * speed + Vector3.up * upward;
-        Vector3 velocity = force; // ForceMode.Impulse with mass=1 means force equals velocity
+        // Calculate initial velocity using the exact same physics as the bomb
+        // The bomb's mass gets multiplied by flightMassMultiplier during throw (line 350 in Bomb.cs)
+        // ForceMode.Impulse applies force/mass as velocity change, so we need to account for the mass change
+        Vector3 force = aimDirection.normalized * speed + Vector3.up * upward;
+        float effectiveMass = 1f * currentBomb.FlightMassMultiplier; // Match bomb's mass calculation
+        Vector3 velocity = force / effectiveMass; // ForceMode.Impulse: velocity = force / mass
         
         Vector3 lastPos = startPos;
         Vector3 landingPos = Vector3.zero;
@@ -443,40 +458,73 @@ public class PlayerBombHandler : NetworkBehaviour
             // Calculate next position
             Vector3 next = currentPos + currentVelocity * timeStep;
             
-            if (Physics.Raycast(lastPos, next - lastPos, out RaycastHit hit,
-                                (next - lastPos).magnitude, collisionMask))
+            // Use a more generous raycast distance for better collision detection
+            Vector3 rayDirection = (next - lastPos).normalized;
+            float rayDistance = (next - lastPos).magnitude;
+            
+            if (rayDistance > 0.001f)
             {
-                trajectoryPoints.Add(hit.point);
+                // First try the exact ray
+                bool hitSomething = Physics.Raycast(lastPos, rayDirection, out RaycastHit hit, rayDistance + 0.1f, collisionMask);
                 
-                // Check if this is a bounce or final landing
-                Vector3 surfaceNormal = hit.normal;
-                float dotProduct = Vector3.Dot(currentVelocity.normalized, -surfaceNormal);
-                
-                // If hitting at a shallow angle and haven't exceeded max bounces, treat as bounce
-                if (dotProduct < 0.7f && bounceCount < maxBounces && currentVelocity.magnitude > 5f)
+                // If no hit, try a slightly downward ray to catch ground better (especially for lob throws)
+                if (!hitSomething && currentVelocity.y < 0)
                 {
-                    // This is a bounce
-                    bouncePoints.Add(hit.point);
-                    bounceCount++;
+                    Vector3 downwardRay = rayDirection + Vector3.down * 0.3f;
+                    hitSomething = Physics.Raycast(lastPos, downwardRay.normalized, out hit, rayDistance * 1.5f, collisionMask);
+                }
+                
+                if (hitSomething)
+                {
+                    trajectoryPoints.Add(hit.point);
                     
-                    // Calculate bounce velocity (simplified physics)
-                    Vector3 bounceVelocity = Vector3.Reflect(currentVelocity, surfaceNormal);
-                    bounceVelocity *= 0.6f; // Energy loss on bounce
+                    // Check if this is a bounce or final landing
+                    Vector3 surfaceNormal = hit.normal;
+                    float dotProduct = Vector3.Dot(currentVelocity.normalized, -surfaceNormal);
                     
-                    // Continue trajectory from bounce point
-                    currentVelocity = bounceVelocity;
-                    currentPos = hit.point + surfaceNormal * 0.01f; // Slightly offset from surface
-                    lastPos = currentPos;
-                    
-                    continue;
+                    // If hitting at a shallow angle and haven't exceeded max bounces, treat as bounce
+                    if (dotProduct < 0.7f && bounceCount < maxBounces && currentVelocity.magnitude > 5f)
+                    {
+                        // This is a bounce
+                        bouncePoints.Add(hit.point);
+                        bounceCount++;
+                        
+                        // Calculate bounce velocity (simplified physics)
+                        Vector3 bounceVelocity = Vector3.Reflect(currentVelocity, surfaceNormal);
+                        bounceVelocity *= 0.6f; // Energy loss on bounce
+                        
+                        // Continue trajectory from bounce point
+                        currentVelocity = bounceVelocity;
+                        currentPos = hit.point + surfaceNormal * 0.01f; // Slightly offset from surface
+                        lastPos = currentPos;
+                        
+                        continue;
+                    }
+                    else
+                    {
+                        // This is the final landing
+                        landingPos = hit.point;
+                        foundLanding = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Check if we've fallen below a reasonable floor level (like -10) to prevent infinite falling
+            if (next.y < -10f)
+            {
+                // Try to find the last valid ground position by raycasting downward
+                if (Physics.Raycast(new Vector3(next.x, 50f, next.z), Vector3.down, out RaycastHit groundHit, 100f, collisionMask))
+                {
+                    landingPos = groundHit.point;
+                    foundLanding = true;
                 }
                 else
                 {
-                    // This is the final landing
-                    landingPos = hit.point;
+                    landingPos = next;
                     foundLanding = true;
-                    break;
                 }
+                break;
             }
             
             trajectoryPoints.Add(next);
@@ -490,10 +538,18 @@ public class PlayerBombHandler : NetworkBehaviour
         // Update dotted line trajectory
         UpdateDottedTrajectory();
         
-        // Update landing marker (local only)
-        if (foundLanding && isLocalPlayer)
+        // Update landing marker (local only) - always show if we have a valid landing position
+        if (isLocalPlayer)
         {
-            UpdateLocalLandingMarker(landingPos);
+            if (foundLanding)
+            {
+                UpdateLocalLandingMarker(landingPos);
+            }
+            else
+            {
+                // If no landing found, hide the landing marker but keep trajectory visible
+                HideLandingMarkers();
+            }
         }
     }
 
@@ -542,6 +598,18 @@ public class PlayerBombHandler : NetworkBehaviour
         // Reset active count
         activeDotCount = 0;
         
+        // Only show dots if we have trajectory points
+        if (trajectoryPoints.Count == 0)
+        {
+            Debug.LogWarning("No trajectory points to display");
+            return;
+        }
+        
+        // Get current throw type settings
+        float currentPointSpacing = currentThrowType == ThrowType.Normal ? normalThrowPointSpacing : lobThrowPointSpacing;
+        float currentFadeDistance = currentThrowType == ThrowType.Normal ? normalThrowFadeDistance : lobThrowFadeDistance;
+        Color currentColor = currentThrowType == ThrowType.Normal ? normalThrowColor : lobThrowColor;
+        
         // Position dots along trajectory with spacing
         float accumulatedDistance = 0f;
         Vector3 lastDotPos = trajectoryPoints[0];
@@ -552,7 +620,7 @@ public class PlayerBombHandler : NetworkBehaviour
             float segmentDistance = Vector3.Distance(trajectoryPoints[i-1], currentPoint);
             accumulatedDistance += segmentDistance;
             
-            if (accumulatedDistance >= trajectoryPointSpacing)
+            if (accumulatedDistance >= currentPointSpacing)
             {
                 if (activeDotCount < trajectoryDots.Count)
                 {
@@ -563,9 +631,9 @@ public class PlayerBombHandler : NetworkBehaviour
                     // Update color with fade - material properties already configured
                     if (activeDotCount < trajectoryDotMaterials.Count && trajectoryDotMaterials[activeDotCount] != null)
                     {
-                        Color baseColor = currentThrowType == ThrowType.Short ? shortThrowColor : lobThrowColor;
-                        float fadeFactor = 1f - (i / (float)trajectoryPoints.Count) * trajectoryFadeDistance;
-                        baseColor.a *= fadeFactor;
+                        Color baseColor = currentColor;
+                        float fadeFactor = 1f - (i / (float)trajectoryPoints.Count) * currentFadeDistance;
+                        baseColor.a *= Mathf.Max(0.2f, fadeFactor); // Ensure minimum visibility
                         
                         trajectoryDotMaterials[activeDotCount].color = baseColor;
                     }
@@ -574,8 +642,16 @@ public class PlayerBombHandler : NetworkBehaviour
                     accumulatedDistance = 0f;
                     lastDotPos = currentPoint;
                 }
+                else
+                {
+                    // If we need more dots, break and log it
+                    // Need more trajectory dots - increase maxPoints if needed
+                    break;
+                }
             }
         }
+        
+        // Trajectory dots updated successfully
         
         // Hide unused dots
         for (int i = activeDotCount; i < trajectoryDots.Count; i++)
@@ -586,14 +662,18 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void UpdateTrajectoryColors()
     {
+        // Get current throw type settings
+        Color currentColor = currentThrowType == ThrowType.Normal ? normalThrowColor : lobThrowColor;
+        float currentFadeDistance = currentThrowType == ThrowType.Normal ? normalThrowFadeDistance : lobThrowFadeDistance;
+        
         // Update colors of active dots when throw type changes
         for (int i = 0; i < activeDotCount; i++)
         {
             if (i < trajectoryDotMaterials.Count && trajectoryDotMaterials[i] != null)
             {
-                Color baseColor = currentThrowType == ThrowType.Short ? shortThrowColor : lobThrowColor;
-                float fadeFactor = 1f - (i / (float)activeDotCount) * trajectoryFadeDistance;
-                baseColor.a *= fadeFactor;
+                Color baseColor = currentColor;
+                float fadeFactor = 1f - (i / (float)activeDotCount) * currentFadeDistance;
+                baseColor.a *= Mathf.Max(0.2f, fadeFactor);
                 trajectoryDotMaterials[i].color = baseColor;
             }
         }
@@ -613,21 +693,23 @@ public class PlayerBombHandler : NetworkBehaviour
         while (bounceMarkers.Count < bouncePoints.Count)
         {
             GameObject bounceMarker;
-            GameObject markerPrefab = currentThrowType == ThrowType.Short ? landingMarkerPrefab : lobLandingMarkerPrefab;
             
-            if (markerPrefab != null)
+            if (bounceMarkerPrefab != null)
             {
-                bounceMarker = Instantiate(markerPrefab);
+                bounceMarker = Instantiate(bounceMarkerPrefab);
+                bounceMarker.name = $"BounceMarker_{bounceMarkers.Count}";
             }
             else
             {
                 // Create simple bounce marker if no prefab
-                bounceMarker = new GameObject("BounceMarker");
+                bounceMarker = new GameObject($"BounceMarker_{bounceMarkers.Count}");
                 var spriteRenderer = bounceMarker.AddComponent<SpriteRenderer>();
                 spriteRenderer.sprite = CreateCircleSprite();
                 spriteRenderer.sortingLayerName = landingMarkerLayer;
                 spriteRenderer.sortingOrder = 9; // Slightly below landing marker
                 bounceMarker.transform.localScale = Vector3.one * 1.5f; // Smaller than landing marker
+                // Orange color for bounce markers
+                spriteRenderer.color = new Color(1f, 0.7f, 0.3f, 0.8f);
             }
             
             bounceMarker.SetActive(false);
@@ -659,36 +741,56 @@ public class PlayerBombHandler : NetworkBehaviour
         showLocalLandingMarker = true;
         UpdateLandingMarkerVisual(position);
     }
+    
+    void HideLandingMarkers()
+    {
+        showLocalLandingMarker = false;
+        if (normalThrowMarker != null)
+            normalThrowMarker.SetActive(false);
+        if (lobThrowMarker != null)
+            lobThrowMarker.SetActive(false);
+    }
 
     void UpdateLandingMarkerVisual(Vector3 position)
     {
-        if (isLocalPlayer)
+        if (!isLocalPlayer) return;
+        
+        // Get the appropriate marker based on throw type
+        GameObject currentMarker = currentThrowType == ThrowType.Normal ? normalThrowMarker : lobThrowMarker;
+        GameObject otherMarker = currentThrowType == ThrowType.Normal ? lobThrowMarker : normalThrowMarker;
+        
+        // Update landing marker visual for current throw type
+        
+        // Always hide the other marker first
+        if (otherMarker != null)
         {
-            // Get the appropriate marker based on throw type
-            GameObject currentMarker = currentThrowType == ThrowType.Short ? landingMarker : lobLandingMarker;
-            GameObject otherMarker = currentThrowType == ThrowType.Short ? lobLandingMarker : landingMarker;
-            
-            // Hide the other marker
-            if (otherMarker != null)
+            otherMarker.SetActive(false);
+        }
+        
+        // Show the current marker if we should show it
+        if (currentMarker != null)
+        {
+            currentMarker.SetActive(showLocalLandingMarker);
+            if (showLocalLandingMarker)
             {
-                otherMarker.SetActive(false);
-            }
-            
-            // Show the current marker
-            if (currentMarker != null)
-            {
-                currentMarker.SetActive(showLocalLandingMarker);
                 currentMarker.transform.position = position + Vector3.up * 0.1f; // Slightly above ground
                 
                 // Add visual feedback based on throw type (if using fallback marker creation)
                 var spriteRenderer = currentMarker.GetComponent<SpriteRenderer>();
-                if (spriteRenderer != null && (landingMarkerPrefab == null || lobLandingMarkerPrefab == null))
+                if (spriteRenderer != null)
                 {
-                    Color markerColor = currentThrowType == ThrowType.Short ? 
-                        new Color(1f, 1f, 1f, 0.8f) : new Color(1f, 1f, 0.8f, 0.8f);
+                    // Set colors to distinguish between throw types
+                    Color markerColor = currentThrowType == ThrowType.Normal ? 
+                        new Color(1f, 1f, 1f, 0.9f) : new Color(1f, 1f, 0.2f, 0.9f); // White for normal, yellow for lob
                     spriteRenderer.color = markerColor;
                 }
+                
+                // Landing marker positioned successfully
             }
+        }
+        else
+        {
+            Debug.LogWarning($"No landing marker found for throw type: {currentThrowType}");
         }
     }
 
@@ -705,11 +807,7 @@ public class PlayerBombHandler : NetworkBehaviour
         // Hide landing markers (local only)
         if (isLocalPlayer)
         {
-            showLocalLandingMarker = false;
-            if (landingMarker != null)
-                landingMarker.SetActive(false);
-            if (lobLandingMarker != null)
-                lobLandingMarker.SetActive(false);
+            HideLandingMarkers();
                 
             // Hide bounce markers
             foreach (var marker in bounceMarkers)
