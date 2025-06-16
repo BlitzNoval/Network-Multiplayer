@@ -135,6 +135,42 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Emote1"",
+                    ""type"": ""Button"",
+                    ""id"": ""36ac7d3f-8a5b-42fb-8598-3c0d796cab3b"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Emote2"",
+                    ""type"": ""Button"",
+                    ""id"": ""8feae8f9-d451-4cf4-8a0f-c90c6dfaf6e2"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Emote3"",
+                    ""type"": ""Button"",
+                    ""id"": ""276157c2-f789-4b04-a7d5-e8fabfd510a0"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Emote"",
+                    ""type"": ""Button"",
+                    ""id"": ""d74384af-1569-446b-bdee-c4c186ca1d60"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -291,6 +327,138 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""CancelAim"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""99d96567-5c27-4f2d-9706-ee935875ee5a"",
+                    ""path"": ""<Keyboard>/1"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""Emote1"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b57eaf51-909b-425b-a256-e597c383e4d2"",
+                    ""path"": ""<Gamepad>/dpad/left"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Emote1"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""29dd65ae-cf8f-4a8a-a121-8c7de7f5a8a7"",
+                    ""path"": ""<Keyboard>/2"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""Emote2"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5f7f56de-48c5-4635-bd2f-2b9f33d1fee0"",
+                    ""path"": ""<Gamepad>/dpad/up"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Emote2"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""bbeb4bed-51c6-4d52-afbe-d2b3fc97b4cc"",
+                    ""path"": ""<Keyboard>/3"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""Emote3"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d619ae23-d964-46f0-8e4b-d74b3f5aa1d4"",
+                    ""path"": ""<Gamepad>/dpad/right"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Emote3"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""a7adcee3-f0c1-49cf-8b80-64bbc62213a9"",
+                    ""path"": ""<Keyboard>/1"",
+                    ""interactions"": ""Press"",
+                    ""processors"": ""Scale"",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""Emote"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7fe44046-d19a-4611-b7f5-44fe20915d65"",
+                    ""path"": ""<Keyboard>/2"",
+                    ""interactions"": ""Press"",
+                    ""processors"": ""Scale(factor=2)"",
+                    ""groups"": """",
+                    ""action"": ""Emote"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c5b2a391-25ea-4b2e-be20-58544c00a843"",
+                    ""path"": ""<Keyboard>/3"",
+                    ""interactions"": ""Press"",
+                    ""processors"": ""Scale(factor=3)"",
+                    ""groups"": """",
+                    ""action"": ""Emote"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""95f6e6e2-bd2c-48a2-9a79-c2d1964c6ed9"",
+                    ""path"": ""<Gamepad>/dpad/left"",
+                    ""interactions"": ""Press"",
+                    ""processors"": ""Scale"",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Emote"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7766036d-f3f6-4f7e-b891-3ff39e3d5954"",
+                    ""path"": ""<Gamepad>/dpad/up"",
+                    ""interactions"": ""Press"",
+                    ""processors"": ""Scale(factor=2)"",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Emote"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""812b3ece-c6d9-4794-ac9a-0c61b7fa73cb"",
+                    ""path"": ""<Gamepad>/dpad/right"",
+                    ""interactions"": ""Press"",
+                    ""processors"": ""Scale(factor=3)"",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Emote"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -332,6 +500,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_Aim = m_Player.FindAction("Aim", throwIfNotFound: true);
         m_Player_HoldAim = m_Player.FindAction("HoldAim", throwIfNotFound: true);
         m_Player_CancelAim = m_Player.FindAction("CancelAim", throwIfNotFound: true);
+        m_Player_Emote1 = m_Player.FindAction("Emote1", throwIfNotFound: true);
+        m_Player_Emote2 = m_Player.FindAction("Emote2", throwIfNotFound: true);
+        m_Player_Emote3 = m_Player.FindAction("Emote3", throwIfNotFound: true);
+        m_Player_Emote = m_Player.FindAction("Emote", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -417,6 +589,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Aim;
     private readonly InputAction m_Player_HoldAim;
     private readonly InputAction m_Player_CancelAim;
+    private readonly InputAction m_Player_Emote1;
+    private readonly InputAction m_Player_Emote2;
+    private readonly InputAction m_Player_Emote3;
+    private readonly InputAction m_Player_Emote;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -448,6 +624,22 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/CancelAim".
         /// </summary>
         public InputAction @CancelAim => m_Wrapper.m_Player_CancelAim;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Emote1".
+        /// </summary>
+        public InputAction @Emote1 => m_Wrapper.m_Player_Emote1;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Emote2".
+        /// </summary>
+        public InputAction @Emote2 => m_Wrapper.m_Player_Emote2;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Emote3".
+        /// </summary>
+        public InputAction @Emote3 => m_Wrapper.m_Player_Emote3;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Emote".
+        /// </summary>
+        public InputAction @Emote => m_Wrapper.m_Player_Emote;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -489,6 +681,18 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @CancelAim.started += instance.OnCancelAim;
             @CancelAim.performed += instance.OnCancelAim;
             @CancelAim.canceled += instance.OnCancelAim;
+            @Emote1.started += instance.OnEmote1;
+            @Emote1.performed += instance.OnEmote1;
+            @Emote1.canceled += instance.OnEmote1;
+            @Emote2.started += instance.OnEmote2;
+            @Emote2.performed += instance.OnEmote2;
+            @Emote2.canceled += instance.OnEmote2;
+            @Emote3.started += instance.OnEmote3;
+            @Emote3.performed += instance.OnEmote3;
+            @Emote3.canceled += instance.OnEmote3;
+            @Emote.started += instance.OnEmote;
+            @Emote.performed += instance.OnEmote;
+            @Emote.canceled += instance.OnEmote;
         }
 
         /// <summary>
@@ -515,6 +719,18 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @CancelAim.started -= instance.OnCancelAim;
             @CancelAim.performed -= instance.OnCancelAim;
             @CancelAim.canceled -= instance.OnCancelAim;
+            @Emote1.started -= instance.OnEmote1;
+            @Emote1.performed -= instance.OnEmote1;
+            @Emote1.canceled -= instance.OnEmote1;
+            @Emote2.started -= instance.OnEmote2;
+            @Emote2.performed -= instance.OnEmote2;
+            @Emote2.canceled -= instance.OnEmote2;
+            @Emote3.started -= instance.OnEmote3;
+            @Emote3.performed -= instance.OnEmote3;
+            @Emote3.canceled -= instance.OnEmote3;
+            @Emote.started -= instance.OnEmote;
+            @Emote.performed -= instance.OnEmote;
+            @Emote.canceled -= instance.OnEmote;
         }
 
         /// <summary>
@@ -616,5 +832,33 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnCancelAim(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Emote1" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnEmote1(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Emote2" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnEmote2(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Emote3" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnEmote3(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Emote" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnEmote(InputAction.CallbackContext context);
     }
 }
