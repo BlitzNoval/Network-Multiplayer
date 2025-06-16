@@ -3057,6 +3057,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Bush
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 298dfc85c9396b340a9a61c1c3bed75f, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4357,7 +4361,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1507636620937791836, guid: 7097ba7ba649e1f41bba232312bdcbd8, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1507636620937791839, guid: 7097ba7ba649e1f41bba232312bdcbd8, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
@@ -7703,6 +7707,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Tub
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 3c347fa96b983cf44bab8bd5fd95367c, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9943,6 +9951,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 72127ae003c6c494293bd8028ee04523, type: 3}
       propertyPath: m_Name
       value: DoubleTree
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 72127ae003c6c494293bd8028ee04523, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -12929,6 +12941,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Bush (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 298dfc85c9396b340a9a61c1c3bed75f, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -14492,6 +14508,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 4e2322eac2e207740b13ed72818df786, type: 3}
       propertyPath: m_Name
       value: New_MiddleBridge
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4e2322eac2e207740b13ed72818df786, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1442450553484104045, guid: 4e2322eac2e207740b13ed72818df786, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
@@ -16830,6 +16850,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 16b15ef23fc688d4ba8e4dea1b9b4bf4, type: 3}
       propertyPath: m_Name
       value: BoatBridge
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 16b15ef23fc688d4ba8e4dea1b9b4bf4, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1442450553484104045, guid: 16b15ef23fc688d4ba8e4dea1b9b4bf4, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
@@ -23903,8 +23927,8 @@ Camera:
   m_GameObject: {fileID: 1352019343}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_ClearFlags: 2
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -38142,7 +38166,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4064598724637770079, guid: 1bf3629cb3931784399661fb728a193a, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4111043062122942132, guid: 1bf3629cb3931784399661fb728a193a, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
