@@ -22,8 +22,8 @@ public class PlayerBombHandler : NetworkBehaviour
     
     [Header("Trajectory General")]
     [SerializeField] LayerMask collisionMask;
-    [SerializeField] private GameObject trajectoryPointPrefab; // Prefab for dotted line points
-    [SerializeField] private GameObject arrowPointPrefab; // Prefab for arrow trajectory points
+    [SerializeField] private GameObject trajectoryPointPrefab; // Prefab for dotted line points (lob throw)
+    [SerializeField] private GameObject shortThrowPrefab; // Prefab for short throw trajectory points
     
     [Header("Landing Markers")]
     [SerializeField] private GameObject underarmThrowMarkerPrefab; // Prefab for underarm throw landing marker
@@ -50,7 +50,7 @@ public class PlayerBombHandler : NetworkBehaviour
     private List<GameObject> bounceMarkers = new List<GameObject>();
     private int activeDotCount = 0;
     
-    // Arrow dots for underarm throw (similar to trajectory dots but arrow-shaped)
+    // Arrow dots for underarm throw (like trajectory dots but using arrow prefabs)
     private List<GameObject> arrowDots = new List<GameObject>();
     private List<Material> arrowDotMaterials = new List<Material>();
     private int activeArrowCount = 0;
@@ -699,16 +699,45 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void UpdateArrowTrajectory()
     {
-        // Use the exact same logic as UpdateDottedTrajectory but with arrow prefabs
+        // EXACT SAME LOGIC AS UpdateDottedTrajectory() but with flatter scale for underarm
         // Ensure we have enough arrow dots
         while (arrowDots.Count < trajectoryPoints.Count)
         {
-            GameObject arrowDot = CreateArrowDotFromPrefab();
-            if (arrowDot != null)
+            GameObject arrow;
+            Material arrowMaterial = null;
+            
+            if (shortThrowPrefab != null)
             {
-                arrowDot.SetActive(false);
-                arrowDots.Add(arrowDot);
+                arrow = Instantiate(shortThrowPrefab);
             }
+            else
+            {
+                // Create simple sphere if no prefab
+                arrow = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                arrow.transform.localScale = Vector3.one * 0.2f;
+                Destroy(arrow.GetComponent<Collider>());
+            }
+            
+            // Pre-create and configure material for transparency
+            Renderer renderer = arrow.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                arrowMaterial = new Material(renderer.material);
+                // Configure material for transparency once
+                arrowMaterial.SetFloat("_Mode", 3);
+                arrowMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                arrowMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                arrowMaterial.SetInt("_ZWrite", 0);
+                arrowMaterial.DisableKeyword("_ALPHATEST_ON");
+                arrowMaterial.EnableKeyword("_ALPHABLEND_ON");
+                arrowMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                arrowMaterial.renderQueue = 3000;
+                renderer.material = arrowMaterial;
+            }
+            
+            arrow.SetActive(false);
+            arrowDots.Add(arrow);
+            arrowDotMaterials.Add(arrowMaterial);
         }
 
         // Reset active count
@@ -720,12 +749,12 @@ public class PlayerBombHandler : NetworkBehaviour
             return;
         }
         
-        // Get current throw type settings (same as dots)
+        // Get current throw type settings
         float currentPointSpacing = underarmThrowPointSpacing;
         float currentFadeDistance = underarmThrowFadeDistance;
         Color currentColor = underarmThrowColor;
         
-        // Position arrow dots along trajectory with spacing (same logic as dots)
+        // Position arrows along trajectory with spacing (EXACT SAME LOGIC AS DOTS)
         float accumulatedDistance = 0f;
         Vector3 lastArrowPos = trajectoryPoints[0];
         Vector3 lastDirection = Vector3.forward; // Default direction
@@ -740,21 +769,13 @@ public class PlayerBombHandler : NetworkBehaviour
             {
                 if (activeArrowCount < arrowDots.Count)
                 {
-                    GameObject arrowDot = arrowDots[activeArrowCount];
-                    arrowDot.SetActive(true);
-                    arrowDot.transform.position = currentPoint;
+                    GameObject arrow = arrowDots[activeArrowCount];
+                    arrow.SetActive(true);
+                    arrow.transform.position = currentPoint;
                     
-                    // Calculate direction for this arrow segment
-                    Vector3 direction = (currentPoint - lastArrowPos).normalized;
-                    if (direction != Vector3.zero)
-                    {
-                        lastDirection = direction;
-                    }
+                    // No rotation needed for flattened trajectory points
                     
-                    // Rotate arrow to point in trajectory direction
-                    arrowDot.transform.rotation = Quaternion.LookRotation(lastDirection, Vector3.up);
-                    
-                    // Update color with fade (same logic as dots) - apply to all renderers in prefab
+                    // Update color with fade - material properties already configured
                     if (activeArrowCount < arrowDotMaterials.Count && arrowDotMaterials[activeArrowCount] != null)
                     {
                         Color baseColor = currentColor;
@@ -775,83 +796,13 @@ public class PlayerBombHandler : NetworkBehaviour
             }
         }
         
-        // Hide unused arrow dots
+        // Hide unused arrows
         for (int i = activeArrowCount; i < arrowDots.Count; i++)
         {
             arrowDots[i].SetActive(false);
         }
     }
     
-    GameObject CreateArrowDotFromPrefab()
-    {
-        if (arrowPointPrefab != null)
-        {
-            GameObject arrowDot = Instantiate(arrowPointPrefab);
-            
-            // Find all renderers in the prefab and set up materials for color control
-            Renderer[] renderers = arrowDot.GetComponentsInChildren<Renderer>();
-            if (renderers.Length > 0)
-            {
-                // Create a new material instance from the first renderer for color control
-                Material arrowMaterial = new Material(renderers[0].material);
-                
-                // Configure material for transparency
-                arrowMaterial.SetFloat("_Mode", 3);
-                arrowMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                arrowMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                arrowMaterial.SetInt("_ZWrite", 0);
-                arrowMaterial.DisableKeyword("_ALPHATEST_ON");
-                arrowMaterial.EnableKeyword("_ALPHABLEND_ON");
-                arrowMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                arrowMaterial.renderQueue = 3000;
-                
-                // Apply the material to all renderers in the prefab
-                foreach (Renderer renderer in renderers)
-                {
-                    renderer.material = arrowMaterial;
-                }
-                
-                arrowDotMaterials.Add(arrowMaterial);
-            }
-            else
-            {
-                // Fallback - add a null material so the lists stay in sync
-                arrowDotMaterials.Add(null);
-            }
-            
-            return arrowDot;
-        }
-        else
-        {
-            // Fallback to simple sphere if no prefab provided (like trajectory dots)
-            GameObject arrowDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            arrowDot.transform.localScale = Vector3.one * 0.2f;
-            Destroy(arrowDot.GetComponent<Collider>());
-            
-            // Pre-create and configure material for transparency
-            Renderer renderer = arrowDot.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                Material arrowMaterial = new Material(renderer.material);
-                arrowMaterial.SetFloat("_Mode", 3);
-                arrowMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                arrowMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                arrowMaterial.SetInt("_ZWrite", 0);
-                arrowMaterial.DisableKeyword("_ALPHATEST_ON");
-                arrowMaterial.EnableKeyword("_ALPHABLEND_ON");
-                arrowMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                arrowMaterial.renderQueue = 3000;
-                renderer.material = arrowMaterial;
-                arrowDotMaterials.Add(arrowMaterial);
-            }
-            else
-            {
-                arrowDotMaterials.Add(null);
-            }
-            
-            return arrowDot;
-        }
-    }
 
     void HideDottedTrajectory()
     {
@@ -904,6 +855,9 @@ public class PlayerBombHandler : NetworkBehaviour
             if (marker != null) marker.SetActive(false);
         }
         
+        // Don't show bounce markers for underarm/short throws
+        if (currentThrowType == ThrowType.Underarm) return;
+        
         // Ensure we have enough bounce markers
         while (bounceMarkers.Count < bouncePoints.Count)
         {
@@ -940,11 +894,18 @@ public class PlayerBombHandler : NetworkBehaviour
                 marker.SetActive(true);
                 marker.transform.position = bouncePoints[i] + Vector3.up * 0.05f; // Slightly above ground
                 
-                // Color bounce markers differently (orange-ish)
+                // Color bounce markers based on throw type
                 var spriteRenderer = marker.GetComponent<SpriteRenderer>();
                 if (spriteRenderer != null)
                 {
-                    spriteRenderer.color = new Color(1f, 0.7f, 0.3f, 0.7f); // Orange with transparency
+                    if (currentThrowType == ThrowType.Underarm)
+                    {
+                        spriteRenderer.color = new Color(1f, 1f, 1f, 0.8f); // White for underarm bounces
+                    }
+                    else
+                    {
+                        spriteRenderer.color = new Color(1f, 0.7f, 0.3f, 0.7f); // Orange for lob bounces
+                    }
                 }
             }
         }
