@@ -27,9 +27,14 @@ public class PlayerLifeManager : NetworkBehaviour
     [Header("Knockback Settings")]
     [SyncVar(hook = nameof(OnPercentageKnockbackChanged))] 
     private float percentageKnockback = 0f;
-    [SerializeField] private float baseKnockbackIncreaseRate = 10f; // Base rate per second
-    [SerializeField] private float maxKnockbackPercentage = 350f; // Increased to 350%
-    [SerializeField] private float[] milestoneMultipliers = { 1f, 1.2f, 1.4f, 1.6f }; // At 0%, 100%, 200%, 300% - reduced from 1.5, 2, 2.5
+    [SerializeField] private float maxKnockbackPercentage = 500f; // Max knockback percentage
+    
+    
+    [Header("Camera View Elimination")]
+    [SerializeField] private float outOfViewTimeLimit = 5f; // Time out of camera view before elimination
+    [SerializeField] private float cameraCheckInterval = 0.5f; // How often to check camera view
+    private float timeOutOfView = 0f;
+    private float lastCameraCheckTime = 0f;
     
     // Properties
     public float KnockbackMultiplier => 1f + (percentageKnockback / 100f);
@@ -55,6 +60,7 @@ public class PlayerLifeManager : NetworkBehaviour
         movement    = GetComponent<PlayerMovement>();
         col         = GetComponent<Collider>();
         rb          = GetComponent<Rigidbody>();
+        
     }
 
     public override void OnStartServer()
@@ -68,6 +74,8 @@ public class PlayerLifeManager : NetworkBehaviour
         KnockbackHitCount   = 0;
         isRespawning        = false;
         lastRespawnTime     = -gracePeriod; // Initialize to allow immediate checks
+        timeOutOfView       = 0f;
+        lastCameraCheckTime = 0f;
     }
 
     public override void OnStartClient()
@@ -99,15 +107,10 @@ public class PlayerLifeManager : NetworkBehaviour
                     isHoldingBomb = true;
                 }
                 
-                // Calculate rate multiplier based on current percentage milestones
-                float rateMultiplier = 1f;
-                if (percentageKnockback >= 300f) rateMultiplier = milestoneMultipliers[3];
-                else if (percentageKnockback >= 200f) rateMultiplier = milestoneMultipliers[2];
-                else if (percentageKnockback >= 100f) rateMultiplier = milestoneMultipliers[1];
-                else rateMultiplier = milestoneMultipliers[0];
-                
-                // Increase knockback percentage with milestone multiplier
-                float increase = baseKnockbackIncreaseRate * rateMultiplier * Time.deltaTime;
+                // Get dynamic rate from KnockbackCalc and apply increase
+                KnockbackCalculator knockbackCalc = FindAnyObjectByType<KnockbackCalculator>();
+                float rate = knockbackCalc != null ? knockbackCalc.GetDynamicKnockbackRate(percentageKnockback) : 10f;
+                float increase = rate * Time.deltaTime;
                 SetKnockbackPercentage(Mathf.Min(percentageKnockback + increase, maxKnockbackPercentage));
             }
             else if (isHoldingBomb)
@@ -130,19 +133,36 @@ public class PlayerLifeManager : NetworkBehaviour
         if (Time.time - lastRespawnTime < gracePeriod)
             return;
 
+        // Check if player is out of camera view
+        if (Time.time - lastCameraCheckTime >= cameraCheckInterval)
+        {
+            lastCameraCheckTime = Time.time;
+            
+            if (IsPlayerOutOfCameraView())
+            {
+                timeOutOfView += cameraCheckInterval;
+                if (timeOutOfView >= outOfViewTimeLimit)
+                {
+                    RpcLogToClient($"Player {gameObject.name} eliminated: out of camera view for {timeOutOfView:F1}s (limit: {outOfViewTimeLimit}s)");
+                    HandleDeath();
+                }
+            }
+            else
+            {
+                timeOutOfView = 0f; // Reset timer when back in view
+            }
+        }
+        
+        // Keep basic fall-off check as backup
         if (SpawnManager.Instance != null && SpawnManager.Instance.respawnReference != null)
         {
             float referenceY = SpawnManager.Instance.respawnReference.position.y;
             float threshold = referenceY - SpawnManager.Instance.respawnOffset;
             if (transform.position.y < threshold)
             {
-                RpcLogToClient($"Player {gameObject.name} below threshold: position={transform.position}, threshold={threshold}, IsDead={IsDead}");
+                RpcLogToClient($"Player {gameObject.name} fell below threshold: position={transform.position}, threshold={threshold}");
                 HandleDeath();
             }
-        }
-        else
-        {
-            RpcLogWarningToClient("SpawnManager.Instance or respawnReference is null");
         }
 
         // Update total hold time (legacy system - kept for compatibility)
@@ -222,6 +242,7 @@ public class PlayerLifeManager : NetworkBehaviour
         percentageKnockback = 0f;
         TotalHoldTime       = 0f;
         KnockbackHitCount   = 0;
+        timeOutOfView       = 0f;
         SetAliveState(true, false);
         isRespawning = false;
         lastRespawnTime = Time.time; // Set the last respawn time for grace period
@@ -295,15 +316,79 @@ public class PlayerLifeManager : NetworkBehaviour
     [TargetRpc]
     public void TargetApplyKnockback(NetworkConnectionToClient _, Vector3 force)
     {
-        movement.enabled = false;
-        rb.AddForce(force, ForceMode.Impulse);
-        StartCoroutine(ReEnableMovement(0.5f));
+        // Don't disable movement completely - instead reduce effectiveness and apply gradual force
+        StartCoroutine(ApplyDynamicKnockback(force));
     }
 
-    IEnumerator ReEnableMovement(float delay)
+    [TargetRpc]
+    public void TargetSyncExplosionData(NetworkConnectionToClient _, Vector3 explosionPos, float magnitude, int sector)
     {
-        yield return new WaitForSeconds(delay);
-        movement.enabled = true;
+        // Client-side explosion data for validation and effects
+        // This helps ensure knockback feels consistent even with network latency
+        if (KnockbackCalculator.GlobalDebugEnabled)
+        {
+            Debug.Log($"Client received explosion data: pos={explosionPos}, magnitude={magnitude:F1}, sector={sector}", this);
+        }
+        
+        // Optional: Add client-side prediction validation here
+        // Could check if client position matches expected knockback trajectory
+    }
+
+    IEnumerator ApplyDynamicKnockback(Vector3 totalForce)
+    {
+        float knockbackDuration = 0.9f; // Slightly longer for stronger knockback feel
+        float movementReductionTime = 0.5f; // Increased for better control during knockback
+        float forceApplicationTime = 0.15f; // Faster application for more immediate impact
+        
+        // Apply stronger initial burst followed by gradual force
+        float initialBurstRatio = 0.4f; // 40% of force as immediate burst
+        Vector3 initialForce = totalForce * initialBurstRatio;
+        Vector3 gradualForce = totalForce * (1f - initialBurstRatio);
+        
+        // Apply initial burst for immediate impact
+        if (rb != null)
+            rb.AddForce(initialForce, ForceMode.Impulse);
+        
+        // Apply remaining force gradually over fewer steps for smoother feel
+        float forceSteps = 8f;
+        Vector3 forcePerStep = gradualForce / forceSteps;
+        
+        for (int i = 0; i < forceSteps; i++)
+        {
+            if (rb != null)
+                rb.AddForce(forcePerStep, ForceMode.Impulse);
+            yield return new WaitForFixedUpdate();
+        }
+        
+        // Reduce movement effectiveness with better scaling based on knockback strength
+        if (movement != null)
+        {
+            float forceStrength = totalForce.magnitude;
+            float movementReduction = Mathf.Clamp(0.15f + (forceStrength * 0.01f), 0.1f, 0.4f); // Dynamic reduction based on force
+            movement.SetKnockbackState(true, movementReduction);
+        }
+        
+        yield return new WaitForSeconds(movementReductionTime);
+        
+        // Gradually restore movement effectiveness over time for smoother transition
+        float restoreTime = 0.3f;
+        float elapsedTime = 0f;
+        float currentReduction = movement != null ? movement.GetCurrentMovementMultiplier() : 0.3f;
+        
+        while (elapsedTime < restoreTime && movement != null)
+        {
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / restoreTime;
+            float newMultiplier = Mathf.Lerp(currentReduction, 1f, t);
+            movement.SetKnockbackState(true, newMultiplier);
+            yield return null;
+        }
+        
+        // Ensure full movement is restored
+        if (movement != null)
+        {
+            movement.SetKnockbackState(false, 1f);
+        }
     }
 
     [Server]
@@ -346,5 +431,49 @@ public class PlayerLifeManager : NetworkBehaviour
             string playerTag = $"P{PlayerNumber}";
             nameDisplay.SetPlayerTag(playerTag);
         }
+    }
+
+    bool IsPlayerOutOfCameraView()
+    {
+        if (Camera.main == null) return false;
+        
+        // Get the player's position in viewport coordinates
+        Vector3 viewportPos = Camera.main.WorldToViewportPoint(transform.position);
+        
+        // Generous buffer with grace boundary for players on viewport edge
+        float buffer = 0.25f; // 25% buffer outside screen edges with grace boundary
+        
+        // Check if player is within the camera's viewport with generous buffer
+        // Special grace boundary: if player is near viewport edge, give them more time
+        bool inView = viewportPos.x >= -buffer && viewportPos.x <= 1f + buffer &&
+                     viewportPos.y >= -buffer && viewportPos.y <= 1f + buffer &&
+                     viewportPos.z > 0; // z > 0 means in front of camera
+                     
+        // Grace boundary check - if player is on the edge, they get extra leeway
+        bool onGraceBoundary = (viewportPos.x >= -0.1f && viewportPos.x <= 1.1f &&
+                               viewportPos.y >= -0.1f && viewportPos.y <= 1.1f &&
+                               viewportPos.z > 0);
+                               
+        if (onGraceBoundary && !inView)
+        {
+            // Player is in grace boundary - reset timer to give them chance to return
+            timeOutOfView = Mathf.Max(0f, timeOutOfView - (cameraCheckInterval * 0.5f));
+            inView = true; // Treat as in view for this frame
+        }
+        
+        // Additional check: if player is very close to camera but out of view, don't eliminate
+        float distanceToCamera = Vector3.Distance(transform.position, Camera.main.transform.position);
+        if (distanceToCamera < 5f) // Within 5 units of camera
+        {
+            inView = true; // Don't eliminate if very close to camera
+        }
+        
+        // Debug log when player goes out of view
+        if (!inView)
+        {
+            RpcLogToClient($"Player out of view: viewport={viewportPos}, distance={distanceToCamera:F1}, graceBoundary={onGraceBoundary}");
+        }
+        
+        return !inView;
     }
 }

@@ -10,6 +10,10 @@ public class PlayerMovement : NetworkBehaviour
     [SyncVar] public float acceleration = 10f;
     [SyncVar] public float deceleration = 10f;
     [SyncVar] public float rotationSpeed = 10f;
+    
+    [Header("Knockback")]
+    private bool isInKnockback = false;
+    private float knockbackMovementMultiplier = 1f;
 
     Rigidbody rb;
     InputAction moveAct;
@@ -107,12 +111,17 @@ public class PlayerMovement : NetworkBehaviour
         cameraRight.y = 0;
         cameraRight.Normalize();
 
-        Vector3 target = (cameraRight * moveInput.x + cameraForward * moveInput.y) * speed;
+        Vector3 target = (cameraRight * moveInput.x + cameraForward * moveInput.y) * speed * knockbackMovementMultiplier;
 
-        horizVel = Vector3.MoveTowards(
-            horizVel,
-            target,
-            (target.magnitude > 0.01f ? acceleration : deceleration) * Time.fixedDeltaTime);
+        float currentAcceleration = (target.magnitude > 0.01f ? acceleration : deceleration) * Time.fixedDeltaTime;
+        
+        // Reduce acceleration/deceleration during knockback for more natural feel
+        if (isInKnockback)
+        {
+            currentAcceleration *= 0.5f; // Slower movement changes during knockback
+        }
+
+        horizVel = Vector3.MoveTowards(horizVel, target, currentAcceleration);
 
         rb.linearVelocity = new Vector3(horizVel.x, rb.linearVelocity.y, horizVel.z);
     }
@@ -122,4 +131,15 @@ public class PlayerMovement : NetworkBehaviour
 
     [Command]
     public void CmdResumeGame() => GameManager.Instance.ResumeGame(netIdentity);
+
+    public void SetKnockbackState(bool inKnockback, float movementMultiplier)
+    {
+        isInKnockback = inKnockback;
+        knockbackMovementMultiplier = movementMultiplier;
+    }
+
+    public float GetCurrentMovementMultiplier()
+    {
+        return knockbackMovementMultiplier;
+    }
 }

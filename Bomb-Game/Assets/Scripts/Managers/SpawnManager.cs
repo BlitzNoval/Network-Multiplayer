@@ -12,6 +12,7 @@ public class SpawnManager : NetworkBehaviour
     [Header("Respawn Settings")]
     public Transform respawnReference;
     public float respawnOffset = 40f;
+    
 
     [Header("Reuse Cool-down")]
     public float pointCooldown = 1f;
@@ -80,5 +81,17 @@ public class SpawnManager : NetworkBehaviour
     {
         int idx = ChooseSpawnIndex();
         return spawnPoints[idx];
+    }
+
+
+    void OnDrawGizmos()
+    {        
+        // Draw respawn threshold line
+        if (respawnReference != null)
+        {
+            Vector3 thresholdPos = respawnReference.position - Vector3.up * respawnOffset;
+            Gizmos.color = Color.blue;
+            Gizmos.DrawWireCube(thresholdPos, new Vector3(100f, 0.1f, 100f));
+        }
     }
 }

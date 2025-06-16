@@ -1406,13 +1406,9 @@ MonoBehaviour:
   KnockbackHitCount: 0
   PlayerNumber: 0
   CurrentLives: 0
-  baseKnockbackIncreaseRate: 10
   maxKnockbackPercentage: 350
-  milestoneMultipliers:
-  - 1
-  - 1.5
-  - 2
-  - 2.5
+  outOfViewTimeLimit: 3.5
+  cameraCheckInterval: 0.5
 --- !u!95 &6115396542742235922
 Animator:
   serializedVersion: 7
