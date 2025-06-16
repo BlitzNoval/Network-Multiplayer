@@ -497,7 +497,7 @@ MonoBehaviour:
   audioSource: {fileID: 6085821998421801923}
   shakeDuration: 0.5
   shakeMagnitude: 0.1
-  audioPreloadTime: 0.05
+  audioPreloadTime: 0.049
 --- !u!114 &1722947946795985453
 MonoBehaviour:
   m_ObjectHideFlags: 0
