@@ -8543,9 +8543,9 @@ MonoBehaviour:
   rotationSpeed: 11
   heightOffset: 1.5
   introDuration: 0.1
-  pauseAfterIntro: 5
+  pauseAfterIntro: 0.1
   introStartOffset: {x: 90, y: 20, z: 100}
-  settleDuration: 4
+  settleDuration: 0.1
   overshootStrength: 8
   pauseAfterRotationDuration: 15
   introCompleteCanvas: {fileID: 973195807}
