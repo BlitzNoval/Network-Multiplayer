@@ -14,7 +14,8 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] private GameObject trajectoryPointPrefab; // Prefab for dotted line points
     [SerializeField] private float trajectoryPointSpacing = 0.5f; // Space between dots
     [SerializeField] private Sprite landingMarkerSprite; // Sprite for landing indicator
-    [SerializeField] private GameObject landingMarkerPrefab; // Prefab with SpriteRenderer
+    [SerializeField] private GameObject landingMarkerPrefab; // Prefab with SpriteRenderer for short throws
+    [SerializeField] private GameObject lobLandingMarkerPrefab; // Prefab with SpriteRenderer for lob throws
     [SerializeField] private string landingMarkerLayer = "UI"; // Layer for landing marker
     
     
@@ -37,6 +38,7 @@ public class PlayerBombHandler : NetworkBehaviour
     private List<GameObject> trajectoryDots = new List<GameObject>();
     private List<Material> trajectoryDotMaterials = new List<Material>(); // Pre-created materials for performance
     private GameObject landingMarker;
+    private GameObject lobLandingMarker;
     private List<GameObject> bounceMarkers = new List<GameObject>();
     private int activeDotCount = 0;
     
@@ -89,7 +91,7 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void InitializeTrajectoryVisualization()
     {
-        // Create landing marker
+        // Create regular (short throw) landing marker
         if (landingMarkerPrefab != null)
         {
             landingMarker = Instantiate(landingMarkerPrefab);
@@ -125,6 +127,45 @@ public class PlayerBombHandler : NetworkBehaviour
             spriteRenderer.sortingOrder = 10;
             landingMarker.transform.localScale = Vector3.one * 2f; // Adjust size
             landingMarker.SetActive(false);
+        }
+        
+        // Create lob throw landing marker
+        if (lobLandingMarkerPrefab != null)
+        {
+            lobLandingMarker = Instantiate(lobLandingMarkerPrefab);
+            lobLandingMarker.SetActive(false);
+            
+            // Set the sprite if provided
+            if (landingMarkerSprite != null)
+            {
+                var spriteRenderer = lobLandingMarker.GetComponent<SpriteRenderer>();
+                if (spriteRenderer != null)
+                {
+                    spriteRenderer.sprite = landingMarkerSprite;
+                    spriteRenderer.sortingLayerName = landingMarkerLayer;
+                    spriteRenderer.sortingOrder = 10; // Ensure it's on top
+                }
+            }
+        }
+        else
+        {
+            // Create a simple lob landing marker if no prefab provided
+            lobLandingMarker = new GameObject("LobLandingMarker");
+            var spriteRenderer = lobLandingMarker.AddComponent<SpriteRenderer>();
+            if (landingMarkerSprite != null)
+            {
+                spriteRenderer.sprite = landingMarkerSprite;
+            }
+            else
+            {
+                // Create a simple circle sprite if none provided
+                spriteRenderer.sprite = CreateCircleSprite();
+            }
+            spriteRenderer.sortingLayerName = landingMarkerLayer;
+            spriteRenderer.sortingOrder = 10;
+            spriteRenderer.color = new Color(1f, 1f, 0.2f, 0.9f); // Yellow-ish color for lob
+            lobLandingMarker.transform.localScale = Vector3.one * 2.5f; // Larger size for lob
+            lobLandingMarker.SetActive(false);
         }
     }
 
@@ -184,8 +225,9 @@ public class PlayerBombHandler : NetworkBehaviour
         }
         bounceMarkers.Clear();
         
-        // Clean up landing marker
+        // Clean up landing markers
         if (landingMarker != null) Destroy(landingMarker);
+        if (lobLandingMarker != null) Destroy(lobLandingMarker);
     }
 
     public override void OnStartLocalPlayer()
@@ -571,9 +613,11 @@ public class PlayerBombHandler : NetworkBehaviour
         while (bounceMarkers.Count < bouncePoints.Count)
         {
             GameObject bounceMarker;
-            if (landingMarkerPrefab != null)
+            GameObject markerPrefab = currentThrowType == ThrowType.Short ? landingMarkerPrefab : lobLandingMarkerPrefab;
+            
+            if (markerPrefab != null)
             {
-                bounceMarker = Instantiate(landingMarkerPrefab);
+                bounceMarker = Instantiate(markerPrefab);
             }
             else
             {
@@ -618,18 +662,32 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void UpdateLandingMarkerVisual(Vector3 position)
     {
-        if (landingMarker != null && isLocalPlayer)
+        if (isLocalPlayer)
         {
-            landingMarker.SetActive(showLocalLandingMarker);
-            landingMarker.transform.position = position + Vector3.up * 0.1f; // Slightly above ground
+            // Get the appropriate marker based on throw type
+            GameObject currentMarker = currentThrowType == ThrowType.Short ? landingMarker : lobLandingMarker;
+            GameObject otherMarker = currentThrowType == ThrowType.Short ? lobLandingMarker : landingMarker;
             
-            // Add visual feedback based on throw type
-            var spriteRenderer = landingMarker.GetComponent<SpriteRenderer>();
-            if (spriteRenderer != null)
+            // Hide the other marker
+            if (otherMarker != null)
             {
-                Color markerColor = currentThrowType == ThrowType.Short ? 
-                    new Color(1f, 1f, 1f, 0.8f) : new Color(1f, 1f, 0.8f, 0.8f);
-                spriteRenderer.color = markerColor;
+                otherMarker.SetActive(false);
+            }
+            
+            // Show the current marker
+            if (currentMarker != null)
+            {
+                currentMarker.SetActive(showLocalLandingMarker);
+                currentMarker.transform.position = position + Vector3.up * 0.1f; // Slightly above ground
+                
+                // Add visual feedback based on throw type (if using fallback marker creation)
+                var spriteRenderer = currentMarker.GetComponent<SpriteRenderer>();
+                if (spriteRenderer != null && (landingMarkerPrefab == null || lobLandingMarkerPrefab == null))
+                {
+                    Color markerColor = currentThrowType == ThrowType.Short ? 
+                        new Color(1f, 1f, 1f, 0.8f) : new Color(1f, 1f, 0.8f, 0.8f);
+                    spriteRenderer.color = markerColor;
+                }
             }
         }
     }
@@ -644,12 +702,14 @@ public class PlayerBombHandler : NetworkBehaviour
         }
         activeDotCount = 0;
         
-        // Hide landing marker (local only)
+        // Hide landing markers (local only)
         if (isLocalPlayer)
         {
             showLocalLandingMarker = false;
             if (landingMarker != null)
                 landingMarker.SetActive(false);
+            if (lobLandingMarker != null)
+                lobLandingMarker.SetActive(false);
                 
             // Hide bounce markers
             foreach (var marker in bounceMarkers)
