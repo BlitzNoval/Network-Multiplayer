@@ -8,11 +8,11 @@ using System.Linq;
 [RequireComponent(typeof(PlayerInput))]
 public class PlayerBombHandler : NetworkBehaviour
 {
-    [Header("Trajectory - Normal Throw")]
-    [SerializeField, Range(10,500)] int normalThrowMaxPoints = 200;
-    [SerializeField] private float normalThrowPointSpacing = 0.4f; // Space between dots
-    [SerializeField] private float normalThrowFadeDistance = 0.7f; // Fade dots over distance
-    [SerializeField] private Color normalThrowColor = Color.white;
+    [Header("Trajectory - Underarm Throw")]
+    [SerializeField, Range(10,500)] int underarmThrowMaxPoints = 200;
+    [SerializeField] private float underarmThrowPointSpacing = 0.4f; // Space between dots
+    [SerializeField] private float underarmThrowFadeDistance = 0.7f; // Fade dots over distance
+    [SerializeField] private Color underarmThrowColor = Color.white;
     
     [Header("Trajectory - Lob Throw")]
     [SerializeField, Range(10,500)] int lobThrowMaxPoints = 400;
@@ -25,7 +25,7 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] private GameObject trajectoryPointPrefab; // Prefab for dotted line points
     
     [Header("Landing Markers")]
-    [SerializeField] private GameObject normalThrowMarkerPrefab; // Prefab for normal throw landing marker
+    [SerializeField] private GameObject underarmThrowMarkerPrefab; // Prefab for underarm throw landing marker
     [SerializeField] private GameObject lobThrowMarkerPrefab; // Prefab for lob throw landing marker
     [SerializeField] private GameObject bounceMarkerPrefab; // Prefab for bounce points (shared)
     [SerializeField] private Sprite landingMarkerSprite; // Fallback sprite for landing indicators
@@ -44,10 +44,15 @@ public class PlayerBombHandler : NetworkBehaviour
     // Trajectory visualization
     private List<GameObject> trajectoryDots = new List<GameObject>();
     private List<Material> trajectoryDotMaterials = new List<Material>(); // Pre-created materials for performance
-    private GameObject normalThrowMarker;
+    private GameObject underarmThrowMarker;
     private GameObject lobThrowMarker;
     private List<GameObject> bounceMarkers = new List<GameObject>();
     private int activeDotCount = 0;
+    
+    // Arrow visualization for underarm throw
+    private GameObject arrowLine;
+    private LineRenderer arrowLineRenderer;
+    private GameObject arrowHead;
     
     // Aiming state
     bool isAiming;
@@ -63,12 +68,12 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] float aimDirectionThreshold = 0.05f; // Minimum change to trigger recalculation
     private float lastTrajectoryUpdate = 0f;
     private Vector3 lastCachedAimDirection = Vector3.zero;
-    private ThrowType lastCachedThrowType = ThrowType.Normal;
+    private ThrowType lastCachedThrowType = ThrowType.Underarm;
     private bool trajectoryNeedsUpdate = true;
     
     // Throw type state
-    public enum ThrowType { Normal, Lob }
-    [SyncVar(hook = nameof(OnThrowTypeChanged))] ThrowType currentThrowType = ThrowType.Normal;
+    public enum ThrowType { Underarm, Lob }
+    [SyncVar(hook = nameof(OnThrowTypeChanged))] ThrowType currentThrowType = ThrowType.Underarm;
     
     // Local landing marker (only visible to this player)
     Vector3 localLandingPosition = Vector3.zero;
@@ -98,17 +103,17 @@ public class PlayerBombHandler : NetworkBehaviour
 
     void InitializeTrajectoryVisualization()
     {
-        // Create normal throw landing marker
-        if (normalThrowMarkerPrefab != null)
+        // Create underarm throw landing marker
+        if (underarmThrowMarkerPrefab != null)
         {
-            normalThrowMarker = Instantiate(normalThrowMarkerPrefab);
-            normalThrowMarker.name = "NormalThrowMarker";
-            normalThrowMarker.SetActive(false);
+            underarmThrowMarker = Instantiate(underarmThrowMarkerPrefab);
+            underarmThrowMarker.name = "UnderarmThrowMarker";
+            underarmThrowMarker.SetActive(false);
             
             // Set the sprite if provided
             if (landingMarkerSprite != null)
             {
-                var spriteRenderer = normalThrowMarker.GetComponent<SpriteRenderer>();
+                var spriteRenderer = underarmThrowMarker.GetComponent<SpriteRenderer>();
                 if (spriteRenderer != null)
                 {
                     spriteRenderer.sprite = landingMarkerSprite;
@@ -119,9 +124,9 @@ public class PlayerBombHandler : NetworkBehaviour
         }
         else
         {
-            // Create a simple normal throw marker if no prefab provided
-            normalThrowMarker = new GameObject("NormalThrowMarker");
-            var spriteRenderer = normalThrowMarker.AddComponent<SpriteRenderer>();
+            // Create a simple underarm throw marker if no prefab provided
+            underarmThrowMarker = new GameObject("UnderarmThrowMarker");
+            var spriteRenderer = underarmThrowMarker.AddComponent<SpriteRenderer>();
             if (landingMarkerSprite != null)
             {
                 spriteRenderer.sprite = landingMarkerSprite;
@@ -133,9 +138,9 @@ public class PlayerBombHandler : NetworkBehaviour
             }
             spriteRenderer.sortingLayerName = landingMarkerLayer;
             spriteRenderer.sortingOrder = 10;
-            spriteRenderer.color = new Color(1f, 1f, 1f, 0.9f); // White for normal
-            normalThrowMarker.transform.localScale = Vector3.one * 2f; // Standard size
-            normalThrowMarker.SetActive(false);
+            spriteRenderer.color = new Color(1f, 1f, 1f, 0.9f); // White for underarm
+            underarmThrowMarker.transform.localScale = Vector3.one * 2f; // Standard size
+            underarmThrowMarker.SetActive(false);
         }
         
         // Create lob throw landing marker
@@ -177,6 +182,9 @@ public class PlayerBombHandler : NetworkBehaviour
             lobThrowMarker.transform.localScale = Vector3.one * 2.5f; // Larger size for lob
             lobThrowMarker.SetActive(false);
         }
+        
+        // Initialize arrow visualization for underarm throw
+        InitializeArrowVisualization();
     }
 
     Sprite CreateCircleSprite()
@@ -205,6 +213,43 @@ public class PlayerBombHandler : NetworkBehaviour
         
         tex.Apply();
         return Sprite.Create(tex, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f));
+    }
+
+    void InitializeArrowVisualization()
+    {
+        // Create arrow line
+        arrowLine = new GameObject("UnderarmArrowLine");
+        arrowLineRenderer = arrowLine.AddComponent<LineRenderer>();
+        arrowLineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        arrowLineRenderer.material.color = underarmThrowColor;
+        arrowLineRenderer.startWidth = 0.1f;
+        arrowLineRenderer.endWidth = 0.1f;
+        arrowLineRenderer.positionCount = 2;
+        arrowLineRenderer.useWorldSpace = true;
+        arrowLine.SetActive(false);
+        
+        // Create arrow head (simple triangle)
+        arrowHead = new GameObject("UnderarmArrowHead");
+        var meshFilter = arrowHead.AddComponent<MeshFilter>();
+        var meshRenderer = arrowHead.AddComponent<MeshRenderer>();
+        
+        // Create arrow head mesh
+        Mesh arrowMesh = new Mesh();
+        Vector3[] vertices = new Vector3[]
+        {
+            new Vector3(0, 0.2f, 0),      // Top
+            new Vector3(-0.15f, -0.2f, 0), // Bottom left
+            new Vector3(0.15f, -0.2f, 0)   // Bottom right
+        };
+        int[] triangles = new int[] { 0, 1, 2 };
+        arrowMesh.vertices = vertices;
+        arrowMesh.triangles = triangles;
+        arrowMesh.RecalculateNormals();
+        
+        meshFilter.mesh = arrowMesh;
+        meshRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        meshRenderer.material.color = underarmThrowColor;
+        arrowHead.SetActive(false);
     }
 
     public override void OnStartClient()
@@ -236,8 +281,12 @@ public class PlayerBombHandler : NetworkBehaviour
         bounceMarkers.Clear();
         
         // Clean up landing markers
-        if (normalThrowMarker != null) Destroy(normalThrowMarker);
+        if (underarmThrowMarker != null) Destroy(underarmThrowMarker);
         if (lobThrowMarker != null) Destroy(lobThrowMarker);
+        
+        // Clean up arrow visualization
+        if (arrowLine != null) Destroy(arrowLine);
+        if (arrowHead != null) Destroy(arrowHead);
     }
 
     public override void OnStartLocalPlayer()
@@ -382,7 +431,7 @@ public class PlayerBombHandler : NetworkBehaviour
     [Command]
     void CmdToggleThrowTypes()
     {
-        currentThrowType = currentThrowType == ThrowType.Normal ? ThrowType.Lob : ThrowType.Normal;
+        currentThrowType = currentThrowType == ThrowType.Underarm ? ThrowType.Lob : ThrowType.Underarm;
     }
 
     [Command]
@@ -393,8 +442,8 @@ public class PlayerBombHandler : NetworkBehaviour
             if (playerAnimator != null)
                 playerAnimator.OnBombThrow();
             
-            bool useNormalThrow = throwType == ThrowType.Normal;
-            currentBomb.ThrowBomb(direction, useNormalThrow);
+            bool useUnderarmThrow = throwType == ThrowType.Underarm;
+            currentBomb.ThrowBomb(direction, useUnderarmThrow);
             
             // Landing marker will be hidden locally when aiming stops
         }
@@ -418,13 +467,13 @@ public class PlayerBombHandler : NetworkBehaviour
         }
 
         // Get throw parameters from the bomb itself to match exact physics
-        float speed = currentThrowType == ThrowType.Normal ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
-        float upward = currentThrowType == ThrowType.Normal ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
+        float speed = currentThrowType == ThrowType.Underarm ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
+        float upward = currentThrowType == ThrowType.Underarm ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
         
         // Get trajectory settings based on throw type
-        int maxPoints = currentThrowType == ThrowType.Normal ? normalThrowMaxPoints : lobThrowMaxPoints;
-        float pointSpacing = currentThrowType == ThrowType.Normal ? normalThrowPointSpacing : lobThrowPointSpacing;
-        float fadeDistance = currentThrowType == ThrowType.Normal ? normalThrowFadeDistance : lobThrowFadeDistance;
+        int maxPoints = currentThrowType == ThrowType.Underarm ? underarmThrowMaxPoints : lobThrowMaxPoints;
+        float pointSpacing = currentThrowType == ThrowType.Underarm ? underarmThrowPointSpacing : lobThrowPointSpacing;
+        float fadeDistance = currentThrowType == ThrowType.Underarm ? underarmThrowFadeDistance : lobThrowFadeDistance;
 
         Vector3 startPos = origin.position;
         
@@ -535,8 +584,17 @@ public class PlayerBombHandler : NetworkBehaviour
         // Update bounce markers
         UpdateBounceMarkers(bouncePoints);
 
-        // Update dotted line trajectory
-        UpdateDottedTrajectory();
+        // Update trajectory visualization based on throw type
+        if (currentThrowType == ThrowType.Underarm)
+        {
+            UpdateArrowTrajectory();
+            HideDottedTrajectory(); // Hide dots when showing arrow
+        }
+        else
+        {
+            UpdateDottedTrajectory();
+            HideArrowTrajectory(); // Hide arrow when showing dots
+        }
         
         // Update landing marker (local only) - always show if we have a valid landing position
         if (isLocalPlayer)
@@ -606,9 +664,9 @@ public class PlayerBombHandler : NetworkBehaviour
         }
         
         // Get current throw type settings
-        float currentPointSpacing = currentThrowType == ThrowType.Normal ? normalThrowPointSpacing : lobThrowPointSpacing;
-        float currentFadeDistance = currentThrowType == ThrowType.Normal ? normalThrowFadeDistance : lobThrowFadeDistance;
-        Color currentColor = currentThrowType == ThrowType.Normal ? normalThrowColor : lobThrowColor;
+        float currentPointSpacing = currentThrowType == ThrowType.Underarm ? underarmThrowPointSpacing : lobThrowPointSpacing;
+        float currentFadeDistance = currentThrowType == ThrowType.Underarm ? underarmThrowFadeDistance : lobThrowFadeDistance;
+        Color currentColor = currentThrowType == ThrowType.Underarm ? underarmThrowColor : lobThrowColor;
         
         // Position dots along trajectory with spacing
         float accumulatedDistance = 0f;
@@ -660,11 +718,58 @@ public class PlayerBombHandler : NetworkBehaviour
         }
     }
 
+    void UpdateArrowTrajectory()
+    {
+        if (trajectoryPoints.Count < 2 || arrowLineRenderer == null) return;
+        
+        // For underarm throw, draw a straight arrow from start to landing point
+        Vector3 startPos = trajectoryPoints[0];
+        Vector3 endPos = trajectoryPoints[trajectoryPoints.Count - 1];
+        
+        // Set up the line renderer
+        arrowLineRenderer.SetPosition(0, startPos);
+        arrowLineRenderer.SetPosition(1, endPos);
+        arrowLineRenderer.material.color = underarmThrowColor;
+        arrowLine.SetActive(true);
+        
+        // Position and orient the arrow head at the end
+        if (arrowHead != null)
+        {
+            arrowHead.transform.position = endPos;
+            
+            // Point the arrow head in the direction of the throw
+            Vector3 direction = (endPos - startPos).normalized;
+            if (direction != Vector3.zero)
+            {
+                arrowHead.transform.rotation = Quaternion.LookRotation(Vector3.forward, direction);
+            }
+            
+            arrowHead.SetActive(true);
+        }
+    }
+
+    void HideDottedTrajectory()
+    {
+        // Hide all trajectory dots
+        foreach (var dot in trajectoryDots)
+        {
+            if (dot != null)
+                dot.SetActive(false);
+        }
+        activeDotCount = 0;
+    }
+
+    void HideArrowTrajectory()
+    {
+        if (arrowLine != null) arrowLine.SetActive(false);
+        if (arrowHead != null) arrowHead.SetActive(false);
+    }
+
     void UpdateTrajectoryColors()
     {
         // Get current throw type settings
-        Color currentColor = currentThrowType == ThrowType.Normal ? normalThrowColor : lobThrowColor;
-        float currentFadeDistance = currentThrowType == ThrowType.Normal ? normalThrowFadeDistance : lobThrowFadeDistance;
+        Color currentColor = currentThrowType == ThrowType.Underarm ? underarmThrowColor : lobThrowColor;
+        float currentFadeDistance = currentThrowType == ThrowType.Underarm ? underarmThrowFadeDistance : lobThrowFadeDistance;
         
         // Update colors of active dots when throw type changes
         for (int i = 0; i < activeDotCount; i++)
@@ -745,8 +850,8 @@ public class PlayerBombHandler : NetworkBehaviour
     void HideLandingMarkers()
     {
         showLocalLandingMarker = false;
-        if (normalThrowMarker != null)
-            normalThrowMarker.SetActive(false);
+        if (underarmThrowMarker != null)
+            underarmThrowMarker.SetActive(false);
         if (lobThrowMarker != null)
             lobThrowMarker.SetActive(false);
     }
@@ -756,8 +861,8 @@ public class PlayerBombHandler : NetworkBehaviour
         if (!isLocalPlayer) return;
         
         // Get the appropriate marker based on throw type
-        GameObject currentMarker = currentThrowType == ThrowType.Normal ? normalThrowMarker : lobThrowMarker;
-        GameObject otherMarker = currentThrowType == ThrowType.Normal ? lobThrowMarker : normalThrowMarker;
+        GameObject currentMarker = currentThrowType == ThrowType.Underarm ? underarmThrowMarker : lobThrowMarker;
+        GameObject otherMarker = currentThrowType == ThrowType.Underarm ? lobThrowMarker : underarmThrowMarker;
         
         // Update landing marker visual for current throw type
         
@@ -780,8 +885,8 @@ public class PlayerBombHandler : NetworkBehaviour
                 if (spriteRenderer != null)
                 {
                     // Set colors to distinguish between throw types
-                    Color markerColor = currentThrowType == ThrowType.Normal ? 
-                        new Color(1f, 1f, 1f, 0.9f) : new Color(1f, 1f, 0.2f, 0.9f); // White for normal, yellow for lob
+                    Color markerColor = currentThrowType == ThrowType.Underarm ? 
+                        new Color(1f, 1f, 1f, 0.9f) : new Color(1f, 1f, 0.2f, 0.9f); // White for underarm, yellow for lob
                     spriteRenderer.color = markerColor;
                 }
                 
@@ -803,6 +908,9 @@ public class PlayerBombHandler : NetworkBehaviour
                 dot.SetActive(false);
         }
         activeDotCount = 0;
+        
+        // Hide arrow trajectory
+        HideArrowTrajectory();
         
         // Hide landing markers (local only)
         if (isLocalPlayer)

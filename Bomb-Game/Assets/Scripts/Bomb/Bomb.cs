@@ -12,8 +12,8 @@ public class Bomb : NetworkBehaviour
     [SyncVar] [SerializeField] float initialTimer = 10f;
 
     [Header("Throw")]
-    [SyncVar] [SerializeField] float normalThrowSpeed = 20f;
-    [SyncVar] [SerializeField] float normalThrowUpward = 2f;
+    [SyncVar] [SerializeField] float underarmThrowSpeed = 20f;
+    [SyncVar] [SerializeField] float underarmThrowUpward = 2f;
     [SyncVar] [SerializeField] float lobThrowSpeed = 10f;
     [SyncVar] [SerializeField] float lobThrowUpward = 5f;
     [SyncVar] [SerializeField] float throwCooldown = 0.5f;
@@ -24,8 +24,8 @@ public class Bomb : NetworkBehaviour
     private KnockbackCalculator knockbackCalculator;
 
     public void SetInitialTimer(float v) => initialTimer = v;
-    public void SetNormalThrowSpeed(float v) => normalThrowSpeed = v;
-    public void SetNormalThrowUpward(float v) => normalThrowUpward = v;
+    public void SetUnderarmThrowSpeed(float v) => underarmThrowSpeed = v;
+    public void SetUnderarmThrowUpward(float v) => underarmThrowUpward = v;
     public void SetLobThrowSpeed(float v) => lobThrowSpeed = v;
     public void SetLobThrowUpward(float v) => lobThrowUpward = v;
     public void SetThrowCooldown(float v) => throwCooldown = v;
@@ -48,8 +48,8 @@ public class Bomb : NetworkBehaviour
     public bool IsOnRight => isOnRight;
     public bool IsHeld => isHeld;
     public float CurrentTimer => currentTimer;
-    public float NormalThrowSpeed => normalThrowSpeed;
-    public float NormalThrowUpward => normalThrowUpward;
+    public float NormalThrowSpeed => underarmThrowSpeed;
+    public float NormalThrowUpward => underarmThrowUpward;
     public float LobThrowSpeed => lobThrowSpeed;
     public float LobThrowUpward => lobThrowUpward;
     public float FlightMassMultiplier => flightMassMultiplier;
@@ -319,7 +319,7 @@ public class Bomb : NetworkBehaviour
         Transform origin = holder.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
         Vector3 forward = origin ? origin.forward : holder.transform.forward;
         Vector3 force = isOnRight
-            ? forward * normalThrowSpeed + Vector3.up * normalThrowUpward
+            ? forward * underarmThrowSpeed + Vector3.up * underarmThrowUpward
             : forward * lobThrowSpeed + Vector3.up * lobThrowUpward;
 
         rb.linearVelocity = Vector3.zero;
@@ -358,8 +358,8 @@ public class Bomb : NetworkBehaviour
         rb.mass *= flightMassMultiplier;
 
         // Use provided direction and throw type - ensure direction is normalized
-        float speed = useNormalThrow ? normalThrowSpeed : lobThrowSpeed;
-        float upward = useNormalThrow ? normalThrowUpward : lobThrowUpward;
+        float speed = useNormalThrow ? underarmThrowSpeed : lobThrowSpeed;
+        float upward = useNormalThrow ? underarmThrowUpward : lobThrowUpward;
         Vector3 force = direction.normalized * speed + Vector3.up * upward;
 
         rb.linearVelocity = Vector3.zero;
@@ -400,8 +400,8 @@ public class Bomb : NetworkBehaviour
         rb.mass *= flightMassMultiplier;
 
         // Use provided direction and throw type - ensure direction is normalized
-        float speed = useNormalThrow ? normalThrowSpeed : lobThrowSpeed;
-        float upward = useNormalThrow ? normalThrowUpward : lobThrowUpward;
+        float speed = useNormalThrow ? underarmThrowSpeed : lobThrowSpeed;
+        float upward = useNormalThrow ? underarmThrowUpward : lobThrowUpward;
         Vector3 force = direction.normalized * speed + Vector3.up * upward;
 
         rb.linearVelocity = Vector3.zero;
