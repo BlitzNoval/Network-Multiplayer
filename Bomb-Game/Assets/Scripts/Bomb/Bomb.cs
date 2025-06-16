@@ -12,8 +12,8 @@ public class Bomb : NetworkBehaviour
     [SyncVar] [SerializeField] float initialTimer = 10f;
 
     [Header("Throw")]
-    [SyncVar] [SerializeField] float normalThrowSpeed = 20f;
-    [SyncVar] [SerializeField] float normalThrowUpward = 2f;
+    [SyncVar] [SerializeField] float underarmThrowSpeed = 20f;
+    [SyncVar] [SerializeField] float underarmThrowUpward = 2f;
     [SyncVar] [SerializeField] float lobThrowSpeed = 10f;
     [SyncVar] [SerializeField] float lobThrowUpward = 5f;
     [SyncVar] [SerializeField] float throwCooldown = 0.5f;
@@ -24,8 +24,8 @@ public class Bomb : NetworkBehaviour
     private KnockbackCalculator knockbackCalculator;
 
     public void SetInitialTimer(float v) => initialTimer = v;
-    public void SetNormalThrowSpeed(float v) => normalThrowSpeed = v;
-    public void SetNormalThrowUpward(float v) => normalThrowUpward = v;
+    public void SetUnderarmThrowSpeed(float v) => underarmThrowSpeed = v;
+    public void SetUnderarmThrowUpward(float v) => underarmThrowUpward = v;
     public void SetLobThrowSpeed(float v) => lobThrowSpeed = v;
     public void SetLobThrowUpward(float v) => lobThrowUpward = v;
     public void SetThrowCooldown(float v) => throwCooldown = v;
@@ -48,8 +48,8 @@ public class Bomb : NetworkBehaviour
     public bool IsOnRight => isOnRight;
     public bool IsHeld => isHeld;
     public float CurrentTimer => currentTimer;
-    public float NormalThrowSpeed => normalThrowSpeed;
-    public float NormalThrowUpward => normalThrowUpward;
+    public float NormalThrowSpeed => underarmThrowSpeed;
+    public float NormalThrowUpward => underarmThrowUpward;
     public float LobThrowSpeed => lobThrowSpeed;
     public float LobThrowUpward => lobThrowUpward;
     public float FlightMassMultiplier => flightMassMultiplier;
@@ -319,7 +319,7 @@ public class Bomb : NetworkBehaviour
         Transform origin = holder.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
         Vector3 forward = origin ? origin.forward : holder.transform.forward;
         Vector3 force = isOnRight
-            ? forward * normalThrowSpeed + Vector3.up * normalThrowUpward
+            ? forward * underarmThrowSpeed + Vector3.up * underarmThrowUpward
             : forward * lobThrowSpeed + Vector3.up * lobThrowUpward;
 
         rb.linearVelocity = Vector3.zero;
@@ -332,9 +332,9 @@ public class Bomb : NetworkBehaviour
     }
     
     [Server]
-    public void ThrowBomb(Vector3 direction, bool useShortThrow)
+    public void ThrowBomb(Vector3 direction, bool useNormalThrow)
     {
-        Debug.Log($"ThrowBomb: Called with direction={direction}, useShortThrow={useShortThrow}, isHeld={isHeld}, holder={(holder != null ? holder.name : "null")}, Time.time={Time.time}, lastThrowTime={lastThrowTime}, throwCooldown={throwCooldown}, cooldownCheck={Time.time < lastThrowTime + throwCooldown}");
+        Debug.Log($"ThrowBomb: Called with direction={direction}, useNormalThrow={useNormalThrow}, isHeld={isHeld}, holder={(holder != null ? holder.name : "null")}, Time.time={Time.time}, lastThrowTime={lastThrowTime}, throwCooldown={throwCooldown}, cooldownCheck={Time.time < lastThrowTime + throwCooldown}");
         
         if (!isHeld || holder == null || Time.time < lastThrowTime + throwCooldown)
         {
@@ -342,16 +342,24 @@ public class Bomb : NetworkBehaviour
             return;
         }
 
+        // Store the exact position from RightHoldPoint before releasing the bomb
+        Transform holdPoint = holder.transform.Find("RightHoldPoint");
+        Vector3 throwOrigin = holdPoint ? holdPoint.position : transform.position;
+
         lastThrower = holder;
         transform.SetParent(null);
+        
+        // Set the bomb to the exact throw origin position to match trajectory calculation
+        transform.position = throwOrigin;
+        
         isHeld = false;
         rb.isKinematic = false;
         col.isTrigger = false;
         rb.mass *= flightMassMultiplier;
 
-        // Use provided direction and throw type
-        float speed = useShortThrow ? normalThrowSpeed : lobThrowSpeed;
-        float upward = useShortThrow ? normalThrowUpward : lobThrowUpward;
+        // Use provided direction and throw type - ensure direction is normalized
+        float speed = useNormalThrow ? underarmThrowSpeed : lobThrowSpeed;
+        float upward = useNormalThrow ? underarmThrowUpward : lobThrowUpward;
         Vector3 force = direction.normalized * speed + Vector3.up * upward;
 
         rb.linearVelocity = Vector3.zero;
@@ -360,15 +368,15 @@ public class Bomb : NetworkBehaviour
         lastThrowTime = Time.time;
         holder = null;
         
-        Debug.Log($"ThrowBomb: SUCCESS - Bomb thrown with force={force}, speed={speed}, upward={upward}");
+        Debug.Log($"ThrowBomb: SUCCESS - Bomb thrown from {throwOrigin} with force={force}, speed={speed}, upward={upward}, finalMass={rb.mass}");
 
         StartCoroutine(ReturnToThrowerAfterDelay());
     }
 
     [Server]
-    public bool TryThrowBomb(Vector3 direction, bool useShortThrow)
+    public bool TryThrowBomb(Vector3 direction, bool useNormalThrow)
     {
-        Debug.Log($"TryThrowBomb: Called with direction={direction}, useShortThrow={useShortThrow}, isHeld={isHeld}, holder={(holder != null ? holder.name : "null")}, Time.time={Time.time}, lastThrowTime={lastThrowTime}, throwCooldown={throwCooldown}, cooldownCheck={Time.time < lastThrowTime + throwCooldown}");
+        Debug.Log($"TryThrowBomb: Called with direction={direction}, useNormalThrow={useNormalThrow}, isHeld={isHeld}, holder={(holder != null ? holder.name : "null")}, Time.time={Time.time}, lastThrowTime={lastThrowTime}, throwCooldown={throwCooldown}, cooldownCheck={Time.time < lastThrowTime + throwCooldown}");
         
         if (!isHeld || holder == null || Time.time < lastThrowTime + throwCooldown)
         {
@@ -376,16 +384,24 @@ public class Bomb : NetworkBehaviour
             return false;
         }
 
+        // Store the exact position from RightHoldPoint before releasing the bomb
+        Transform holdPoint = holder.transform.Find("RightHoldPoint");
+        Vector3 throwOrigin = holdPoint ? holdPoint.position : transform.position;
+
         lastThrower = holder;
         transform.SetParent(null);
+        
+        // Set the bomb to the exact throw origin position to match trajectory calculation
+        transform.position = throwOrigin;
+        
         isHeld = false;
         rb.isKinematic = false;
         col.isTrigger = false;
         rb.mass *= flightMassMultiplier;
 
-        // Use provided direction and throw type
-        float speed = useShortThrow ? normalThrowSpeed : lobThrowSpeed;
-        float upward = useShortThrow ? normalThrowUpward : lobThrowUpward;
+        // Use provided direction and throw type - ensure direction is normalized
+        float speed = useNormalThrow ? underarmThrowSpeed : lobThrowSpeed;
+        float upward = useNormalThrow ? underarmThrowUpward : lobThrowUpward;
         Vector3 force = direction.normalized * speed + Vector3.up * upward;
 
         rb.linearVelocity = Vector3.zero;
@@ -394,7 +410,7 @@ public class Bomb : NetworkBehaviour
         lastThrowTime = Time.time;
         holder = null;
         
-        Debug.Log($"TryThrowBomb: SUCCESS - Bomb thrown with force={force}, speed={speed}, upward={upward}");
+        Debug.Log($"TryThrowBomb: SUCCESS - Bomb thrown from {throwOrigin} with force={force}, speed={speed}, upward={upward}, finalMass={rb.mass}");
 
         StartCoroutine(ReturnToThrowerAfterDelay());
         return true;
