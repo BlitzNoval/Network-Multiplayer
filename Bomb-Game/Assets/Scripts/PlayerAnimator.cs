@@ -33,7 +33,8 @@ public class PlayerAnimator : NetworkBehaviour
 
     private bool wasFalling;
 
-    private InputAction emote1Act, emote2Act, emote3Act;
+    private InputAction emoteAct;
+    private int lastEmote;
 
     void Awake()
     {
@@ -47,45 +48,20 @@ public class PlayerAnimator : NetworkBehaviour
             netAnimator.animator = animator;
 
         var pi = GetComponent<PlayerInput>();
-        emote1Act = pi.actions.FindAction("Emote1");
-        emote2Act = pi.actions.FindAction("Emote2");
-        emote3Act = pi.actions.FindAction("Emote3");
+        emoteAct = pi.actions.FindAction("Emote");
     }
 
     public override void OnStartAuthority()
     {
         enabled = true;
-        emote1Act.Enable();
-        emote2Act.Enable();
-        emote3Act.Enable();
-        emote1Act.started += OnEmote1Started;
-        emote1Act.canceled += OnEmote1Canceled;
-        emote2Act.started += OnEmote2Started;
-        emote2Act.canceled += OnEmote2Canceled;
-        emote3Act.started += OnEmote3Started;
-        emote3Act.canceled += OnEmote3Canceled;
+        emoteAct.Enable();
     }
 
     public override void OnStopAuthority()
     {
         enabled = false;
-        emote1Act.Disable();
-        emote2Act.Disable();
-        emote3Act.Disable();
-        emote1Act.started -= OnEmote1Started;
-        emote1Act.canceled -= OnEmote1Canceled;
-        emote2Act.started -= OnEmote2Started;
-        emote2Act.canceled -= OnEmote2Canceled;
-        emote3Act.started -= OnEmote3Started;
-        emote3Act.canceled -= OnEmote3Canceled;
+        emoteAct.Disable();
     }
-
-    private void OnEmote1Started(InputAction.CallbackContext ctx) => animator.SetInteger(EmoteHash, 1);
-    private void OnEmote1Canceled(InputAction.CallbackContext ctx) => animator.SetInteger(EmoteHash, 0);
-    private void OnEmote2Started(InputAction.CallbackContext ctx) => animator.SetInteger(EmoteHash, 2);
-    private void OnEmote2Canceled(InputAction.CallbackContext ctx) => animator.SetInteger(EmoteHash, 0);
-    private void OnEmote3Started(InputAction.CallbackContext ctx) => animator.SetInteger(EmoteHash, 3);
-    private void OnEmote3Canceled(InputAction.CallbackContext ctx) => animator.SetInteger(EmoteHash, 0);
 
     void Update()
     {
@@ -94,6 +70,14 @@ public class PlayerAnimator : NetworkBehaviour
         UpdateActiveHand();
         UpdateMovementState();
         CheckLanding();
+
+        // Poll the emote value each frame and replicate when it changes
+        int val = (int)emoteAct.ReadValue<float>(); // 0,1,2,3
+        if (val != lastEmote)
+        {
+            animator.SetInteger(EmoteHash, val); // NetworkAnimator syncs this
+            lastEmote = val;
+        }
     }
 
     void UpdateActiveHand()
@@ -108,17 +92,17 @@ public class PlayerAnimator : NetworkBehaviour
     void UpdateMovementState()
     {
         Vector3 horiz = new(rb.linearVelocity.x, 0, rb.linearVelocity.z);
-        if (horiz.magnitude > movementThreshold)
+        bool moving = horiz.magnitude > movementThreshold;
+        animator.SetBool(IsMovingHash, moving);
+
+        if (moving)
         {
-            animator.SetBool(IsMovingHash, true);
-            Vector3 localVel = transform.InverseTransformDirection(horiz);
-            float angle = Mathf.Atan2(localVel.x, localVel.z) * Mathf.Rad2Deg;
-            float direction = (angle + 180f) / 360f;
-            animator.SetFloat(DirectionHash, direction);
-        }
-        else
-        {
-            animator.SetBool(IsMovingHash, false);
+            Vector3 local = transform.InverseTransformDirection(horiz.normalized);
+            // Map -π to π to the 4 discrete sectors: Forward (0), Left (1), Backward (2), Right (3)
+            float a = Mathf.Atan2(local.x, local.z);          // radians
+            int sector = Mathf.RoundToInt(a / (Mathf.PI * 0.5f)) & 3; // 0-3
+            float dirParam = sector / 3f;                     // 0, 0.333, 0.666, 1
+            animator.SetFloat(DirectionHash, dirParam);
         }
     }
 

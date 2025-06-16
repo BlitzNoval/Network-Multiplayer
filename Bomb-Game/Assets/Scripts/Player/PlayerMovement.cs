@@ -16,12 +16,12 @@ public class PlayerMovement : NetworkBehaviour
     InputAction aimAct;
     Vector2 moveInput;
     Vector3 horizVel;
-    private PlayerInput playerInput; // Added field
+    private PlayerInput playerInput;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        playerInput = GetComponent<PlayerInput>(); // Assign to field
+        playerInput = GetComponent<PlayerInput>();
         moveAct = playerInput.actions.FindAction("Move");
         aimAct = playerInput.actions.FindAction("Aim");
     }
@@ -54,16 +54,19 @@ public class PlayerMovement : NetworkBehaviour
         if (playerInput.currentControlScheme == "KeyboardMouse")
         {
             Vector2 mousePos = Mouse.current.position.ReadValue();
-            Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
+            // Project the ray onto a plane at player height, not y=0
+            Plane ground = new Plane(Vector3.up, transform.position);
             Ray ray = Camera.main.ScreenPointToRay(mousePos);
-            if (groundPlane.Raycast(ray, out float distance))
+            if (ground.Raycast(ray, out float d))
             {
-                Vector3 hitPoint = ray.GetPoint(distance);
-                Vector3 direction = (hitPoint - transform.position).normalized;
-                if (direction.sqrMagnitude > 0.01f)
+                Vector3 hit = ray.GetPoint(d);
+                // Zero-out the vertical component before normalizing to ensure rotation around Y-axis only
+                Vector3 direction = hit - transform.position;
+                direction.y = 0f;
+                if (direction.sqrMagnitude > 0.001f)
                 {
-                    Quaternion targetRotation = Quaternion.LookRotation(direction);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+                    Quaternion look = Quaternion.LookRotation(direction);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, look, rotationSpeed * Time.deltaTime);
                 }
             }
         }
