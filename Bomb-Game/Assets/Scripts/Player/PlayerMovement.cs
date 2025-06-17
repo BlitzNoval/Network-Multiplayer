@@ -11,32 +11,32 @@ public class PlayerMovement : NetworkBehaviour
     [SyncVar] public float deceleration = 10f;
     [SyncVar] public float rotationSpeed = 10f;
 
-    Rigidbody  rb;
+    Rigidbody rb;
     InputAction moveAct;
-    Vector2    moveInput;
-    Vector3    horizVel;
+    InputAction aimAct;
+    Vector2 moveInput;
+    Vector3 horizVel;
+    private PlayerInput playerInput;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        var pi = GetComponent<PlayerInput>();
-        moveAct = pi.actions.FindAction("Move");
+        playerInput = GetComponent<PlayerInput>();
+        moveAct = playerInput.actions.FindAction("Move");
+        aimAct = playerInput.actions.FindAction("Aim");
     }
 
-    void OnEnable()  { if (isLocalPlayer) moveAct.Enable(); }
-    void OnDisable() { if (isLocalPlayer) moveAct.Disable(); }
+    void OnEnable() { if (isLocalPlayer) { moveAct.Enable(); aimAct.Enable(); } }
+    void OnDisable() { if (isLocalPlayer) { moveAct.Disable(); aimAct.Disable(); } }
 
     void Update()
     {
-        if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive)
-            return;
+        if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive) return;
 
-        // Check for ESC key press to pause or resume
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             if (GameManager.Instance.IsPaused)
             {
-                // Only the player who paused can resume
                 if (GameManager.Instance.Pauser == netIdentity)
                 {
                     CmdResumeGame();
@@ -49,16 +49,45 @@ public class PlayerMovement : NetworkBehaviour
         }
 
         moveInput = moveAct.ReadValue<Vector2>();
+
+        // Handle rotation based on aiming input
+        if (playerInput.currentControlScheme == "KeyboardMouse")
+        {
+            Vector2 mousePos = Mouse.current.position.ReadValue();
+            // Project the ray onto a plane at player height, not y=0
+            Plane ground = new Plane(Vector3.up, transform.position);
+            Ray ray = Camera.main.ScreenPointToRay(mousePos);
+            if (ground.Raycast(ray, out float d))
+            {
+                Vector3 hit = ray.GetPoint(d);
+                // Zero-out the vertical component before normalizing to ensure rotation around Y-axis only
+                Vector3 direction = hit - transform.position;
+                direction.y = 0f;
+                if (direction.sqrMagnitude > 0.001f)
+                {
+                    Quaternion look = Quaternion.LookRotation(direction);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, look, rotationSpeed * Time.deltaTime);
+                }
+            }
+        }
+        else if (playerInput.currentControlScheme == "Gamepad")
+        {
+            Vector2 aimInput = aimAct.ReadValue<Vector2>();
+            if (aimInput.sqrMagnitude > 0.01f)
+            {
+                Vector3 direction = new Vector3(aimInput.x, 0, aimInput.y).normalized;
+                Quaternion targetRotation = Quaternion.LookRotation(direction);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            }
+        }
     }
 
     void FixedUpdate()
     {
-        if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive)
-            return;
+        if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive) return;
 
         if (GameManager.Instance.IsPaused)
         {
-            // Stop movement when paused
             rb.linearVelocity = Vector3.zero;
             return;
         }
@@ -69,7 +98,16 @@ public class PlayerMovement : NetworkBehaviour
     void ApplyMovement()
     {
         if (moveInput.magnitude > 1f) moveInput.Normalize();
-        Vector3 target = new Vector3(moveInput.x, 0, moveInput.y) * speed;
+
+        Vector3 cameraForward = Camera.main.transform.forward;
+        cameraForward.y = 0;
+        cameraForward.Normalize();
+
+        Vector3 cameraRight = Camera.main.transform.right;
+        cameraRight.y = 0;
+        cameraRight.Normalize();
+
+        Vector3 target = (cameraRight * moveInput.x + cameraForward * moveInput.y) * speed;
 
         horizVel = Vector3.MoveTowards(
             horizVel,
@@ -77,23 +115,11 @@ public class PlayerMovement : NetworkBehaviour
             (target.magnitude > 0.01f ? acceleration : deceleration) * Time.fixedDeltaTime);
 
         rb.linearVelocity = new Vector3(horizVel.x, rb.linearVelocity.y, horizVel.z);
-
-        if (horizVel.magnitude > 0.1f)
-        {
-            Quaternion rot = Quaternion.LookRotation(horizVel.normalized);
-            transform.rotation = Quaternion.Slerp(transform.rotation, rot, rotationSpeed * Time.fixedDeltaTime);
-        }
     }
 
     [Command]
-    public void CmdPauseGame()
-    {
-        GameManager.Instance.PauseGame(netIdentity);
-    }
+    public void CmdPauseGame() => GameManager.Instance.PauseGame(netIdentity);
 
     [Command]
-    public void CmdResumeGame()
-    {
-        GameManager.Instance.ResumeGame(netIdentity);
-    }
+    public void CmdResumeGame() => GameManager.Instance.ResumeGame(netIdentity);
 }
