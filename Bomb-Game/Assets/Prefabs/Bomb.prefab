@@ -533,7 +533,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31d3361528923924da0a5bbe85562ef3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  baseKnockback: 20
+  baseKnockback: 25
   explosionRadius: 10
   sectorFalloffCurve:
     serializedVersion: 2
@@ -569,8 +569,8 @@ MonoBehaviour:
   - 0.8
   - 0.5
   - 0.2
-  baseUpwardBias: 0.35
-  maxUpwardBias: 0.45
+  baseUpwardBias: 0.15
+  maxUpwardBias: 0.4
   percentageCurveExponent: 0.5
   massInfluence: 0.2
   knockbackAngleCurve:
@@ -606,7 +606,13 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  baseKnockbackIncreaseRate: 11
+  holderMultiplier: 1.6
+  verticalStrengthMultiplier: 0.5
+  horizontalStrengthMin: 3
+  horizontalStrengthMax: 2
+  horizontalBoostMin: 1.7
+  horizontalBoostMax: 2.5
+  baseKnockbackIncreaseRate: 15
   milestoneMultipliers:
   - 1
   - 1.3

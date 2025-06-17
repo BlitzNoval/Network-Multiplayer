@@ -1407,7 +1407,7 @@ MonoBehaviour:
   PlayerNumber: 0
   CurrentLives: 0
   maxKnockbackPercentage: 350
-  outOfViewTimeLimit: 3.5
+  outOfViewTimeLimit: 3
   cameraCheckInterval: 0.5
 --- !u!95 &6115396542742235922
 Animator:
