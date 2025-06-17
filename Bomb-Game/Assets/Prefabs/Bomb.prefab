@@ -513,9 +513,9 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  initialTimer: 100
-  normalThrowSpeed: 20
-  normalThrowUpward: 0.5
+  initialTimer: 10
+  underarmThrowSpeed: 20
+  underarmThrowUpward: 2
   lobThrowSpeed: 17
   lobThrowUpward: 8
   throwCooldown: 0.00001
@@ -533,7 +533,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31d3361528923924da0a5bbe85562ef3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  baseKnockback: 5
+  baseKnockback: 20
   explosionRadius: 10
   sectorFalloffCurve:
     serializedVersion: 2
@@ -569,8 +569,8 @@ MonoBehaviour:
   - 0.8
   - 0.5
   - 0.2
-  baseUpwardBias: 0.1
-  maxUpwardBias: 0.1
+  baseUpwardBias: 0.35
+  maxUpwardBias: 0.45
   percentageCurveExponent: 0.5
   massInfluence: 0.2
   knockbackAngleCurve:
@@ -606,6 +606,12 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  baseKnockbackIncreaseRate: 11
+  milestoneMultipliers:
+  - 1
+  - 1.3
+  - 1.6
+  - 1.9
   showDebugSectors: 1
   debugDisplayDuration: 2
   sectorColors:
