@@ -374,37 +374,16 @@ public class PlayerLifeManager : NetworkBehaviour
         // Ensure we end at the exact end point
         rb.MovePosition(arcData.endPoint);
         
-        // Start daze period - player can't move
-        if (movement != null)
-        {
-            movement.SetKnockbackState(true, 0f); // Completely dazed
-        }
+        // Hide landing dot when player lands - use the manager
+        LandingDotManager.Instance?.HideLandingDotForPlayer(PlayerNumber);
         
-        Debug.Log($"Knockback arc completed for {gameObject.name}: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m. Starting daze period: {arcData.dazeTime}s", this);
-        
-        // Wait for daze period
-        yield return new WaitForSeconds(arcData.dazeTime);
-        
-        // Gradually restore movement over short time
-        float recoveryTime = 0.5f;
-        float recoveryElapsed = 0f;
-        
-        while (recoveryElapsed < recoveryTime && movement != null)
-        {
-            recoveryElapsed += Time.deltaTime;
-            float recoveryT = recoveryElapsed / recoveryTime;
-            float movementMultiplier = Mathf.Lerp(0f, 1f, recoveryT);
-            movement.SetKnockbackState(true, movementMultiplier);
-            yield return null;
-        }
-        
-        // Restore full movement
+        // Immediately restore full movement (no daze)
         if (movement != null)
         {
             movement.SetKnockbackState(false, 1f);
         }
         
-        Debug.Log($"Player {gameObject.name} recovered from knockback daze", this);
+        Debug.Log($"Player {gameObject.name} landed from knockback: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m", this);
     }
     
 

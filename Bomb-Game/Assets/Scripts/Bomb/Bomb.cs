@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Mirror;
 using UnityEngine;
 
@@ -116,6 +117,46 @@ public class Bomb : NetworkBehaviour
 
         var potentialTargets = Physics.OverlapSphere(explosionPos, knockbackCalculator.GetComponent<KnockbackCalculator>() ? 5f : 5f);
         
+        // Collect all affected players first
+        List<GameObject> affectedPlayers = new List<GameObject>();
+        if (holder != null)
+        {
+            affectedPlayers.Add(holder);
+        }
+        
+        foreach (var hit in potentialTargets)
+        {
+            if (!hit.CompareTag(playerTag)) continue;
+            if (hit.gameObject == holder) continue; // Already added holder
+            
+            affectedPlayers.Add(hit.gameObject);
+        }
+        
+        // Calculate landing positions on server and send to all clients
+        List<LandingDotData> landingData = new List<LandingDotData>();
+        
+        foreach (var player in affectedPlayers)
+        {
+            if (player == null) continue;
+            
+            var lifeManager = player.GetComponent<PlayerLifeManager>();
+            if (lifeManager == null) continue;
+            
+            bool isHolder = (player == holder);
+            var arcData = knockbackCalculator.CalculateKnockbackArc(explosionPos, player, lifeManager.PercentageKnockback, isHolder);
+            
+            if (arcData.affected)
+            {
+                landingData.Add(new LandingDotData(arcData.endPoint, lifeManager.PlayerNumber));
+            }
+        }
+        
+        // Send landing dots to all clients with server-calculated positions
+        if (landingData.Count > 0)
+        {
+            RpcShowLandingDots(explosionPos, landingData.ToArray());
+        }
+        
         // Process holder first (as per spec: "they will be the first to receive a dose of knockback")
         if (holder != null)
         {
@@ -194,6 +235,17 @@ public class Bomb : NetworkBehaviour
             }
         }
         NetworkServer.Destroy(gameObject);
+    }
+
+
+    [ClientRpc]
+    void RpcShowLandingDots(Vector3 explosionPos, LandingDotData[] landingData)
+    {
+        var knockbackCalc = GetComponent<KnockbackCalculator>();
+        if (knockbackCalc != null)
+        {
+            knockbackCalc.ShowLandingDots(landingData);
+        }
     }
 
     [ClientRpc]

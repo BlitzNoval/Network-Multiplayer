@@ -1,5 +1,7 @@
 using UnityEngine;
 using Mirror;
+using System.Collections;
+using System.Collections.Generic;
 
 public class KnockbackCalculator : MonoBehaviour
 {
@@ -24,7 +26,7 @@ public class KnockbackCalculator : MonoBehaviour
     [SerializeField] private float[] durationMultipliers = { 0f, 0.25f, 0.5f, 0.75f, 1f };
     
     [Header("Daze Settings")]
-    [SerializeField] private float dazeTime = 1.5f; // Time player is dazed after landing
+    [SerializeField] private float dazeTime = 0f; // Daze disabled for faster gameplay
     
     [Header("Debug Visualization")]
     [SerializeField] private bool showDebugSectors = false;
@@ -34,9 +36,16 @@ public class KnockbackCalculator : MonoBehaviour
     [SerializeField] private Color playerArcColor = Color.yellow;
     [SerializeField] private float debugDisplayDuration = 2f;
     [SerializeField] private Color[] sectorColors = { Color.red, new Color(1f, 0.5f, 0f), Color.yellow, Color.green };
+    
+    [Header("Landing Prediction")]
+    [SerializeField] private GameObject landingDotPrefab;
+    [SerializeField] private bool showLandingPrediction = true;
 
     // Global debug toggle
     public static bool GlobalDebugEnabled = false;
+    
+    // Landing prediction tracking
+    private Dictionary<int, GameObject> playerLandingDots = new Dictionary<int, GameObject>();
 
     private void Awake()
     {
@@ -102,6 +111,8 @@ public class KnockbackCalculator : MonoBehaviour
             DrawPlayerArc(startPoint, endPoint, finalHeight, playerArcColor);
         }
         
+        // Landing dot will be shown separately for all players at once
+        
         return arcData;
     }
 
@@ -153,8 +164,21 @@ public class KnockbackCalculator : MonoBehaviour
             // Linear interpolation for horizontal movement
             Vector3 horizontalPos = Vector3.Lerp(startPos, endPos, t);
             
-            // Parabolic curve for vertical movement (perfect arc)
-            float verticalOffset = 4 * height * t * (1 - t);
+            // Improved parabolic curve with smoother landing
+            // Use a curve that naturally goes to zero at t=1 without sharp drop
+            float verticalOffset;
+            if (t < 0.9f)
+            {
+                // Normal parabolic arc for most of the flight
+                verticalOffset = 4 * height * t * (1 - t);
+            }
+            else
+            {
+                // Smooth landing transition for last 10% of arc
+                float landingT = (t - 0.9f) / 0.1f; // Normalize landing phase
+                float arcHeightAtLanding = 4 * height * 0.9f * (1 - 0.9f); // Height at 90%
+                verticalOffset = Mathf.Lerp(arcHeightAtLanding, 0f, landingT * landingT); // Smooth quadratic landing
+            }
             
             arcPoints[i] = new Vector3(horizontalPos.x, startPos.y + verticalOffset, horizontalPos.z);
         }
@@ -323,6 +347,52 @@ public class KnockbackCalculator : MonoBehaviour
         else if (currentPercentage >= 100f) return baseRate * 1.2f;
         else return baseRate;
     }
+    
+    public void ShowLandingDots(LandingDotData[] dotData)
+    {
+        // Pass the prefab to the manager if needed
+        if (LandingDotManager.Instance != null && landingDotPrefab != null)
+        {
+            LandingDotManager.Instance.SetLandingDotPrefab(landingDotPrefab);
+        }
+        
+        // Use the manager to show dots
+        LandingDotManager.Instance?.ShowLandingDots(dotData);
+    }
+    
+    private void ShowLandingDotForPlayer(Vector3 landingPosition, int playerNumber)
+    {
+        if (landingDotPrefab == null) return;
+        
+        // Create new landing dot at predicted position
+        GameObject dot = Instantiate(landingDotPrefab, landingPosition, Quaternion.identity);
+        
+        // Make it face camera with simple rotation
+        if (Camera.main != null)
+        {
+            dot.transform.LookAt(dot.transform.position + Camera.main.transform.rotation * Vector3.forward,
+                               Camera.main.transform.rotation * Vector3.up);
+        }
+        
+        // Store the dot
+        playerLandingDots[playerNumber] = dot;
+    }
+    
+    private IEnumerator ClearAllDotsAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        ClearAllLandingDots();
+    }
+    
+    public void HideLandingDotForPlayer(int playerNumber)
+    {
+        LandingDotManager.Instance?.HideLandingDotForPlayer(playerNumber);
+    }
+
+    public void ClearAllLandingDots()
+    {
+        LandingDotManager.Instance?.ClearAllLandingDots();
+    }
 }
 
 [System.Serializable]
@@ -336,4 +406,17 @@ public struct KnockbackArcData
     public int sector;
     public Vector3[] arcPoints;
     public float dazeTime;
+}
+
+[System.Serializable]
+public struct LandingDotData
+{
+    public Vector3 position;
+    public int playerNumber;
+    
+    public LandingDotData(Vector3 pos, int playerNum)
+    {
+        position = pos;
+        playerNumber = playerNum;
+    }
 }
