@@ -568,11 +568,36 @@ MonoBehaviour:
   - 0.8
   - 0.5
   - 0.2
-  baseDistance: 10
-  arcHeight: 5
-  arcDuration: 1
-  holderDistanceMultiplier: 1.5
-  percentageDistanceMultiplier: 0.01
+  baseKnockbackDistance: 3
+  baseArcHeight: 1
+  baseArcDuration: 1
+  bombHolderBonus: 1.5
+  percentageThresholds:
+  - 0
+  - 87.5
+  - 175
+  - 262.5
+  - 350
+  distanceMultipliers:
+  - 0
+  - 2
+  - 4
+  - 6
+  - 8
+  heightMultipliers:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  durationMultipliers:
+  - 0
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1
+  landingIndicatorPrefab: {fileID: 347459730655445168, guid: a1b2c3d4e5f67890123456789012345e, type: 3}
+  indicatorLifetime: 3
   showDebugSectors: 1
   showArcGizmos: 1
   arcResolution: 30

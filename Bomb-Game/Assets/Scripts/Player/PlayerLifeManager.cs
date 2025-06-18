@@ -330,10 +330,10 @@ public class PlayerLifeManager : NetworkBehaviour
     {
         if (rb == null || arcData.arcPoints == null || arcData.arcPoints.Length == 0) yield break;
         
-        // Disable player movement during arc
+        // Initially disable player movement
         if (movement != null)
         {
-            movement.SetKnockbackState(true, 0f); // No movement allowed
+            movement.SetKnockbackState(true, 0f); // No movement during initial phase
         }
         
         // Clear existing velocity
@@ -341,9 +341,11 @@ public class PlayerLifeManager : NetworkBehaviour
         rb.angularVelocity = Vector3.zero;
         
         float elapsedTime = 0f;
-        int currentPointIndex = 0;
+        Vector3 originalEndPoint = arcData.endPoint;
+        Vector3 currentEndPoint = originalEndPoint;
+        Vector3 airControlOffset = Vector3.zero;
         
-        while (elapsedTime < arcData.duration && currentPointIndex < arcData.arcPoints.Length - 1)
+        while (elapsedTime < arcData.duration)
         {
             elapsedTime += Time.fixedDeltaTime;
             float t = elapsedTime / arcData.duration;
@@ -372,14 +374,39 @@ public class PlayerLifeManager : NetworkBehaviour
         // Ensure we end at the exact end point
         rb.MovePosition(arcData.endPoint);
         
-        // Restore player movement
+        // Start daze period - player can't move
+        if (movement != null)
+        {
+            movement.SetKnockbackState(true, 0f); // Completely dazed
+        }
+        
+        Debug.Log($"Knockback arc completed for {gameObject.name}: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m. Starting daze period: {arcData.dazeTime}s", this);
+        
+        // Wait for daze period
+        yield return new WaitForSeconds(arcData.dazeTime);
+        
+        // Gradually restore movement over short time
+        float recoveryTime = 0.5f;
+        float recoveryElapsed = 0f;
+        
+        while (recoveryElapsed < recoveryTime && movement != null)
+        {
+            recoveryElapsed += Time.deltaTime;
+            float recoveryT = recoveryElapsed / recoveryTime;
+            float movementMultiplier = Mathf.Lerp(0f, 1f, recoveryT);
+            movement.SetKnockbackState(true, movementMultiplier);
+            yield return null;
+        }
+        
+        // Restore full movement
         if (movement != null)
         {
             movement.SetKnockbackState(false, 1f);
         }
         
-        Debug.Log($"Knockback arc completed for {gameObject.name}: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m", this);
+        Debug.Log($"Player {gameObject.name} recovered from knockback daze", this);
     }
+    
 
     [Server]
     void SetAliveState(bool alive, bool triggerMode)

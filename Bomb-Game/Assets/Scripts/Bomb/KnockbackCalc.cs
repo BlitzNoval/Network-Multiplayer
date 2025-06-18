@@ -4,19 +4,27 @@ using Mirror;
 public class KnockbackCalculator : MonoBehaviour
 {
     [Header("Explosion Settings")]
-    [SerializeField] private float explosionRadius = 2f; // Small for testing
+    [SerializeField] private float explosionRadius = 2f;
     [SerializeField] private AnimationCurve sectorFalloffCurve;
     
-    [Header("Sector Configuration")]
-    [SerializeField] private float[] sectorRadii = { 0.5f, 1f, 1.5f, 2f }; // Small sectors for testing
-    [SerializeField] private float[] sectorMultipliers = { 1f, 0.75f, 0.5f, 0.25f }; // Sector damage multipliers
+    [Header("Damage Sectors")]
+    [SerializeField] private float[] sectorRadii = { 0.5f, 1f, 1.5f, 2f };
+    [SerializeField] private float[] sectorMultipliers = { 1f, 0.75f, 0.5f, 0.25f };
     
-    [Header("Arc Knockback Settings")]
-    [SerializeField] private float baseDistance = 3f; // Base knockback distance
-    [SerializeField] private float arcHeight = 1f; // Height of parabolic arc
-    [SerializeField] private float arcDuration = 1f; // Time to complete the arc
-    [SerializeField] private float holderDistanceMultiplier = 1.5f; // Extra distance for bomb holder
-    [SerializeField] private float percentageDistanceMultiplier = 0.01f; // Distance per percentage point
+    [Header("Base Arc Properties")]
+    [SerializeField] private float baseKnockbackDistance = 3f;
+    [SerializeField] private float baseArcHeight = 1f;
+    [SerializeField] private float baseArcDuration = 1f;
+    [SerializeField] private float bombHolderBonus = 1.5f;
+    
+    [Header("Percentage Scaling (0%, 25%, 50%, 75%, 100%=350%)")]
+    [SerializeField] private float[] percentageThresholds = { 0f, 87.5f, 175f, 262.5f, 350f };
+    [SerializeField] private float[] distanceMultipliers = { 0f, 0.25f, 0.5f, 0.75f, 1f };
+    [SerializeField] private float[] heightMultipliers = { 0f, 0.25f, 0.5f, 0.75f, 1f };
+    [SerializeField] private float[] durationMultipliers = { 0f, 0.25f, 0.5f, 0.75f, 1f };
+    
+    [Header("Daze Settings")]
+    [SerializeField] private float dazeTime = 1.5f; // Time player is dazed after landing
     
     [Header("Debug Visualization")]
     [SerializeField] private bool showDebugSectors = false;
@@ -60,30 +68,38 @@ public class KnockbackCalculator : MonoBehaviour
             return arcData;
         }
         
-        // Calculate knockback distance based on all factors
-        float knockbackDistance = baseDistance;
-        knockbackDistance *= sectorMultiplier; // Sector influence
-        knockbackDistance += percentageKnockback * percentageDistanceMultiplier; // Percentage influence
-        if (isHolder) knockbackDistance *= holderDistanceMultiplier; // Holder bonus
+        // Calculate percentage-based multipliers
+        float distanceBonus = GetPercentageMultiplier(percentageKnockback, distanceMultipliers);
+        float heightBonus = GetPercentageMultiplier(percentageKnockback, heightMultipliers);
+        float durationBonus = GetPercentageMultiplier(percentageKnockback, durationMultipliers);
         
-        // Calculate arc points
+        // Calculate final arc properties
+        float finalDistance = baseKnockbackDistance * (1f + distanceBonus) * sectorMultiplier;
+        float finalHeight = baseArcHeight * (1f + heightBonus);
+        float finalDuration = baseArcDuration * (1f + durationBonus);
+        
+        // Apply bomb holder bonus
+        if (isHolder) finalDistance *= bombHolderBonus;
+        
+        // Calculate arc points with scaled values
         Vector3 horizontalDir = new Vector3(direction.x, 0, direction.z).normalized;
         Vector3 startPoint = targetPos;
-        Vector3 endPoint = startPoint + horizontalDir * knockbackDistance;
+        Vector3 endPoint = startPoint + horizontalDir * finalDistance;
         
-        // Generate arc points
+        // Generate arc data with scaled properties
         arcData.affected = true;
         arcData.startPoint = startPoint;
         arcData.endPoint = endPoint;
-        arcData.arcHeight = arcHeight;
-        arcData.duration = arcDuration;
+        arcData.arcHeight = finalHeight;
+        arcData.duration = finalDuration;
         arcData.sector = sector;
-        arcData.arcPoints = GenerateArcPoints(startPoint, endPoint, arcHeight);
+        arcData.arcPoints = GenerateArcPoints(startPoint, endPoint, finalHeight);
+        arcData.dazeTime = dazeTime;
         
         // Draw visualization
         if (GlobalDebugEnabled || showArcGizmos)
         {
-            DrawPlayerArc(startPoint, endPoint, arcHeight, playerArcColor);
+            DrawPlayerArc(startPoint, endPoint, finalHeight, playerArcColor);
         }
         
         return arcData;
@@ -222,9 +238,9 @@ public class KnockbackCalculator : MonoBehaviour
             {
                 float angle = dir * 45f * Mathf.Deg2Rad;
                 Vector3 direction = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle));
-                Vector3 endPoint = center + direction * baseDistance;
+                Vector3 endPoint = center + direction * baseKnockbackDistance;
                 
-                DrawGizmoParabolicArc(center, endPoint, arcHeight);
+                DrawGizmoParabolicArc(center, endPoint, baseArcHeight);
             }
         }
     }
@@ -282,6 +298,22 @@ public class KnockbackCalculator : MonoBehaviour
         showDebugSectors = enabled;
     }
     
+    private float GetPercentageMultiplier(float currentPercentage, float[] multipliers)
+    {
+        // Find which threshold we're between
+        for (int i = 0; i < percentageThresholds.Length - 1; i++)
+        {
+            if (currentPercentage <= percentageThresholds[i + 1])
+            {
+                float t = Mathf.InverseLerp(percentageThresholds[i], percentageThresholds[i + 1], currentPercentage);
+                return Mathf.Lerp(multipliers[i], multipliers[i + 1], t);
+            }
+        }
+        // If above max threshold, use max multiplier
+        return multipliers[multipliers.Length - 1];
+    }
+    
+    
     public float GetDynamicKnockbackRate(float currentPercentage)
     {
         // Simple rate calculation for percentage increase over time
@@ -303,4 +335,5 @@ public struct KnockbackArcData
     public float duration;
     public int sector;
     public Vector3[] arcPoints;
+    public float dazeTime;
 }
