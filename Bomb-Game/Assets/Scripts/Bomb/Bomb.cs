@@ -160,19 +160,20 @@ public class Bomb : NetworkBehaviour
 
         if (!knockbackResult.affected) return;
 
-        // Apply server-side physics for authority with better balance
-        Vector3 serverForce = knockbackResult.force * 0.1f; // Increased from 0.05f for better server authority
-        rb.AddForce(serverForce, ForceMode.Impulse);
-
-        // Apply main networked knockback for smooth client experience with prediction compensation
+        // Apply knockback force with server authority
         if (player.TryGetComponent(out NetworkIdentity ni) && ni.connectionToClient != null)
         {
-            // Compensate for network delay by slightly increasing client force
-            Vector3 clientForce = knockbackResult.force * 1.05f;
-            lifeManager.TargetApplyKnockback(ni.connectionToClient, clientForce);
+            // Send full force to client for application
+            lifeManager.TargetApplyKnockback(ni.connectionToClient, knockbackResult.force);
             
-            // Also send explosion data for client-side validation
+            // Send explosion data for client validation/effects
             lifeManager.TargetSyncExplosionData(ni.connectionToClient, explosionPos, knockbackResult.magnitude, knockbackResult.sector);
+        }
+        else
+        {
+            // Host player - apply directly with velocity change for smooth arc
+            rb.linearVelocity = Vector3.zero;
+            rb.AddForce(knockbackResult.force, ForceMode.VelocityChange);
         }
 
         // Update player stats

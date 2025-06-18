@@ -336,55 +336,48 @@ public class PlayerLifeManager : NetworkBehaviour
 
     IEnumerator ApplyDynamicKnockback(Vector3 totalForce)
     {
-        float knockbackDuration = 0.9f; // Slightly longer for stronger knockback feel
-        float movementReductionTime = 0.5f; // Increased for better control during knockback
-        float forceApplicationTime = 0.15f; // Faster application for more immediate impact
-        
-        // Apply stronger initial burst followed by gradual force
-        float initialBurstRatio = 0.4f; // 40% of force as immediate burst
-        Vector3 initialForce = totalForce * initialBurstRatio;
-        Vector3 gradualForce = totalForce * (1f - initialBurstRatio);
-        
-        // Apply initial burst for immediate impact
+        // Smooth force application over short time
         if (rb != null)
-            rb.AddForce(initialForce, ForceMode.Impulse);
-        
-        // Apply remaining force gradually over fewer steps for smoother feel
-        float forceSteps = 8f;
-        Vector3 forcePerStep = gradualForce / forceSteps;
-        
-        for (int i = 0; i < forceSteps; i++)
         {
-            if (rb != null)
-                rb.AddForce(forcePerStep, ForceMode.Impulse);
-            yield return new WaitForFixedUpdate();
+            float smoothTime = 0.1f; // Very short smoothing time
+            int steps = 5; // Apply over 5 frames
+            Vector3 forcePerStep = totalForce / steps;
+            
+            for (int i = 0; i < steps; i++)
+            {
+                if (rb != null)
+                    rb.AddForce(forcePerStep, ForceMode.VelocityChange);
+                yield return new WaitForFixedUpdate();
+            }
         }
         
-        // Reduce movement effectiveness with better scaling based on knockback strength
+        // Calculate movement reduction based on force strength
+        float forceStrength = totalForce.magnitude;
+        float movementReduction = Mathf.Clamp(0.2f + (forceStrength * 0.01f), 0.2f, 0.6f);
+        float movementReductionTime = Mathf.Clamp(0.3f + (forceStrength * 0.02f), 0.3f, 0.8f);
+        
+        // Apply movement reduction during knockback
         if (movement != null)
         {
-            float forceStrength = totalForce.magnitude;
-            float movementReduction = Mathf.Clamp(0.15f + (forceStrength * 0.01f), 0.1f, 0.4f); // Dynamic reduction based on force
             movement.SetKnockbackState(true, movementReduction);
         }
         
         yield return new WaitForSeconds(movementReductionTime);
         
-        // Gradually restore movement effectiveness over time for smoother transition
-        float restoreTime = 0.3f;
+        // Gradually restore movement over short time
+        float restoreTime = 0.2f;
         float elapsedTime = 0f;
-        float currentReduction = movement != null ? movement.GetCurrentMovementMultiplier() : 0.3f;
         
         while (elapsedTime < restoreTime && movement != null)
         {
             elapsedTime += Time.deltaTime;
             float t = elapsedTime / restoreTime;
-            float newMultiplier = Mathf.Lerp(currentReduction, 1f, t);
-            movement.SetKnockbackState(true, newMultiplier);
+            float currentMultiplier = Mathf.Lerp(movementReduction, 1f, t);
+            movement.SetKnockbackState(true, currentMultiplier);
             yield return null;
         }
         
-        // Ensure full movement is restored
+        // Restore full movement
         if (movement != null)
         {
             movement.SetKnockbackState(false, 1f);

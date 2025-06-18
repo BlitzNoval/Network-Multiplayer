@@ -12,22 +12,10 @@ public class KnockbackCalculator : MonoBehaviour
     [SerializeField] private float[] sectorRadii = { 1f, 2f, 3.5f, 5f }; // Percentage of explosion radius
     [SerializeField] private float[] sectorMultipliers = { 1f, 0.75f, 0.5f, 0.1f }; // 100%, 75%, 50%, 10%
     
-    [Header("Physics Settings")]
-    [SerializeField] private float baseUpwardBias = 0.35f; // Base upward force at 0% (increased from 0.3f)
-    [SerializeField] private float maxUpwardBias = 0.85f; // Maximum upward force at high % (increased from 0.8f)
-    [SerializeField] private float percentageCurveExponent = 1.3f; // How quickly upward bias increases (increased from 1.2f)
-    [SerializeField] private float massInfluence = 0.4f; // How much mass affects knockback (reduced from 0.5f for more consistent knockback)
-    [SerializeField] private AnimationCurve knockbackAngleCurve; // Custom curve for knockback angle
-    
-    [Header("Force Multipliers")]
+    [Header("Force Settings")]
+    [SerializeField] private float horizontalForceMultiplier = 2.0f; // Pure horizontal force multiplier
     [SerializeField] private float holderMultiplier = 1.7f; // Knockback bonus for bomb holder
-    [SerializeField] private float verticalStrengthMultiplier = 0.9f; // Vertical force multiplier
-    
-    [Header("Horizontal Force Settings")]
-    [SerializeField] private float horizontalStrengthMin = 2.2f; // Minimum horizontal strength
-    [SerializeField] private float horizontalStrengthMax = 1.4f; // Maximum horizontal strength (at high upward ratio)
-    [SerializeField] private float horizontalBoostMin = 1.7f; // Minimum horizontal boost
-    [SerializeField] private float horizontalBoostMax = 2.5f; // Maximum horizontal boost
+    [SerializeField] private float massInfluence = 0.3f; // Mass influence
     
     [Header("Dynamic Knockback Settings")]
     [SerializeField] private float baseKnockbackIncreaseRate = 10f; // Base rate per second
@@ -49,19 +37,7 @@ public class KnockbackCalculator : MonoBehaviour
             sectorFalloffCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
         }
         
-        // Initialize knockback angle curve if not set (Better horizontal/vertical balance)
-        if (knockbackAngleCurve == null || knockbackAngleCurve.keys.Length == 0)
-        {
-            // 0% = mostly horizontal (0.2), gradual increase to 350% = strong vertical (0.65), 500%+ = max vertical (0.7)
-            knockbackAngleCurve = new AnimationCurve(
-                new Keyframe(0f, 0.2f),                // 0% knockback - strong horizontal potential
-                new Keyframe(50f, 0.25f),              // 50% knockback - slight increase
-                new Keyframe(100f, 0.3f),              // 100% knockback - balanced start
-                new Keyframe(200f, 0.4f),              // 200% knockback - more balanced
-                new Keyframe(350f, 0.65f),             // 350% knockback - strong vertical (max intended)
-                new Keyframe(500f, 0.7f)               // 500%+ knockback - max vertical
-            );
-        }
+        // No need for animation curve - using direct calculation for predictable results
     }
     
     public KnockbackResult CalculateKnockback(Vector3 explosionPos, GameObject target, float percentageKnockback, bool isHolder)
@@ -101,44 +77,18 @@ public class KnockbackCalculator : MonoBehaviour
         // Calculate final knockback magnitude
         float knockbackMagnitude = baseKnockback * sectorMultiplier * percentageModifier * appliedHolderMultiplier * massModifier;
         
-        // Calculate balanced horizontal/vertical knockback
+        // Pure horizontal X/Z knockback only
         Vector3 horizontalDir = new Vector3(direction.x, 0, direction.z).normalized;
         
-        // Get upward ratio from curve - this determines vertical vs horizontal balance
-        float upwardRatio = knockbackAngleCurve.Evaluate(percentageKnockback);
-        
-        // Calculate horizontal and vertical components with stronger horizontal emphasis
-        float horizontalStrength = Mathf.Lerp(horizontalStrengthMin, horizontalStrengthMax, upwardRatio);
-        float verticalStrength = upwardRatio * verticalStrengthMultiplier;
-        
-        // Factor in player's current movement for momentum-based knockback
-        Vector3 playerVelocity = Vector3.zero;
-        if (target.TryGetComponent<Rigidbody>(out var playerRb))
-        {
-            playerVelocity = new Vector3(playerRb.linearVelocity.x, 0, playerRb.linearVelocity.z);
-            // Add player momentum to horizontal direction (up to 50% boost)
-            horizontalStrength += playerVelocity.magnitude * 0.1f;
-        }
-        
-        // Create knockback direction with enhanced horizontal focus
-        Vector3 knockbackDirection = (horizontalDir * horizontalStrength + Vector3.up * verticalStrength).normalized;
-        
-        // Add slight randomness for natural feel (very minimal)
-        float randomness = Mathf.Lerp(0.05f, 0.02f, percentageKnockback / 500f);
-        knockbackDirection += Random.insideUnitSphere * randomness;
-        knockbackDirection.Normalize();
-        
-        // Apply strong horizontal boost to ensure knockout potential at any percentage
-        float horizontalBoost = Mathf.Lerp(horizontalBoostMin, horizontalBoostMax, percentageKnockback / 500f);
-        knockbackDirection.x *= horizontalBoost;
-        knockbackDirection.z *= horizontalBoost;
-        knockbackDirection.Normalize();
+        // Apply only horizontal force - NO Y component at all
+        float horizontalMagnitude = knockbackMagnitude * horizontalForceMultiplier;
+        Vector3 totalForce = horizontalDir * horizontalMagnitude;
         
         result.affected = true;
-        result.force = knockbackDirection * knockbackMagnitude;
-        result.magnitude = knockbackMagnitude;
+        result.force = totalForce;
+        result.magnitude = totalForce.magnitude;
         result.sector = GetSectorIndex(normalizedDistance);
-        result.direction = knockbackDirection;
+        result.direction = totalForce.normalized;
         
         // Debug visualization
         if (GlobalDebugEnabled || showDebugSectors)
