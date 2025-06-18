@@ -3777,8 +3777,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   heart1: {fileID: 924646052}
-  heart2: {fileID: 0}
-  heart3: {fileID: 0}
+  heart2: {fileID: 1831872974}
+  heart3: {fileID: 1196357466}
   playerLabel: {fileID: 498193152}
   colorPanel: {fileID: 682623536}
   percentageText: {fileID: 1211983779}
@@ -7324,8 +7324,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   heart1: {fileID: 194623504}
-  heart2: {fileID: 0}
-  heart3: {fileID: 0}
+  heart2: {fileID: 1133152204}
+  heart3: {fileID: 629395451}
   playerLabel: {fileID: 548299248}
   colorPanel: {fileID: 1017498527}
   percentageText: {fileID: 1227033884}
@@ -16756,8 +16756,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   heart1: {fileID: 853481237}
-  heart2: {fileID: 0}
-  heart3: {fileID: 0}
+  heart2: {fileID: 1617224880}
+  heart3: {fileID: 367323553}
   playerLabel: {fileID: 589491571}
   colorPanel: {fileID: 862458274}
   percentageText: {fileID: 826042924}
@@ -35327,8 +35327,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   heart1: {fileID: 1161542841}
-  heart2: {fileID: 0}
-  heart3: {fileID: 0}
+  heart2: {fileID: 1192919287}
+  heart3: {fileID: 1354177097}
   playerLabel: {fileID: 1969925197}
   colorPanel: {fileID: 2066698606}
   percentageText: {fileID: 664287251}
