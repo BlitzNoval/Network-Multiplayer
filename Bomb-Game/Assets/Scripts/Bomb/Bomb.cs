@@ -151,36 +151,32 @@ public class Bomb : NetworkBehaviour
 
         float percentageKnockback = lifeManager.PercentageKnockback;
 
-        var knockbackResult = knockbackCalculator.CalculateKnockback(
+        var arcData = knockbackCalculator.CalculateKnockbackArc(
             explosionPos,
             player,
             percentageKnockback,
             isHolder
         );
 
-        if (!knockbackResult.affected) return;
+        if (!arcData.affected) return;
 
-        // Apply knockback force with server authority
+        // Apply arc-based knockback
         if (player.TryGetComponent(out NetworkIdentity ni) && ni.connectionToClient != null)
         {
-            // Send full force to client for application
-            lifeManager.TargetApplyKnockback(ni.connectionToClient, knockbackResult.force);
-            
-            // Send explosion data for client validation/effects
-            lifeManager.TargetSyncExplosionData(ni.connectionToClient, explosionPos, knockbackResult.magnitude, knockbackResult.sector);
+            // Send arc data to client for smooth arc following
+            lifeManager.TargetFollowKnockbackArc(ni.connectionToClient, arcData);
         }
         else
         {
-            // Host player - apply directly with velocity change for smooth arc
-            rb.linearVelocity = Vector3.zero;
-            rb.AddForce(knockbackResult.force, ForceMode.VelocityChange);
+            // Host player - start arc following directly
+            lifeManager.StartKnockbackArc(arcData);
         }
 
         // Update player stats
         lifeManager.RegisterKnockbackHit();
-        lifeManager.AddExplosionKnockbackPercentage(knockbackResult.sector);
+        lifeManager.AddExplosionKnockbackPercentage(arcData.sector);
         
-        Debug.Log($"Applied knockback to {player.name}: Force={knockbackResult.force.magnitude:F1}, Percentage={percentageKnockback:F1}%, Sector={knockbackResult.sector}, IsHolder={isHolder}");
+        Debug.Log($"Applied knockback arc to {player.name}: Distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m, Percentage={percentageKnockback:F1}%, Sector={arcData.sector}, IsHolder={isHolder}");
     }
 
     [Server]

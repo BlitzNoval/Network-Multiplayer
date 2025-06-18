@@ -314,74 +314,71 @@ public class PlayerLifeManager : NetworkBehaviour
     }
 
     [TargetRpc]
-    public void TargetApplyKnockback(NetworkConnectionToClient _, Vector3 force)
+    public void TargetFollowKnockbackArc(NetworkConnectionToClient _, KnockbackArcData arcData)
     {
-        // Don't disable movement completely - instead reduce effectiveness and apply gradual force
-        StartCoroutine(ApplyDynamicKnockback(force));
+        // Client follows the calculated arc
+        StartKnockbackArc(arcData);
+    }
+    
+    public void StartKnockbackArc(KnockbackArcData arcData)
+    {
+        // Start following the parabolic arc
+        StartCoroutine(FollowKnockbackArc(arcData));
     }
 
-    [TargetRpc]
-    public void TargetSyncExplosionData(NetworkConnectionToClient _, Vector3 explosionPos, float magnitude, int sector)
+    IEnumerator FollowKnockbackArc(KnockbackArcData arcData)
     {
-        // Client-side explosion data for validation and effects
-        // This helps ensure knockback feels consistent even with network latency
-        if (KnockbackCalculator.GlobalDebugEnabled)
-        {
-            Debug.Log($"Client received explosion data: pos={explosionPos}, magnitude={magnitude:F1}, sector={sector}", this);
-        }
+        if (rb == null || arcData.arcPoints == null || arcData.arcPoints.Length == 0) yield break;
         
-        // Optional: Add client-side prediction validation here
-        // Could check if client position matches expected knockback trajectory
-    }
-
-    IEnumerator ApplyDynamicKnockback(Vector3 totalForce)
-    {
-        // Smooth force application over short time
-        if (rb != null)
-        {
-            float smoothTime = 0.1f; // Very short smoothing time
-            int steps = 5; // Apply over 5 frames
-            Vector3 forcePerStep = totalForce / steps;
-            
-            for (int i = 0; i < steps; i++)
-            {
-                if (rb != null)
-                    rb.AddForce(forcePerStep, ForceMode.VelocityChange);
-                yield return new WaitForFixedUpdate();
-            }
-        }
-        
-        // Calculate movement reduction based on force strength
-        float forceStrength = totalForce.magnitude;
-        float movementReduction = Mathf.Clamp(0.2f + (forceStrength * 0.01f), 0.2f, 0.6f);
-        float movementReductionTime = Mathf.Clamp(0.3f + (forceStrength * 0.02f), 0.3f, 0.8f);
-        
-        // Apply movement reduction during knockback
+        // Disable player movement during arc
         if (movement != null)
         {
-            movement.SetKnockbackState(true, movementReduction);
+            movement.SetKnockbackState(true, 0f); // No movement allowed
         }
         
-        yield return new WaitForSeconds(movementReductionTime);
+        // Clear existing velocity
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
         
-        // Gradually restore movement over short time
-        float restoreTime = 0.2f;
         float elapsedTime = 0f;
+        int currentPointIndex = 0;
         
-        while (elapsedTime < restoreTime && movement != null)
+        while (elapsedTime < arcData.duration && currentPointIndex < arcData.arcPoints.Length - 1)
         {
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / restoreTime;
-            float currentMultiplier = Mathf.Lerp(movementReduction, 1f, t);
-            movement.SetKnockbackState(true, currentMultiplier);
-            yield return null;
+            elapsedTime += Time.fixedDeltaTime;
+            float t = elapsedTime / arcData.duration;
+            
+            // Calculate which point we should be at
+            int targetPointIndex = Mathf.FloorToInt(t * (arcData.arcPoints.Length - 1));
+            targetPointIndex = Mathf.Clamp(targetPointIndex, 0, arcData.arcPoints.Length - 1);
+            
+            // Smoothly move to the target point
+            Vector3 targetPosition = arcData.arcPoints[targetPointIndex];
+            
+            // If we have a next point, interpolate between current and next
+            if (targetPointIndex < arcData.arcPoints.Length - 1)
+            {
+                float pointT = (t * (arcData.arcPoints.Length - 1)) - targetPointIndex;
+                Vector3 nextPosition = arcData.arcPoints[targetPointIndex + 1];
+                targetPosition = Vector3.Lerp(targetPosition, nextPosition, pointT);
+            }
+            
+            // Set position directly for precise arc following
+            rb.MovePosition(targetPosition);
+            
+            yield return new WaitForFixedUpdate();
         }
         
-        // Restore full movement
+        // Ensure we end at the exact end point
+        rb.MovePosition(arcData.endPoint);
+        
+        // Restore player movement
         if (movement != null)
         {
             movement.SetKnockbackState(false, 1f);
         }
+        
+        Debug.Log($"Knockback arc completed for {gameObject.name}: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m", this);
     }
 
     [Server]

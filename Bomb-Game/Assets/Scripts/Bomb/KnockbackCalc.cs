@@ -3,32 +3,33 @@ using Mirror;
 
 public class KnockbackCalculator : MonoBehaviour
 {
-    [Header("Knockback Settings")]
-    [SerializeField] private float baseKnockback = 15f; // Increased from 10f for stronger knockback
-    [SerializeField] private float explosionRadius = 5f;
+    [Header("Explosion Settings")]
+    [SerializeField] private float explosionRadius = 2f; // Small for testing
     [SerializeField] private AnimationCurve sectorFalloffCurve;
     
     [Header("Sector Configuration")]
-    [SerializeField] private float[] sectorRadii = { 1f, 2f, 3.5f, 5f }; // Percentage of explosion radius
-    [SerializeField] private float[] sectorMultipliers = { 1f, 0.75f, 0.5f, 0.1f }; // 100%, 75%, 50%, 10%
+    [SerializeField] private float[] sectorRadii = { 0.5f, 1f, 1.5f, 2f }; // Small sectors for testing
+    [SerializeField] private float[] sectorMultipliers = { 1f, 0.75f, 0.5f, 0.25f }; // Sector damage multipliers
     
-    [Header("Force Settings")]
-    [SerializeField] private float horizontalForceMultiplier = 2.0f; // Pure horizontal force multiplier
-    [SerializeField] private float holderMultiplier = 1.7f; // Knockback bonus for bomb holder
-    [SerializeField] private float massInfluence = 0.3f; // Mass influence
-    
-    [Header("Dynamic Knockback Settings")]
-    [SerializeField] private float baseKnockbackIncreaseRate = 10f; // Base rate per second
-    [SerializeField] private float[] milestoneMultipliers = { 1f, 1.2f, 1.4f, 1.6f }; // At 0%, 100%, 200%, 300%
+    [Header("Arc Knockback Settings")]
+    [SerializeField] private float baseDistance = 3f; // Base knockback distance
+    [SerializeField] private float arcHeight = 1f; // Height of parabolic arc
+    [SerializeField] private float arcDuration = 1f; // Time to complete the arc
+    [SerializeField] private float holderDistanceMultiplier = 1.5f; // Extra distance for bomb holder
+    [SerializeField] private float percentageDistanceMultiplier = 0.01f; // Distance per percentage point
     
     [Header("Debug Visualization")]
     [SerializeField] private bool showDebugSectors = false;
+    [SerializeField] private bool showArcGizmos = true;
+    [SerializeField] private int arcResolution = 30;
+    [SerializeField] private Color arcColor = Color.red;
+    [SerializeField] private Color playerArcColor = Color.yellow;
     [SerializeField] private float debugDisplayDuration = 2f;
     [SerializeField] private Color[] sectorColors = { Color.red, new Color(1f, 0.5f, 0f), Color.yellow, Color.green };
-    
+
     // Global debug toggle
     public static bool GlobalDebugEnabled = false;
-    
+
     private void Awake()
     {
         // Initialize falloff curve if not set
@@ -36,69 +37,58 @@ public class KnockbackCalculator : MonoBehaviour
         {
             sectorFalloffCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
         }
-        
-        // No need for animation curve - using direct calculation for predictable results
     }
-    
-    public KnockbackResult CalculateKnockback(Vector3 explosionPos, GameObject target, float percentageKnockback, bool isHolder)
+
+    public KnockbackArcData CalculateKnockbackArc(Vector3 explosionPos, GameObject target, float percentageKnockback, bool isHolder)
     {
-        var result = new KnockbackResult();
+        var arcData = new KnockbackArcData();
         
-        // Calculate distance and direction
+        // Calculate distance and direction from explosion
         Vector3 targetPos = target.transform.position;
         Vector3 direction = (targetPos - explosionPos);
         float distance = direction.magnitude;
         direction.Normalize();
         
-        // Determine sector and base multiplier
+        // Determine sector and check if affected
         float normalizedDistance = distance / explosionRadius;
         float sectorMultiplier = GetSectorMultiplier(normalizedDistance);
+        int sector = GetSectorIndex(normalizedDistance);
         
         if (sectorMultiplier <= 0f)
         {
-            result.affected = false;
-            return result;
+            arcData.affected = false;
+            return arcData;
         }
         
-        // Calculate percentage modifier with exponential scaling
-        float percentageModifier = 1f + Mathf.Pow(percentageKnockback / 100f, 1.5f);
+        // Calculate knockback distance based on all factors
+        float knockbackDistance = baseDistance;
+        knockbackDistance *= sectorMultiplier; // Sector influence
+        knockbackDistance += percentageKnockback * percentageDistanceMultiplier; // Percentage influence
+        if (isHolder) knockbackDistance *= holderDistanceMultiplier; // Holder bonus
         
-        // Apply holder bonus (increased for stronger holder punishment)
-        float appliedHolderMultiplier = isHolder ? holderMultiplier : 1f;
-        
-        // Get mass modifier (lighter = more knockback)
-        float massModifier = 1f;
-        if (target.TryGetComponent<Rigidbody>(out var rb))
-        {
-            float standardMass = 1f; // Assuming standard player mass
-            massModifier = Mathf.Lerp(1f, standardMass / rb.mass, massInfluence);
-        }
-        
-        // Calculate final knockback magnitude
-        float knockbackMagnitude = baseKnockback * sectorMultiplier * percentageModifier * appliedHolderMultiplier * massModifier;
-        
-        // Pure horizontal X/Z knockback only
+        // Calculate arc points
         Vector3 horizontalDir = new Vector3(direction.x, 0, direction.z).normalized;
+        Vector3 startPoint = targetPos;
+        Vector3 endPoint = startPoint + horizontalDir * knockbackDistance;
         
-        // Apply only horizontal force - NO Y component at all
-        float horizontalMagnitude = knockbackMagnitude * horizontalForceMultiplier;
-        Vector3 totalForce = horizontalDir * horizontalMagnitude;
+        // Generate arc points
+        arcData.affected = true;
+        arcData.startPoint = startPoint;
+        arcData.endPoint = endPoint;
+        arcData.arcHeight = arcHeight;
+        arcData.duration = arcDuration;
+        arcData.sector = sector;
+        arcData.arcPoints = GenerateArcPoints(startPoint, endPoint, arcHeight);
         
-        result.affected = true;
-        result.force = totalForce;
-        result.magnitude = totalForce.magnitude;
-        result.sector = GetSectorIndex(normalizedDistance);
-        result.direction = totalForce.normalized;
-        
-        // Debug visualization
-        if (GlobalDebugEnabled || showDebugSectors)
+        // Draw visualization
+        if (GlobalDebugEnabled || showArcGizmos)
         {
-            DrawDebugSector(explosionPos, targetPos, result.sector);
+            DrawPlayerArc(startPoint, endPoint, arcHeight, playerArcColor);
         }
         
-        return result;
+        return arcData;
     }
-    
+
     private float GetSectorMultiplier(float normalizedDistance)
     {
         // Use smooth falloff curve for better feel
@@ -135,7 +125,42 @@ public class KnockbackCalculator : MonoBehaviour
         }
         return 0; // Outside all sectors
     }
+
+    private Vector3[] GenerateArcPoints(Vector3 startPos, Vector3 endPos, float height)
+    {
+        Vector3[] arcPoints = new Vector3[arcResolution];
+        
+        for (int i = 0; i < arcResolution; i++)
+        {
+            float t = (float)i / (arcResolution - 1);
+            
+            // Linear interpolation for horizontal movement
+            Vector3 horizontalPos = Vector3.Lerp(startPos, endPos, t);
+            
+            // Parabolic curve for vertical movement (perfect arc)
+            float verticalOffset = 4 * height * t * (1 - t);
+            
+            arcPoints[i] = new Vector3(horizontalPos.x, startPos.y + verticalOffset, horizontalPos.z);
+        }
+        
+        return arcPoints;
+    }
     
+    private void DrawPlayerArc(Vector3 startPos, Vector3 endPos, float height, Color color)
+    {
+        Vector3[] arcPoints = GenerateArcPoints(startPos, endPos, height);
+        
+        // Draw the arc with debug lines
+        for (int i = 0; i < arcPoints.Length - 1; i++)
+        {
+            Debug.DrawLine(arcPoints[i], arcPoints[i + 1], color, debugDisplayDuration);
+        }
+        
+        // Draw start and end markers
+        Debug.DrawRay(startPos, Vector3.up * 0.5f, Color.green, debugDisplayDuration);
+        Debug.DrawRay(endPos, Vector3.up * 0.5f, Color.red, debugDisplayDuration);
+    }
+
     private void DrawDebugSector(Vector3 explosionPos, Vector3 targetPos, int sector)
     {
         if (sector < 1 || sector > sectorColors.Length) return;
@@ -144,7 +169,7 @@ public class KnockbackCalculator : MonoBehaviour
         Debug.DrawLine(explosionPos, targetPos, color, debugDisplayDuration);
         Debug.DrawRay(targetPos, Vector3.up * 2f, color, debugDisplayDuration);
     }
-    
+
     public void DrawDebugSectors(Vector3 center)
     {
         if (!GlobalDebugEnabled && !showDebugSectors) return;
@@ -155,7 +180,7 @@ public class KnockbackCalculator : MonoBehaviour
             DrawDebugCircle(center, radius, sectorColors[i], 32);
         }
     }
-    
+
     private void DrawDebugCircle(Vector3 center, float radius, Color color, int segments)
     {
         float angleStep = 360f / segments;
@@ -169,22 +194,41 @@ public class KnockbackCalculator : MonoBehaviour
             prevPoint = newPoint;
         }
     }
-    
+
     void OnDrawGizmos()
     {
-        if (!GlobalDebugEnabled && !showDebugSectors) return;
+        if (!GlobalDebugEnabled && !showDebugSectors && !showArcGizmos) return;
         
         // Draw sector circles as gizmos
         Vector3 center = transform.position;
         
-        for (int i = 0; i < sectorRadii.Length; i++)
+        if (GlobalDebugEnabled || showDebugSectors)
         {
-            float radius = sectorRadii[i] * explosionRadius;
-            Gizmos.color = sectorColors[i];
-            DrawGizmoCircle(center, radius, 32);
+            for (int i = 0; i < sectorRadii.Length; i++)
+            {
+                float radius = sectorRadii[i] * explosionRadius;
+                Gizmos.color = sectorColors[i];
+                DrawGizmoCircle(center, radius, 32);
+            }
+        }
+        
+        // Draw sample parabolic arcs from explosion center
+        if (showArcGizmos)
+        {
+            Gizmos.color = arcColor;
+            
+            // Draw sample arcs in 8 directions
+            for (int dir = 0; dir < 8; dir++)
+            {
+                float angle = dir * 45f * Mathf.Deg2Rad;
+                Vector3 direction = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle));
+                Vector3 endPoint = center + direction * baseDistance;
+                
+                DrawGizmoParabolicArc(center, endPoint, arcHeight);
+            }
         }
     }
-    
+
     private void DrawGizmoCircle(Vector3 center, float radius, int segments)
     {
         float angleStep = 360f / segments;
@@ -199,6 +243,30 @@ public class KnockbackCalculator : MonoBehaviour
         }
     }
     
+    private void DrawGizmoParabolicArc(Vector3 startPos, Vector3 endPos, float height)
+    {
+        Vector3 prevPoint = startPos;
+        
+        for (int i = 1; i <= arcResolution; i++)
+        {
+            float t = (float)i / arcResolution;
+            
+            // Linear interpolation for horizontal movement
+            Vector3 horizontalPos = Vector3.Lerp(startPos, endPos, t);
+            
+            // Parabolic curve for vertical movement (perfect half circle arc)
+            float verticalOffset = 4 * height * t * (1 - t);
+            
+            Vector3 currentPoint = new Vector3(horizontalPos.x, startPos.y + verticalOffset, horizontalPos.z);
+            Gizmos.DrawLine(prevPoint, currentPoint);
+            prevPoint = currentPoint;
+        }
+        
+        // Draw markers at start and end
+        Gizmos.DrawWireSphere(startPos, 0.1f);
+        Gizmos.DrawWireSphere(endPos, 0.1f);
+    }
+
     void Update()
     {
         // Handle F1 debug toggle
@@ -207,55 +275,32 @@ public class KnockbackCalculator : MonoBehaviour
             GlobalDebugEnabled = !GlobalDebugEnabled;
             Debug.Log($"Knockback Debug Visualization: {(GlobalDebugEnabled ? "ENABLED" : "DISABLED")}");
         }
-        
-        // Draw runtime debug circles if enabled
-        if (GlobalDebugEnabled || showDebugSectors)
-        {
-            DrawRuntimeDebugSectors();
-        }
     }
-    
-    private void DrawRuntimeDebugSectors()
-    {
-        Vector3 center = transform.position;
-        
-        for (int i = 0; i < sectorRadii.Length; i++)
-        {
-            float radius = sectorRadii[i] * explosionRadius;
-            DrawDebugCircle(center, radius, sectorColors[i], 48);
-        }
-    }
-    
+
     public void SetDebugMode(bool enabled)
     {
         showDebugSectors = enabled;
     }
     
-    public void UpdateSettings(float newBaseKnockback, float newExplosionRadius)
-    {
-        baseKnockback = newBaseKnockback;
-        explosionRadius = newExplosionRadius;
-    }
-    
     public float GetDynamicKnockbackRate(float currentPercentage)
     {
-        // Calculate rate multiplier based on current percentage milestones
-        float rateMultiplier = 1f;
-        if (currentPercentage >= 300f) rateMultiplier = milestoneMultipliers[3];
-        else if (currentPercentage >= 200f) rateMultiplier = milestoneMultipliers[2];
-        else if (currentPercentage >= 100f) rateMultiplier = milestoneMultipliers[1];
-        else rateMultiplier = milestoneMultipliers[0];
-        
-        return baseKnockbackIncreaseRate * rateMultiplier;
+        // Simple rate calculation for percentage increase over time
+        float baseRate = 10f;
+        if (currentPercentage >= 300f) return baseRate * 1.6f;
+        else if (currentPercentage >= 200f) return baseRate * 1.4f;
+        else if (currentPercentage >= 100f) return baseRate * 1.2f;
+        else return baseRate;
     }
 }
 
 [System.Serializable]
-public struct KnockbackResult
+public struct KnockbackArcData
 {
     public bool affected;
-    public Vector3 force;
-    public float magnitude;
+    public Vector3 startPoint;
+    public Vector3 endPoint;
+    public float arcHeight;
+    public float duration;
     public int sector;
-    public Vector3 direction;
+    public Vector3[] arcPoints;
 }
