@@ -8987,6 +8987,7 @@ MonoBehaviour:
   RoomName: DefaultRoom
   DesiredRoomName: 
   selectedMapName: 
+  gameStartDelay: 2
 --- !u!114 &1411861430
 MonoBehaviour:
   m_ObjectHideFlags: 0
