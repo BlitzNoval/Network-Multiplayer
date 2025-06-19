@@ -86,7 +86,7 @@ public class MainMenuController : MonoBehaviour
         }
     }
     
-    private void ShowPlayPanel()
+    private void ShowPlayPanel()  
     {
         if (playPanel != null && playPanelRect != null)
         {
