@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Map
   - MapOut
+  - Floor
   layers:
   - Default
   - TransparentFX

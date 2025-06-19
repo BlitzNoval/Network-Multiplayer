@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6058907587b81ca4ea6fa5097091af60, type: 3}
+  m_Name: MapCollection
+  m_EditorClassIdentifier: 
+  maps:
+  - mapName: City
+    mapPrefab: {fileID: 1231410859928053542, guid: 4c1f5cf4fd598fa4e93fbd48dc253db6, type: 3}
+    floorReference: {fileID: 7931240484001504812, guid: cad061ac2b6694042b6ca3790f4935f3, type: 3}
+    spawnPositions:
+    - {x: -12.8, y: 17.28, z: -1}
+    - {x: -12, y: 17.28, z: -24.19}
+    - {x: 17.78, y: 17.28, z: -1.5}
+    - {x: 18.34, y: 17.28, z: -22.06}
+  - mapName: Island
+    mapPrefab: {fileID: 1367740318807626388, guid: 1d8c2b48ec5cf7345b01d35fc1ffa8eb, type: 3}
+    floorReference: {fileID: 7931240484001504812, guid: cde06171cbb531c44b9a56fe3b475a3f, type: 3}
+    spawnPositions:
+    - {x: -24.36, y: 2.8, z: -15.95}
+    - {x: -12, y: 2.8, z: 14.85}
+    - {x: 2.7, y: 2.8, z: -8.57}
+    - {x: -15.03, y: 2.8, z: -2.88}
+  - mapName: Ship
+    mapPrefab: {fileID: 4972914720733053191, guid: 93b120ab4abb20241a8abeccedde7047, type: 3}
+    floorReference: {fileID: 7931240484001504812, guid: c9bc4b773d0c5a34cb729025295f2bd7, type: 3}
+    spawnPositions:
+    - {x: -17.22, y: -0.08, z: -13}
+    - {x: -12.64, y: -0.78, z: 5.32}
+    - {x: -39.2, y: -1.32, z: -0.5}
+    - {x: -30.86, y: -1.32, z: 21.64}

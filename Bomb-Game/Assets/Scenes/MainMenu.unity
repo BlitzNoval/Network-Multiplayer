@@ -8956,6 +8956,12 @@ MonoBehaviour:
   playerSpawnMethod: 0
   spawnPrefabs:
   - {fileID: 5032718245858861815, guid: e1fe868113cff7847a39e74bb78d656e, type: 3}
+  - {fileID: 1231410859928053542, guid: 4c1f5cf4fd598fa4e93fbd48dc253db6, type: 3}
+  - {fileID: 4972914720733053191, guid: 93b120ab4abb20241a8abeccedde7047, type: 3}
+  - {fileID: 1367740318807626388, guid: 1d8c2b48ec5cf7345b01d35fc1ffa8eb, type: 3}
+  - {fileID: 7931240484001504812, guid: cde06171cbb531c44b9a56fe3b475a3f, type: 3}
+  - {fileID: 7931240484001504812, guid: c9bc4b773d0c5a34cb729025295f2bd7, type: 3}
+  - {fileID: 7931240484001504812, guid: cad061ac2b6694042b6ca3790f4935f3, type: 3}
   exceptionsDisconnect: 1
   snapshotSettings:
     bufferTimeMultiplier: 2
@@ -8980,6 +8986,7 @@ MonoBehaviour:
   clientIndex: 0
   RoomName: DefaultRoom
   DesiredRoomName: 
+  selectedMapName: 
 --- !u!114 &1411861430
 MonoBehaviour:
   m_ObjectHideFlags: 0

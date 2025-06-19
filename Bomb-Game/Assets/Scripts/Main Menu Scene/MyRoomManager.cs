@@ -8,11 +8,23 @@ public class MyRoomManager : NetworkRoomManager
     [Header("Room Matching")]
     public string RoomName = "DefaultRoom";
     [HideInInspector] public string DesiredRoomName;
+    
+    [Header("Map Selection")]
+    [HideInInspector] public string selectedMapName = "";
+    public static string SelectedMap => Singleton?.selectedMapName ?? "";
 
     public override void Awake()
     {
         base.Awake();
         Singleton = this;
+        
+        // Subscribe to map voting events
+        MapVotingManager votingManager = FindObjectOfType<MapVotingManager>();
+        if (votingManager != null)
+        {
+            votingManager.OnMapSelected += OnMapSelected;
+        }
+        
         Debug.Log("MyRoomManager Awake: Singleton set", this);
     }
 
@@ -122,13 +134,26 @@ public class MyRoomManager : NetworkRoomManager
         Debug.Log("OnRoomClientDisconnect: Client disconnected", this);
     }
 
+    void OnMapSelected(string mapName)
+    {
+        selectedMapName = mapName;
+        Debug.Log($"MyRoomManager: Map selected - {mapName}", this);
+        
+        // Auto-start game when map is selected (optional - you can remove this if you want manual start)
+        if (NetworkServer.active && allPlayersReady)
+        {
+            ServerChangeScene(GameplayScene);
+        }
+    }
+    
     public override void OnStopHost()
-{
-    base.OnStopHost();
-    if (GameManager.Instance != null)
-        GameManager.Instance.ResetState();
-    if (PlayerUIManager.Instance != null)
-        PlayerUIManager.Instance.ResetPanels();
-    Debug.Log("OnStopHost: Reset GameManager and PlayerUIManager", this);
-}
+    {
+        base.OnStopHost();
+        selectedMapName = ""; // Reset selected map
+        if (GameManager.Instance != null)
+            GameManager.Instance.ResetState();
+        if (PlayerUIManager.Instance != null)
+            PlayerUIManager.Instance.ResetPanels();
+        Debug.Log("OnStopHost: Reset GameManager and PlayerUIManager", this);
+    }
 }
