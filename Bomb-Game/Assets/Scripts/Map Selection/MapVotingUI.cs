@@ -31,6 +31,9 @@ public class MapVotingUI : MonoBehaviour
     [Header("Random Selection UI")]
     [SerializeField] private Transform randomSpinner;
     
+    [Header("Map Preview")]
+    [SerializeField] private MapPreviewController mapPreviewController;
+    
     [Header("Customizable Text Messages")]
     [SerializeField] private string initialVoteText = "Vote for a map!";
     [SerializeField] private string playerVotedText = "You voted for {0}! (Press Ready when done)";
@@ -200,6 +203,12 @@ public class MapVotingUI : MonoBehaviour
         if (randomSpinner != null) randomSpinner.gameObject.SetActive(false);
         
         SetButtonsInteractable(false);
+        
+        // Show the selected map in the preview
+        if (mapPreviewController != null)
+        {
+            mapPreviewController.ShowSelectedMap(selectedMap);
+        }
         
         // The room manager should handle scene transition
         Debug.Log($"Map voting complete. Selected: {selectedMap}");
