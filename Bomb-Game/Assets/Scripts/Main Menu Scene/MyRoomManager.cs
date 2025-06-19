@@ -1,5 +1,6 @@
 using Mirror;
 using UnityEngine;
+using System.Linq;
 
 public class MyRoomManager : NetworkRoomManager
 {
@@ -8,11 +9,27 @@ public class MyRoomManager : NetworkRoomManager
     [Header("Room Matching")]
     public string RoomName = "DefaultRoom";
     [HideInInspector] public string DesiredRoomName;
+    
+    [Header("Map Selection")]
+    [HideInInspector] public string selectedMapName = "";
+    [SerializeField] private float gameStartDelay = 2f;
+    public static string SelectedMap => Singleton?.selectedMapName ?? "";
 
     public override void Awake()
     {
         base.Awake();
         Singleton = this;
+        
+        // Only subscribe to voting events if we're in the Room scene
+        if (Utils.IsSceneActive(RoomScene))
+        {
+            // Subscribe to map voting events - use delayed subscription since MapVotingManager may not be ready yet
+            StartCoroutine(SubscribeToVotingEvents());
+            
+            // Also try immediate subscription in case the coroutine fails
+            Invoke(nameof(TrySubscribeToVotingEvents), 1f);
+        }
+        
         Debug.Log("MyRoomManager Awake: Singleton set", this);
     }
 
@@ -122,13 +139,137 @@ public class MyRoomManager : NetworkRoomManager
         Debug.Log("OnRoomClientDisconnect: Client disconnected", this);
     }
 
+    System.Collections.IEnumerator SubscribeToVotingEvents()
+    {
+        Debug.Log("SubscribeToVotingEvents coroutine started");
+        
+        // Wait a frame for all components to initialize
+        yield return null;
+        
+        TrySubscribeToVotingEvents();
+    }
+    
+    void TrySubscribeToVotingEvents()
+    {
+        // Only try to subscribe if we're in the Room scene
+        if (!Utils.IsSceneActive(RoomScene))
+        {
+            Debug.Log("Not in Room scene, skipping MapVotingManager subscription");
+            return;
+        }
+        
+        Debug.Log("TrySubscribeToVotingEvents called");
+        
+        MapVotingManager votingManager = MapVotingManager.Instance;
+        if (votingManager == null)
+        {
+            Debug.Log("MapVotingManager.Instance is null, trying FindObjectOfType");
+            votingManager = FindObjectOfType<MapVotingManager>();
+        }
+        
+        if (votingManager != null)
+        {
+            // Check if already subscribed to avoid double subscription
+            var existingSubscribers = votingManager.OnMapSelected?.GetInvocationList();
+            bool alreadySubscribed = existingSubscribers?.Any(d => d.Target == this) ?? false;
+            
+            if (!alreadySubscribed)
+            {
+                votingManager.OnMapSelected += OnMapSelected;
+                Debug.Log($"Successfully subscribed to MapVotingManager events. VotingManager: {votingManager.name}, OnMapSelected subscribers: {votingManager.OnMapSelected?.GetInvocationList()?.Length ?? 0}");
+            }
+            else
+            {
+                Debug.Log("Already subscribed to MapVotingManager events");
+            }
+        }
+        else
+        {
+            Debug.LogError("MapVotingManager not found for event subscription!");
+        }
+    }
+    
+    public override void OnRoomServerPlayersReady()
+    {
+        Debug.Log("OnRoomServerPlayersReady called - triggering map vote finalization");
+        
+        // When all players are ready, trigger voting finalization
+        MapVotingManager votingManager = MapVotingManager.Instance;
+        if (votingManager == null)
+        {
+            votingManager = FindObjectOfType<MapVotingManager>();
+        }
+        
+        if (votingManager != null)
+        {
+            Debug.Log("Found MapVotingManager - triggering finalization");
+            
+            // Make sure we're subscribed before triggering finalization
+            TrySubscribeToVotingEvents();
+            
+            votingManager.TriggerVotingFinalization();
+        }
+        else
+        {
+            Debug.Log("No MapVotingManager found - starting game with default map");
+            // No voting system active, start game normally
+            base.OnRoomServerPlayersReady();
+        }
+    }
+    
+    void OnMapSelected(string mapName)
+    {
+        selectedMapName = mapName;
+        Debug.Log($"MyRoomManager.OnMapSelected called with map: {mapName}, NetworkServer.active: {NetworkServer.active}, GameplayScene: {GameplayScene}", this);
+        
+        // Start game with delay for better UX
+        if (NetworkServer.active)
+        {
+            Debug.Log($"Starting delayed game transition. Waiting {gameStartDelay} seconds...");
+            StartCoroutine(DelayedGameStart());
+        }
+        else
+        {
+            Debug.LogWarning("NetworkServer not active, cannot change scene");
+        }
+    }
+    
+    System.Collections.IEnumerator DelayedGameStart()
+    {
+        yield return new WaitForSeconds(gameStartDelay);
+        
+        if (NetworkServer.active)
+        {
+            Debug.Log($"Calling ServerChangeScene with scene: {GameplayScene}");
+            ServerChangeScene(GameplayScene);
+            Debug.Log("ServerChangeScene called successfully");
+        }
+        else
+        {
+            Debug.LogWarning("NetworkServer not active during delayed start, cannot change scene");
+        }
+    }
+    
+    public override void OnRoomServerSceneChanged(string sceneName)
+    {
+        base.OnRoomServerSceneChanged(sceneName);
+        
+        // When room scene loads, try to subscribe to voting events
+        if (sceneName == RoomScene)
+        {
+            Debug.Log("Room scene loaded - attempting to subscribe to voting events");
+            Invoke(nameof(TrySubscribeToVotingEvents), 0.5f);
+        }
+    }
+    
     public override void OnStopHost()
-{
-    base.OnStopHost();
-    if (GameManager.Instance != null)
-        GameManager.Instance.ResetState();
-    if (PlayerUIManager.Instance != null)
-        PlayerUIManager.Instance.ResetPanels();
-    Debug.Log("OnStopHost: Reset GameManager and PlayerUIManager", this);
-}
+    {
+        base.OnStopHost();
+        selectedMapName = ""; // Reset selected map
+        if (GameManager.Instance != null)
+            GameManager.Instance.ResetState();
+        if (PlayerUIManager.Instance != null)
+            PlayerUIManager.Instance.ResetPanels();
+        Debug.Log("OnStopHost: Reset GameManager and PlayerUIManager", this);
+    }
 }

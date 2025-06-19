@@ -13,6 +13,10 @@ public class SpawnManager : NetworkBehaviour
     public Transform respawnReference;
     public float respawnOffset = 40f;
     
+    [Header("Map Configuration")]
+    public MapCollection mapCollection;
+    public Transform currentFloorReference;
+    
 
     [Header("Reuse Cool-down")]
     public float pointCooldown = 1f;
@@ -31,6 +35,7 @@ public class SpawnManager : NetworkBehaviour
     public override void OnStartServer()
     {
         Initialize();
+        UpdateSpawnPointsForSelectedMap();
         Debug.Log($"SpawnManager OnStartServer on {gameObject.name}, Instance set at {Time.time}", this);
     }
 
@@ -81,6 +86,70 @@ public class SpawnManager : NetworkBehaviour
     {
         int idx = ChooseSpawnIndex();
         return spawnPoints[idx];
+    }
+    
+    public void UpdateSpawnPointsForSelectedMap()
+    {
+        string selectedMap = MyRoomManager.SelectedMap;
+        UpdateSpawnPointsForMap(selectedMap);
+    }
+    
+    public void UpdateSpawnPointsForMap(string selectedMap)
+    {
+        if (string.IsNullOrEmpty(selectedMap))
+        {
+            Debug.LogWarning("No map selected, using default spawn positions");
+            return;
+        }
+        
+        if (mapCollection == null)
+        {
+            Debug.LogError("MapCollection not assigned to SpawnManager!");
+            return;
+        }
+        
+        var mapData = mapCollection.GetMapByName(selectedMap);
+        if (mapData == null)
+        {
+            Debug.LogError($"Map data not found for: {selectedMap}");
+            return;
+        }
+        
+        if (mapData.spawnPositions == null || mapData.spawnPositions.Length != 4)
+        {
+            Debug.LogError($"Invalid spawn positions for map: {selectedMap}. Expected 4 positions, got {mapData.spawnPositions?.Length ?? 0}");
+            return;
+        }
+        
+        // Update the positions of existing spawn point GameObjects
+        for (int i = 0; i < spawnPoints.Count && i < mapData.spawnPositions.Length; i++)
+        {
+            if (spawnPoints[i] != null)
+            {
+                spawnPoints[i].position = mapData.spawnPositions[i];
+                Debug.Log($"Updated Spawn {i + 1} position to {mapData.spawnPositions[i]} for map {selectedMap}");
+            }
+        }
+        
+        // Update floor reference if provided
+        if (mapData.floorReference != null)
+        {
+            // Find existing floor reference in scene and update its position/rotation
+            GameObject existingFloor = GameObject.FindGameObjectWithTag("Floor");
+            if (existingFloor != null)
+            {
+                existingFloor.transform.position = mapData.floorReference.transform.position;
+                existingFloor.transform.rotation = mapData.floorReference.transform.rotation;
+                existingFloor.transform.localScale = mapData.floorReference.transform.localScale;
+                Debug.Log($"Updated floor reference for map: {selectedMap}");
+            }
+            else
+            {
+                Debug.LogWarning("No GameObject with 'Floor' tag found to update");
+            }
+        }
+        
+        Debug.Log($"Updated spawn points for map: {selectedMap}");
     }
 
 

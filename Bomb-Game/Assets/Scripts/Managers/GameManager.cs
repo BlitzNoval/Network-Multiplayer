@@ -12,6 +12,9 @@ public class GameManager : NetworkBehaviour
     /* ────────────────────────────  Inspector  ──────────────────────────── */
     [Header("Prefabs")]
     public GameObject bombPrefab;
+    
+    [Header("Map System")]
+    public MapCollection mapCollection;
 
     [Header("UI")]
     public GameUI ui;
@@ -34,6 +37,7 @@ public class GameManager : NetworkBehaviour
     public IReadOnlyList<GameObject> ActivePlayers => players;
     private static int nextPlayerNumber = 1;
     private GameObject bomb;
+    private bool mapSpawned = false; // Prevent multiple map spawning
 
     public Dictionary<string, GameObject> playerObjects = new();
 
@@ -103,6 +107,7 @@ IEnumerator LocateUI()
     public override void OnStartServer()
     {
         ResetState();
+        SpawnSelectedMap();
         GameActive = true;
         StartCoroutine(RoundLoop());
         Debug.Log("OnStartServer: Game started", this);
@@ -117,8 +122,84 @@ IEnumerator LocateUI()
         IsPaused = false;
         Pauser = null;
         bomb = null;
+        mapSpawned = false; // Reset map spawning flag
 
         Debug.Log("ResetState: Cleared game state", this);
+    }
+    
+    [Server]
+    void SpawnSelectedMap()
+    {
+        // Prevent multiple map spawning
+        if (mapSpawned)
+        {
+            Debug.LogWarning("Map already spawned, skipping duplicate spawn request");
+            return;
+        }
+        
+        string selectedMap = MyRoomManager.SelectedMap;
+        
+        if (string.IsNullOrEmpty(selectedMap))
+        {
+            Debug.LogWarning("No map selected, using default map");
+            selectedMap = "City"; // Default to City if no selection
+        }
+        
+        if (mapCollection == null)
+        {
+            Debug.LogError("MapCollection not assigned to GameManager!");
+            return;
+        }
+        
+        var mapData = mapCollection.GetMapByName(selectedMap);
+        if (mapData == null)
+        {
+            Debug.LogError($"Map data not found for: {selectedMap}");
+            return;
+        }
+        
+        if (mapData.mapPrefab == null)
+        {
+            Debug.LogError($"Map prefab not assigned for: {selectedMap}");
+            return;
+        }
+        
+        // Spawn the map prefab
+        GameObject mapInstance = Instantiate(mapData.mapPrefab);
+        NetworkServer.Spawn(mapInstance);
+        
+        mapSpawned = true; // Mark as spawned to prevent duplicates
+        
+        Debug.Log($"Spawned map: {selectedMap}");
+        
+        // Notify ALL clients about spawn point updates via RPC
+        RpcUpdateSpawnPointsForMap(selectedMap);
+        
+        // Also update on server
+        if (SpawnManager.Instance != null)
+        {
+            SpawnManager.Instance.UpdateSpawnPointsForSelectedMap();
+        }
+        else
+        {
+            Debug.LogWarning("SpawnManager.Instance is null when trying to update spawn points");
+        }
+    }
+
+    [ClientRpc]
+    void RpcUpdateSpawnPointsForMap(string selectedMap)
+    {
+        Debug.Log($"Client received spawn point update for map: {selectedMap}");
+        
+        // Update spawn points on client
+        if (SpawnManager.Instance != null)
+        {
+            SpawnManager.Instance.UpdateSpawnPointsForMap(selectedMap);
+        }
+        else
+        {
+            Debug.LogWarning("SpawnManager.Instance is null on client when trying to update spawn points");
+        }
     }
 
     /* ────────────────────────────  Round Flow  ────────────────────────── */

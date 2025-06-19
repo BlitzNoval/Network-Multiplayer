@@ -533,6 +533,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31d3361528923924da0a5bbe85562ef3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   explosionRadius: 10
   sectorFalloffCurve:
     serializedVersion: 2
@@ -568,11 +571,35 @@ MonoBehaviour:
   - 0.8
   - 0.5
   - 0.2
-  baseDistance: 10
-  arcHeight: 5
-  arcDuration: 1
-  holderDistanceMultiplier: 1.5
-  percentageDistanceMultiplier: 0.01
+  baseKnockbackDistance: 3
+  baseArcHeight: 1
+  baseArcDuration: 1
+  bombHolderBonus: 1.5
+  percentageThresholds:
+  - 0
+  - 87.5
+  - 175
+  - 262.5
+  - 350
+  distanceMultipliers:
+  - 0
+  - 2
+  - 4
+  - 6
+  - 8
+  heightMultipliers:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  durationMultipliers:
+  - 0
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1
+  dazeTime: 0.1
   showDebugSectors: 1
   showArcGizmos: 1
   arcResolution: 30
@@ -584,6 +611,8 @@ MonoBehaviour:
   - {r: 1, g: 0.5, b: 0, a: 1}
   - {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   - {r: 0, g: 1, b: 0, a: 1}
+  landingDotPrefab: {fileID: 347459730655445168, guid: 4caa9716750310b4480ed9b2ce25200f, type: 3}
+  showLandingPrediction: 1
 --- !u!82 &6085821998421801923
 AudioSource:
   m_ObjectHideFlags: 0

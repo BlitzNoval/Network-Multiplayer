@@ -330,10 +330,10 @@ public class PlayerLifeManager : NetworkBehaviour
     {
         if (rb == null || arcData.arcPoints == null || arcData.arcPoints.Length == 0) yield break;
         
-        // Disable player movement during arc
+        // Initially disable player movement
         if (movement != null)
         {
-            movement.SetKnockbackState(true, 0f); // No movement allowed
+            movement.SetKnockbackState(true, 0f); // No movement during initial phase
         }
         
         // Clear existing velocity
@@ -341,9 +341,11 @@ public class PlayerLifeManager : NetworkBehaviour
         rb.angularVelocity = Vector3.zero;
         
         float elapsedTime = 0f;
-        int currentPointIndex = 0;
+        Vector3 originalEndPoint = arcData.endPoint;
+        Vector3 currentEndPoint = originalEndPoint;
+        Vector3 airControlOffset = Vector3.zero;
         
-        while (elapsedTime < arcData.duration && currentPointIndex < arcData.arcPoints.Length - 1)
+        while (elapsedTime < arcData.duration)
         {
             elapsedTime += Time.fixedDeltaTime;
             float t = elapsedTime / arcData.duration;
@@ -372,14 +374,18 @@ public class PlayerLifeManager : NetworkBehaviour
         // Ensure we end at the exact end point
         rb.MovePosition(arcData.endPoint);
         
-        // Restore player movement
+        // Hide landing dot when player lands - use the manager
+        LandingDotManager.Instance?.HideLandingDotForPlayer(PlayerNumber);
+        
+        // Immediately restore full movement (no daze)
         if (movement != null)
         {
             movement.SetKnockbackState(false, 1f);
         }
         
-        Debug.Log($"Knockback arc completed for {gameObject.name}: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m", this);
+        Debug.Log($"Player {gameObject.name} landed from knockback: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m", this);
     }
+    
 
     [Server]
     void SetAliveState(bool alive, bool triggerMode)
