@@ -19,6 +19,7 @@ public class Bomb : NetworkBehaviour
     [SyncVar] [SerializeField] float lobThrowUpward = 5f;
     [SyncVar] [SerializeField] float throwCooldown = 0.5f;
     [SyncVar] [SerializeField] float flightMassMultiplier = 1f;
+    [SerializeField] float ignoreThrowerAfterThrowTime = 0.5f; // Time to ignore thrower after throw
 
     [SerializeField] string playerTag = "Player";
 
@@ -294,7 +295,7 @@ public class Bomb : NetworkBehaviour
                     }
                     else
                     {
-                        Debug.LogError("Hand point not set in PlayerBombHandler for " + (isOnRight ? "right" : "left") + " hand on " + newH.name);
+                        Debug.LogError("Hand point not set for " + (isOnRight ? "right" : "left") + " hand on " + newH.name);
                     }
                 }
                 else
@@ -502,8 +503,13 @@ public class Bomb : NetworkBehaviour
         if (GameManager.Instance != null && GameManager.Instance.IsPaused)
             return;
 
-        if (c.gameObject.CompareTag(playerTag) && c.gameObject != holder)
+        if (c.gameObject.CompareTag(playerTag))
         {
+            if (c.gameObject == lastThrower && Time.time - lastThrowTime < ignoreThrowerAfterThrowTime)
+            {
+                Debug.Log("Ignoring collision with last thrower shortly after throw");
+                return;
+            }
             AssignToPlayer(c.gameObject);
         }
     }

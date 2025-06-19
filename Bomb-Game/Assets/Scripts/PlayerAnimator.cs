@@ -1,3 +1,4 @@
+// PlayerAnimator.cs – Unity 6 / Mirror 2025 compatible  ✅
 using Mirror;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -6,10 +7,10 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(PlayerBombHandler))]
 public class PlayerAnimator : NetworkBehaviour
 {
-    /* ─ hashes ─ */
+    /* ─ parameters ─ */
     static readonly int ActiveHandHash = Animator.StringToHash("activeHand");
     static readonly int IsMovingHash   = Animator.StringToHash("isMoving");
-    static readonly int ThrowHash      = Animator.StringToHash("Throw");      // Trigger
+    static readonly int ThrowHash      = Animator.StringToHash("Throw");
     static readonly int StunnedHash    = Animator.StringToHash("Stunned");
     static readonly int LandingHash    = Animator.StringToHash("Landing");
     static readonly int DirectionHash  = Animator.StringToHash("Direction");
@@ -18,7 +19,7 @@ public class PlayerAnimator : NetworkBehaviour
     [Header("Tuning")]
     [SerializeField] float movementThreshold     = .1f;
     [SerializeField] float landingVelocityThresh = -3f;
-    [SerializeField] float handFreezeTime        = .15f;   // keep activeHand stable for 1 frame
+    [SerializeField] float handFreezeTime        = .15f;
 
     Animator        anim;
     NetworkAnimator netAnim;
@@ -26,13 +27,14 @@ public class PlayerAnimator : NetworkBehaviour
     PlayerMovement  movement;
     Rigidbody       rb;
 
-    /* emote replication */
-    [SyncVar(hook = nameof(OnEmoteChanged))] int emoteParam;          // 0-3
+    /* networking */
+    [SyncVar(hook = nameof(OnEmoteChanged))] int emoteParam;
     InputAction emoteAct;
 
-    float handFreezeTimer;
-
-    bool wasFalling;
+    /* cached-per-frame data */
+    Vector3 cachedVelocity;      // <-- ADDED
+    float   handFreezeTimer;
+    bool    wasFalling;
 
     /* ───────── life-cycle ───────── */
     void Awake()
@@ -43,16 +45,13 @@ public class PlayerAnimator : NetworkBehaviour
         movement    = GetComponent<PlayerMovement>();
         rb          = GetComponent<Rigidbody>();
 
-        if (netAnim.animator == null)
-            netAnim.animator = anim;
+        if (netAnim.animator == null) netAnim.animator = anim;
 
-        var pi = GetComponent<PlayerInput>();
-        emoteAct = pi.actions.FindAction("Emote");   // value (Scale) binding 0-3
-        
-        // Ensure components are assigned
-        if (anim == null) Debug.LogError("Animator component not found on " + gameObject.name);
-        if (netAnim == null) Debug.LogError("NetworkAnimator component not found on " + gameObject.name);
+        var pi   = GetComponent<PlayerInput>();
+        emoteAct = pi.actions.FindAction("Emote");     // 0-3 scale
     }
+
+    void FixedUpdate() => cachedVelocity = rb.linearVelocity;    // Unity 6 API :contentReference[oaicite:1]{index=1}
 
     public override void OnStartAuthority()
     {
@@ -90,22 +89,23 @@ public class PlayerAnimator : NetworkBehaviour
 
     void UpdateMovementState()
     {
-        Vector3 hv = new(rb.linearVelocity.x, 0, rb.linearVelocity.z);
+        Vector3 hv = new(cachedVelocity.x, 0f, cachedVelocity.z);   // <-- uses cached velocity
         bool moving = hv.magnitude > movementThreshold;
         anim.SetBool(IsMovingHash, moving);
 
         if (!moving) return;
 
         Vector3 local = transform.InverseTransformDirection(hv.normalized);
-        float   a     = Mathf.Atan2(local.x, local.z);         // −π..π
-        int     sec   = Mathf.RoundToInt(a / (Mathf.PI * .5f)) & 3;
-        float   dir   = sec / 3f;
+        float a   = Mathf.Atan2(local.x, local.z);          // −π..π
+        int   sec = (Mathf.RoundToInt(a / (Mathf.PI * .5f)) & 3);
+        float dir = sec / 3f;
         anim.SetFloat(DirectionHash, dir, 0.15f, Time.deltaTime);
     }
 
     void CheckLanding()
     {
-        bool ground = Physics.Raycast(transform.position + Vector3.up*.1f, Vector3.down, .2f, ~0);
+        bool ground = Physics.Raycast(transform.position + Vector3.up * .1f,
+                                      Vector3.down, .2f, ~0);
         if (wasFalling && ground && rb.linearVelocity.y > landingVelocityThresh)
             netAnim.SetTrigger(LandingHash);
         wasFalling = !ground;
@@ -114,11 +114,11 @@ public class PlayerAnimator : NetworkBehaviour
     /* ────── emotes ────── */
     void HandleEmoteInput()
     {
-        int v = (int)emoteAct.ReadValue<float>();
+        int v = (int)emoteAct.ReadValue<float>();      // InputSystem API :contentReference[oaicite:2]{index=2}
         if (v == emoteParam) return;
 
-        ApplyEmote(v);     // local
-        CmdSetEmote(v);    // replicate
+        ApplyEmote(v);  // local
+        CmdSetEmote(v); // network
     }
     [Command] void CmdSetEmote(int v) => emoteParam = v;
     void OnEmoteChanged(int _, int v)  => ApplyEmote(v);
@@ -126,28 +126,28 @@ public class PlayerAnimator : NetworkBehaviour
     void ApplyEmote(int v)
     {
         anim.SetInteger(EmoteHash, v);
-        movement?.SetEmoteState(v != 0);   // lock movement while emote plays
+        movement?.SetEmoteState(v != 0);
     }
 
-    /* ────── throw entry points ───── */
-    /// <summary>Owner calls this *before* sending the Cmd.</summary>
+    /* ────── throw entry point ────── */
     public void PlayThrowLocal()
     {
         if (!isOwned) return;
-        handFreezeTimer = handFreezeTime;      // keep activeHand as 1/2 for a frame
-        netAnim.SetTrigger(ThrowHash);         // Set trigger locally; NetworkAnimator syncs it
-        Debug.Log("PlayThrowLocal called - Set throw trigger locally on " + gameObject.name);
+
+        int hand = bombHandler.CurrentBomb.IsOnRight ? 2 : 1;
+        anim.SetInteger(ActiveHandHash, hand);  // local frame guarantee
+
+        /*  ▪ Call both Animators:
+            • anim.SetTrigger  – so **our** client plays instantly
+            • netAnim.SetTrigger – so Mirror replicates to others  */
+        anim.SetTrigger(ThrowHash);
+        netAnim.SetTrigger(ThrowHash);          // required for sync :contentReference[oaicite:3]{index=3}
+
+        handFreezeTimer = handFreezeTime;
     }
 
-    /* external callback */
-    public void OnPlayerStunned() { if (isOwned) netAnim.SetTrigger(StunnedHash); }
-}
-
-// Add this as a new script in Unity and attach to the Throw animation state
-public class ThrowStateLogger : StateMachineBehaviour
-{
-    override public void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
+    public void OnPlayerStunned()
     {
-        Debug.Log("Entered throw animation state on " + animator.gameObject.name);
+        if (isOwned) netAnim.SetTrigger(StunnedHash);
     }
 }
