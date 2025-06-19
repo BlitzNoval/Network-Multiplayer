@@ -41,39 +41,22 @@ public class MenuAnimationControl : MonoBehaviour
 
         while (true)
         {
-            int randomNumber1 = Random.Range(0, 2);
-            int randomNumber2 = Random.Range(0, 2);
-            int randomNumber3 = Random.Range(0, 2);
-            int randomNumber4 = Random.Range(0, 2);
+            int randomNumber1 = Random.Range(1, 3);
+            int randomNumber2 = Random.Range(1, 3);
+            int randomNumber3 = Random.Range(1, 3);
+            int randomNumber4 = Random.Range(1, 3);
 
             redAnim.SetInteger("chosenAnimation", randomNumber1);
             blueAnim.SetInteger("chosenAnimation", randomNumber2);
             greenAnim.SetInteger("chosenAnimation", randomNumber3);
             yellowAnim.SetInteger("chosenAnimation", randomNumber4);
 
-            if (randomNumber1 > 0)
-            {
-                yield return new WaitForSeconds(3f);
-                redAnim.SetInteger("chosenAnimation", 0);
-            }
+            yield return new WaitForSeconds(1f);
 
-            if (randomNumber2 > 0)
-            {
-                yield return new WaitForSeconds(3f);
-                blueAnim.SetInteger("chosenAnimation", 0);
-            }
-
-            if (randomNumber3 > 0)
-            {
-                yield return new WaitForSeconds(3f);
-                greenAnim.SetInteger("chosenAnimation", 0);
-            }
-
-            if (randomNumber4 > 0)
-            {
-                yield return new WaitForSeconds(3f);
-                yellowAnim.SetInteger("chosenAnimation", 0);
-            }
+            redAnim.SetInteger("chosenAnimation", 0);
+            blueAnim.SetInteger("chosenAnimation", 0);
+            greenAnim.SetInteger("chosenAnimation", 0);
+            yellowAnim.SetInteger("chosenAnimation", 0);
 
             yield return new WaitForSeconds(timeBetweenAnimations);
 
