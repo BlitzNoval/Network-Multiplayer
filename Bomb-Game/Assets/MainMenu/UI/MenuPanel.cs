@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using DG.Tweening;
 
 public class UIMenuHub : MonoBehaviour
 {
@@ -25,8 +26,22 @@ public class UIMenuHub : MonoBehaviour
     public Button closeSettingsButton;
     public Button closeHowToWinButton;
     
+    [Header("Play Panel Animation Settings")]
+    [SerializeField] private float animationDuration = 0.5f;
+    [SerializeField] private Ease slideEase = Ease.OutQuart;
+    [SerializeField] private Vector2 playPanelStartPosition = new Vector2(1920, 0); // Off-screen right
+    [SerializeField] private Vector2 playPanelEndPosition = new Vector2(0, 0); // Final position
+    
+    private RectTransform playPanelRect;
+    
     void Start()
     {
+        // Get the play panel RectTransform for animations
+        if (playPanel != null)
+        {
+            playPanelRect = playPanel.GetComponent<RectTransform>();
+        }
+        
         // Set up all buttons
         if (playButton != null)
             playButton.onClick.AddListener(OpenPlayPanel);
@@ -68,10 +83,17 @@ public class UIMenuHub : MonoBehaviour
     {
         HideAllPanels();
         HideMainMenu();
-        if (playPanel != null)
+        if (playPanel != null && playPanelRect != null)
         {
             playPanel.SetActive(true);
-            Debug.Log("Play panel opened");
+            
+            // Start the panel at the defined start position
+            playPanelRect.anchoredPosition = playPanelStartPosition;
+            
+            // Animate sliding to the end position
+            playPanelRect.DOAnchorPos(playPanelEndPosition, animationDuration).SetEase(slideEase);
+            
+            Debug.Log("Play panel opened with slide animation");
         }
     }
     
@@ -110,10 +132,22 @@ public class UIMenuHub : MonoBehaviour
     
     public void ClosePlayPanel()
     {
-        if (playPanel != null)
+        if (playPanel != null && playPanelRect != null)
+        {
+            // Animate sliding out to the start position (off-screen)
+            playPanelRect.DOAnchorPos(playPanelStartPosition, animationDuration)
+                .SetEase(slideEase)
+                .OnComplete(() => {
+                    playPanel.SetActive(false);
+                    // Reset position for next time
+                    playPanelRect.anchoredPosition = playPanelEndPosition;
+                    Debug.Log("Play panel closed with slide animation");
+                });
+        }
+        else if (playPanel != null)
         {
             playPanel.SetActive(false);
-            Debug.Log("Play panel closed");
+            Debug.Log("Play panel closed (no animation)");
         }
         ShowMainMenu();
     }
@@ -193,5 +227,12 @@ public class UIMenuHub : MonoBehaviour
         {
             ShowMainMenu();
         }
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up any ongoing animations
+        if (playPanelRect != null)
+            playPanelRect.DOKill();
     }
 }
