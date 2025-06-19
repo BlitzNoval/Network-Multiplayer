@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.VFX;
 
 public class OrbitCamera : MonoBehaviour
 {
@@ -17,6 +18,9 @@ public class OrbitCamera : MonoBehaviour
     public float pauseAfterRotationDuration = 2.0f;
 
     public Canvas introCompleteCanvas; // 👈 Add this Canvas reference
+
+    public VisualEffect vfxEffects;
+    public float effectsTime;
 
     private float currentAngle = 0f;
     private float timer = 0f;
@@ -57,6 +61,10 @@ public class OrbitCamera : MonoBehaviour
 
         Vector3 toTarget = (initialOrbitPos - transform.position).normalized;
         overshootPosition = initialOrbitPos + toTarget * overshootStrength;
+
+        //menu vfx playback speed adjust
+        vfxEffects.playRate = effectsTime;
+        vfxEffects.Play();
     }
 
     void LateUpdate()
