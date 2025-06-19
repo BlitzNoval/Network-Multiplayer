@@ -233,6 +233,15 @@ public class MenuManager : MonoBehaviour
         }
     }
     
+    // Test function - you can call this from a button or console
+    public void ResetToAutoMode()
+    {
+        if (RadioManager.Instance != null)
+        {
+            RadioManager.Instance.ResetToAutoMode();
+        }
+    }
+    
     public void ResetSound()
     {
         savedVolume = defaultVolume;

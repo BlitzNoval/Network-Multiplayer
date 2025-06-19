@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6762150242987609328
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1731086181328597908}
+  - component: {fileID: 3694872556096923415}
+  m_Layer: 0
+  m_Name: RadioManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1731086181328597908
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6762150242987609328}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -27.576376, y: -61.819893, z: 65.03416}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3694872556096923415
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6762150242987609328}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d7c333dd89e105478317553bcd18e47, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mainMenuSong: {fileID: 8300000, guid: 3a4e31d2740e32e4099ac18a4a5c5a56, type: 3}
+  roomSceneSong: {fileID: 8300000, guid: 08866dca966867a43bfabc1e9abe4836, type: 3}
+  cityMapSong: {fileID: 8300000, guid: 7e8b3e839391139479ef5fdb6945dbf1, type: 3}
+  islandMapSong: {fileID: 8300000, guid: 4d235d19164845748b162da0eb08e7f6, type: 3}
+  shipMapSong: {fileID: 8300000, guid: 16b264d6463f7cf429e2359ccb7a9dee, type: 3}
+  allSongs:
+  - {fileID: 8300000, guid: 7e8b3e839391139479ef5fdb6945dbf1, type: 3}
+  - {fileID: 8300000, guid: 4d235d19164845748b162da0eb08e7f6, type: 3}
+  - {fileID: 8300000, guid: 16b264d6463f7cf429e2359ccb7a9dee, type: 3}
+  - {fileID: 8300000, guid: 08866dca966867a43bfabc1e9abe4836, type: 3}
+  - {fileID: 8300000, guid: 3a4e31d2740e32e4099ac18a4a5c5a56, type: 3}
+  - {fileID: 8300000, guid: 58ad286837dd2fe478a84df516758b07, type: 3}
+  - {fileID: 8300000, guid: 1769038d09037b24cb5a2aec06128737, type: 3}

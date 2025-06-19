@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections;
 
 public class RadioManager : MonoBehaviour
 {
@@ -18,8 +19,7 @@ public class RadioManager : MonoBehaviour
     [SerializeField] private AudioClip[] allSongs;
     
     private bool manualOverride = false;
-    private string currentSceneName;
-    private string currentMapName;
+    private string currentContext = "";
     
     private void Awake()
     {
@@ -37,8 +37,8 @@ public class RadioManager : MonoBehaviour
     
     private void Start()
     {
-        currentSceneName = SceneManager.GetActiveScene().name;
-        PlaySceneSpecificMusic();
+        CheckForMusicContext();
+        StartCoroutine(ContinuousContextCheck());
     }
     
     private void OnDestroy()
@@ -48,89 +48,97 @@ public class RadioManager : MonoBehaviour
     
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        currentSceneName = scene.name;
+        Debug.Log($"RadioManager: Scene loaded - {scene.name}");
         
-        if (!manualOverride)
-        {
-            PlaySceneSpecificMusic();
-        }
+        // Reset manual override on scene change for consistency
+        manualOverride = false;
         
-        if (currentSceneName == "Game")
-        {
-            Invoke(nameof(CheckForSpawnedMap), 0.5f);
-        }
+        // Check for music context after a short delay to let objects spawn
+        Invoke(nameof(CheckForMusicContext), 0.5f);
     }
     
-    private void CheckForSpawnedMap()
+    private void CheckForMusicContext()
     {
         if (manualOverride) return;
         
-        string selectedMap = "";
-        
-        if (MyRoomManager.Singleton != null)
-        {
-            selectedMap = MyRoomManager.Singleton.selectedMapName;
-        }
-        
-        if (!string.IsNullOrEmpty(selectedMap) && selectedMap != currentMapName)
-        {
-            currentMapName = selectedMap;
-            PlayMapSpecificMusic(selectedMap);
-        }
-    }
-    
-    private void PlaySceneSpecificMusic()
-    {
+        string newContext = "";
         AudioClip songToPlay = null;
         
-        switch (currentSceneName)
+        // First check for scene markers
+        GameObject sceneMarker = GameObject.FindWithTag("MainMenuMarker");
+        if (sceneMarker != null)
         {
-            case "MainMenu":
-                songToPlay = mainMenuSong;
-                break;
-            case "Room":
+            newContext = "MainMenu";
+            songToPlay = mainMenuSong;
+            Debug.Log("RadioManager: Found MainMenu scene marker");
+        }
+        else
+        {
+            sceneMarker = GameObject.FindWithTag("RoomSceneMarker");
+            if (sceneMarker != null)
+            {
+                newContext = "RoomScene";
                 songToPlay = roomSceneSong;
-                break;
-            case "Game":
-                if (!string.IsNullOrEmpty(currentMapName))
-                {
-                    PlayMapSpecificMusic(currentMapName);
-                    return;
-                }
-                else
-                {
-                    Invoke(nameof(CheckForSpawnedMap), 1f);
-                    return;
-                }
+                Debug.Log("RadioManager: Found RoomScene scene marker");
+            }
         }
         
-        if (songToPlay != null && PersistentAudioManager.Instance != null)
+        // Then check for map markers (these override scene markers)
+        GameObject mapMarker = GameObject.FindWithTag("city");
+        if (mapMarker != null)
         {
-            PersistentAudioManager.Instance.PlayMusic(songToPlay, true);
+            newContext = "city";
+            songToPlay = cityMapSong;
+            Debug.Log("RadioManager: Found city map marker");
+        }
+        else
+        {
+            mapMarker = GameObject.FindWithTag("island");
+            if (mapMarker != null)
+            {
+                newContext = "island";
+                songToPlay = islandMapSong;
+                Debug.Log("RadioManager: Found island map marker");
+            }
+            else
+            {
+                mapMarker = GameObject.FindWithTag("ship");
+                if (mapMarker != null)
+                {
+                    newContext = "ship";
+                    songToPlay = shipMapSong;
+                    Debug.Log("RadioManager: Found ship map marker");
+                }
+            }
+        }
+        
+        // Play the song if context changed or if we found a valid song
+        if (newContext != currentContext || songToPlay != null)
+        {
+            currentContext = newContext;
+            
+            if (songToPlay != null && PersistentAudioManager.Instance != null)
+            {
+                Debug.Log($"RadioManager: Playing song {songToPlay.name} for context '{currentContext}'");
+                PersistentAudioManager.Instance.PlayMusic(songToPlay, true);
+            }
+            else if (songToPlay == null)
+            {
+                Debug.LogWarning($"RadioManager: No song assigned for context '{currentContext}'");
+            }
         }
     }
     
-    private void PlayMapSpecificMusic(string mapName)
+    private IEnumerator ContinuousContextCheck()
     {
-        AudioClip songToPlay = null;
-        
-        switch (mapName.ToLower())
+        while (true)
         {
-            case "city":
-            case "skyscraper":
-                songToPlay = cityMapSong;
-                break;
-            case "island":
-                songToPlay = islandMapSong;
-                break;
-            case "ship":
-                songToPlay = shipMapSong;
-                break;
-        }
-        
-        if (songToPlay != null && PersistentAudioManager.Instance != null)
-        {
-            PersistentAudioManager.Instance.PlayMusic(songToPlay, true);
+            yield return new WaitForSeconds(2f); // Check every 2 seconds
+            
+            if (!manualOverride)
+            {
+                CheckForMusicContext();
+            }
         }
     }
     
@@ -164,14 +172,16 @@ public class RadioManager : MonoBehaviour
         
         if (PersistentAudioManager.Instance != null)
         {
+            Debug.Log($"RadioManager: Manual override - playing {allSongs[nextIndex].name}");
             PersistentAudioManager.Instance.PlayMusic(allSongs[nextIndex], true);
         }
     }
     
-    public void ResetToSceneMusic()
+    public void ResetToAutoMode()
     {
+        Debug.Log("RadioManager: Resetting to automatic mode");
         manualOverride = false;
-        PlaySceneSpecificMusic();
+        CheckForMusicContext();
     }
     
     public AudioClip GetCurrentSong()
@@ -201,5 +211,10 @@ public class RadioManager : MonoBehaviour
     public bool IsManualOverride()
     {
         return manualOverride;
+    }
+    
+    public string GetCurrentContext()
+    {
+        return currentContext;
     }
 }
