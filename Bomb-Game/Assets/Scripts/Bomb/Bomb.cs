@@ -117,7 +117,6 @@ public class Bomb : NetworkBehaviour
 
         var potentialTargets = Physics.OverlapSphere(explosionPos, knockbackCalculator.GetComponent<KnockbackCalculator>() ? 5f : 5f);
         
-        // Collect all affected players first
         List<GameObject> affectedPlayers = new List<GameObject>();
         if (holder != null)
         {
@@ -127,12 +126,11 @@ public class Bomb : NetworkBehaviour
         foreach (var hit in potentialTargets)
         {
             if (!hit.CompareTag(playerTag)) continue;
-            if (hit.gameObject == holder) continue; // Already added holder
+            if (hit.gameObject == holder) continue;
             
             affectedPlayers.Add(hit.gameObject);
         }
         
-        // Calculate landing positions on server and send to all clients
         List<LandingDotData> landingData = new List<LandingDotData>();
         
         foreach (var player in affectedPlayers)
@@ -151,23 +149,20 @@ public class Bomb : NetworkBehaviour
             }
         }
         
-        // Send landing dots to all clients with server-calculated positions
         if (landingData.Count > 0)
         {
             RpcShowLandingDots(explosionPos, landingData.ToArray());
         }
         
-        // Process holder first (as per spec: "they will be the first to receive a dose of knockback")
         if (holder != null)
         {
             ProcessPlayerKnockback(holder, explosionPos, true);
         }
         
-        // Then process all other players in radius
         foreach (var hit in potentialTargets)
         {
             if (!hit.CompareTag(playerTag)) continue;
-            if (hit.gameObject == holder) continue; // Already processed holder
+            if (hit.gameObject == holder) continue;
             
             ProcessPlayerKnockback(hit.gameObject, explosionPos, false);
         }
@@ -201,19 +196,15 @@ public class Bomb : NetworkBehaviour
 
         if (!arcData.affected) return;
 
-        // Apply arc-based knockback
         if (player.TryGetComponent(out NetworkIdentity ni) && ni.connectionToClient != null)
         {
-            // Send arc data to client for smooth arc following
             lifeManager.TargetFollowKnockbackArc(ni.connectionToClient, arcData);
         }
         else
         {
-            // Host player - start arc following directly
             lifeManager.StartKnockbackArc(arcData);
         }
 
-        // Update player stats
         lifeManager.RegisterKnockbackHit();
         lifeManager.AddExplosionKnockbackPercentage(arcData.sector);
         
@@ -236,7 +227,6 @@ public class Bomb : NetworkBehaviour
         }
         NetworkServer.Destroy(gameObject);
     }
-
 
     [ClientRpc]
     void RpcShowLandingDots(Vector3 explosionPos, LandingDotData[] landingData)
@@ -285,33 +275,42 @@ public class Bomb : NetworkBehaviour
             rb.isKinematic = true;
             col.isTrigger = true;
             
-            // Only call RPC from server
             if (isServer)
             {
                 RpcUpdateBombPosition(newH, isOnRight);
             }
             else
             {
-                // On clients, directly position the bomb
-                Transform grip = newH.transform.Find(isOnRight ? "RightHoldPoint" : "LeftHoldPoint");
-                if (grip)
+                PlayerBombHandler handler = newH.GetComponent<PlayerBombHandler>();
+                if (handler != null)
                 {
-                    transform.SetParent(grip);
-                    transform.localPosition = Vector3.zero;
-                    transform.localRotation = Quaternion.identity;
+                    Transform grip = isOnRight ? handler.rightHandPoint : handler.leftHandPoint;
+                    if (grip != null)
+                    {
+                        transform.SetParent(grip);
+                        transform.localPosition = Vector3.zero;
+                        transform.localRotation = Quaternion.identity;
+                        Debug.Log("Bomb parented to " + grip.name + " on " + newH.name + " (client)");
+                    }
+                    else
+                    {
+                        Debug.LogError("Hand point not set in PlayerBombHandler for " + (isOnRight ? "right" : "left") + " hand on " + newH.name);
+                    }
+                }
+                else
+                {
+                    Debug.LogError("PlayerBombHandler not found on " + newH.name);
                 }
             }
         }
         else
         {
-            // Only call RPC from server
             if (isServer)
             {
                 RpcReleaseBomb();
             }
             else
             {
-                // On clients, directly release the bomb
                 transform.SetParent(null);
             }
             rb.isKinematic = false;
@@ -330,11 +329,24 @@ public class Bomb : NetworkBehaviour
     void RpcRefreshGrip(bool right)
     {
         if (!holder) return;
-        Transform grip = holder.transform.Find(right ? "RightHoldPoint" : "LeftHoldPoint");
-        if (grip)
+        PlayerBombHandler handler = holder.GetComponent<PlayerBombHandler>();
+        if (handler != null)
         {
-            transform.SetParent(grip);
-            transform.localPosition = Vector3.zero;
+            Transform grip = right ? handler.rightHandPoint : handler.leftHandPoint;
+            if (grip != null)
+            {
+                transform.SetParent(grip);
+                transform.localPosition = Vector3.zero;
+                transform.localRotation = Quaternion.identity;
+            }
+            else
+            {
+                Debug.LogError("Hand point not set in PlayerBombHandler for " + (right ? "right" : "left") + " hand on " + holder.name);
+            }
+        }
+        else
+        {
+            Debug.LogError("PlayerBombHandler not found on " + holder.name);
         }
     }
 
@@ -343,13 +355,24 @@ public class Bomb : NetworkBehaviour
     {
         if (newHolder == null) return;
         
-        Transform grip = newHolder.transform.Find(useRightHand ? "RightHoldPoint" : "LeftHoldPoint");
-        if (grip)
+        PlayerBombHandler handler = newHolder.GetComponent<PlayerBombHandler>();
+        if (handler == null)
         {
-            transform.SetParent(grip);
-            transform.localPosition = Vector3.zero;
-            transform.localRotation = Quaternion.identity;
+            Debug.LogError("PlayerBombHandler not found on " + newHolder.name);
+            return;
         }
+        
+        Transform grip = useRightHand ? handler.rightHandPoint : handler.leftHandPoint;
+        if (grip == null)
+        {
+            Debug.LogError("Hand point not set in PlayerBombHandler for " + (useRightHand ? "right" : "left") + " hand on " + newHolder.name);
+            return;
+        }
+        
+        transform.SetParent(grip);
+        transform.localPosition = Vector3.zero;
+        transform.localRotation = Quaternion.identity;
+        Debug.Log("Bomb parented to " + grip.name + " on " + newHolder.name);
     }
 
     [ClientRpc]
@@ -397,14 +420,12 @@ public class Bomb : NetworkBehaviour
             return;
         }
 
-        // Store the exact position from RightHoldPoint before releasing the bomb
         Transform holdPoint = holder.transform.Find("RightHoldPoint");
         Vector3 throwOrigin = holdPoint ? holdPoint.position : transform.position;
 
         lastThrower = holder;
         transform.SetParent(null);
         
-        // Set the bomb to the exact throw origin position to match trajectory calculation
         transform.position = throwOrigin;
         
         isHeld = false;
@@ -412,7 +433,6 @@ public class Bomb : NetworkBehaviour
         col.isTrigger = false;
         rb.mass *= flightMassMultiplier;
 
-        // Use provided direction and throw type - ensure direction is normalized
         float speed = useNormalThrow ? underarmThrowSpeed : lobThrowSpeed;
         float upward = useNormalThrow ? underarmThrowUpward : lobThrowUpward;
         Vector3 force = direction.normalized * speed + Vector3.up * upward;
@@ -439,14 +459,12 @@ public class Bomb : NetworkBehaviour
             return false;
         }
 
-        // Store the exact position from RightHoldPoint before releasing the bomb
         Transform holdPoint = holder.transform.Find("RightHoldPoint");
         Vector3 throwOrigin = holdPoint ? holdPoint.position : transform.position;
 
         lastThrower = holder;
         transform.SetParent(null);
         
-        // Set the bomb to the exact throw origin position to match trajectory calculation
         transform.position = throwOrigin;
         
         isHeld = false;
@@ -454,7 +472,6 @@ public class Bomb : NetworkBehaviour
         col.isTrigger = false;
         rb.mass *= flightMassMultiplier;
 
-        // Use provided direction and throw type - ensure direction is normalized
         float speed = useNormalThrow ? underarmThrowSpeed : lobThrowSpeed;
         float upward = useNormalThrow ? underarmThrowUpward : lobThrowUpward;
         Vector3 force = direction.normalized * speed + Vector3.up * upward;
