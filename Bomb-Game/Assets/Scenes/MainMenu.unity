@@ -3503,18 +3503,20 @@ MonoBehaviour:
   borderlessButton: {fileID: 1228365837}
   resetVideoButton: {fileID: 1782108945}
   availableSongs:
-  - {fileID: 8300000, guid: 0b80bdaa0a0e198408275de3b57de29c, type: 3}
-  - {fileID: 8300000, guid: 58ad286837dd2fe478a84df516758b07, type: 3}
-  - {fileID: 8300000, guid: 1769038d09037b24cb5a2aec06128737, type: 3}
+  - {fileID: 8300000, guid: 3a4e31d2740e32e4099ac18a4a5c5a56, type: 3}
+  - {fileID: 8300000, guid: 08866dca966867a43bfabc1e9abe4836, type: 3}
+  - {fileID: 8300000, guid: 7e8b3e839391139479ef5fdb6945dbf1, type: 3}
+  - {fileID: 8300000, guid: 4d235d19164845748b162da0eb08e7f6, type: 3}
+  - {fileID: 8300000, guid: 16b264d6463f7cf429e2359ccb7a9dee, type: 3}
   mutedSprite: {fileID: 21300000, guid: 5cc5983156701e2439a6e42b65ea0cc5, type: 3}
   unmutedSprite: {fileID: 21300000, guid: 077f747d00d87b440a2b326a66e33ba9, type: 3}
   defaultVolume: 0.5
   defaultMuteState: 0
   defaultSongIndex: 0
   autoAdvanceToNextSong: 1
-  maxCharacters: 7
-  scrollSpeed: 1
-  scrollDelay: 2
+  maxCharacters: 9
+  scrollSpeed: 3
+  scrollDelay: 0.5
 --- !u!114 &510516292
 MonoBehaviour:
   m_ObjectHideFlags: 0
