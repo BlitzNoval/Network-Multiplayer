@@ -2,59 +2,66 @@ using Mirror;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(Rigidbody), typeof(PlayerInput))]
 public class PlayerMovement : NetworkBehaviour
 {
+    /* ───────── Inspector ───────── */
     [Header("Movement")]
     [SyncVar] public float speed = 5f;
     [SyncVar] public float acceleration = 10f;
     [SyncVar] public float deceleration = 10f;
     [SyncVar] public float rotationSpeed = 10f;
 
-    [Header("Knockback")]
-    private bool isInKnockback = false;
-    private float knockbackMovementMultiplier = 1f;
+    [Header("Knock-back")]
+    bool  isInKnockback;
+    float knockbackMovementMultiplier = 1f;
 
-    /* NEW: block movement while an emote plays */
-    bool isEmoting;
+    /* ───────── Private ───────── */
+    Rigidbody   rb;
+    PlayerInput pi;
+    InputAction moveAct, aimAct;
+    Vector2     moveInput;
+    Vector3     horizVel;
+    bool        isEmoting;
 
-    Rigidbody rb;
-    InputAction moveAct;
-    InputAction aimAct;
-    Vector2 moveInput;
-    Vector3 horizVel;
-    PlayerInput playerInput;
+    string lastControlScheme;     // cached to avoid null on first frame
 
-    void Awake()
+    /* ───────── Lifecycle ───────── */
+    void Awake()                  // run on ALL instances – owner or not
     {
         rb = GetComponent<Rigidbody>();
-        playerInput = GetComponent<PlayerInput>();
-        moveAct = playerInput.actions.FindAction("Move");
-        aimAct  = playerInput.actions.FindAction("Aim");
+        pi = GetComponent<PlayerInput>();
     }
 
-    void OnEnable()
+    public override void OnStartClient()
     {
-        if (isLocalPlayer)
-        {
-            moveAct.Enable();
-            aimAct.Enable();
-        }
-    }
-    void OnDisable()
-    {
-        if (isLocalPlayer)
-        {
-            moveAct.Disable();
-            aimAct.Disable();
-        }
+        base.OnStartClient();
+        if (!isLocalPlayer)            // ghosts don’t need inputs
+            pi.enabled = false;
     }
 
+    public override void OnStartAuthority()      // owner only
+    {
+        moveAct = pi.actions["Move"];
+        aimAct  = pi.actions["Aim"];
+        moveAct.Enable();
+        aimAct.Enable();
+        enabled = true;
+    }
+
+    public override void OnStopAuthority()
+    {
+        moveAct?.Disable();
+        aimAct?.Disable();
+        enabled = false;
+    }
+
+    /* ───────── Update ───────── */
     void Update()
     {
-        if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive)
-            return;
+        if (!isLocalPlayer || !GameRunning()) return;
 
+        // in-game pause hotkey
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             if (GameManager.Instance.IsPaused)
@@ -68,7 +75,6 @@ public class PlayerMovement : NetworkBehaviour
             }
         }
 
-        // suppress move input while emoting
         moveInput = isEmoting ? Vector2.zero : moveAct.ReadValue<Vector2>();
 
         HandleRotation();
@@ -76,39 +82,46 @@ public class PlayerMovement : NetworkBehaviour
 
     void HandleRotation()
     {
-        if (playerInput.currentControlScheme == "KeyboardMouse")
+        // cache scheme to survive first-frame null
+        string scheme = pi.currentControlScheme ?? lastControlScheme;
+        lastControlScheme = scheme;
+
+        if (scheme == "KeyboardMouse")
         {
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
             Vector2 mousePos = Mouse.current.position.ReadValue();
-            Plane ground = new Plane(Vector3.up, transform.position);
-            Ray ray = Camera.main.ScreenPointToRay(mousePos);
-            if (ground.Raycast(ray, out float d))
+            if (mousePos == Vector2.zero) return;
+
+            if (new Plane(Vector3.up, transform.position)
+                .Raycast(cam.ScreenPointToRay(mousePos), out float d))
             {
-                Vector3 hit = ray.GetPoint(d);
-                Vector3 dir = hit - transform.position;
-                dir.y = 0f;
+                Vector3 dir = cam.ScreenPointToRay(mousePos).GetPoint(d) - transform.position;
+                dir.y = 0;
                 if (dir.sqrMagnitude > 0.001f)
-                {
-                    Quaternion look = Quaternion.LookRotation(dir);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, look, rotationSpeed * Time.deltaTime);
-                }
+                    SmoothLook(dir);
             }
         }
-        else if (playerInput.currentControlScheme == "Gamepad")
+        else if (scheme == "Gamepad")
         {
-            Vector2 aimInput = aimAct.ReadValue<Vector2>();
-            if (aimInput.sqrMagnitude > 0.01f)
-            {
-                Vector3 dir = new Vector3(aimInput.x, 0, aimInput.y).normalized;
-                Quaternion target = Quaternion.LookRotation(dir);
-                transform.rotation = Quaternion.Slerp(transform.rotation, target, rotationSpeed * Time.deltaTime);
-            }
+            Vector2 aim = aimAct.ReadValue<Vector2>();
+            if (aim.sqrMagnitude > 0.01f)
+                SmoothLook(new Vector3(aim.x, 0, aim.y));
         }
     }
 
+    void SmoothLook(Vector3 dir)
+    {
+        Quaternion look = Quaternion.LookRotation(dir.normalized);
+        transform.rotation = Quaternion.Slerp(
+            transform.rotation, look, rotationSpeed * Time.deltaTime);
+    }
+
+    /* ───────── FixedUpdate ───────── */
     void FixedUpdate()
     {
-        if (!isLocalPlayer || !GameManager.Instance || !GameManager.Instance.GameActive)
-            return;
+        if (!isLocalPlayer || !GameRunning()) return;
 
         if (GameManager.Instance.IsPaused)
         {
@@ -118,8 +131,9 @@ public class PlayerMovement : NetworkBehaviour
 
         if (isEmoting)
         {
-            // lock horizontal motion but preserve vertical (e.g., gravity)
-            rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
+            // only the owner freezes itself – prevents NRE on ghosts
+            if (isLocalPlayer)
+                rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
             horizVel = Vector3.zero;
             return;
         }
@@ -131,32 +145,38 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (moveInput.magnitude > 1f) moveInput.Normalize();
 
-        Vector3 camF = Camera.main.transform.forward; camF.y = 0; camF.Normalize();
-        Vector3 camR = Camera.main.transform.right;   camR.y = 0; camR.Normalize();
+        Camera cam = Camera.main;
+        if (cam == null) return;
 
-        Vector3 target = (camR * moveInput.x + camF * moveInput.y) * speed * knockbackMovementMultiplier;
+        Vector3 camF = cam.transform.forward; camF.y = 0; camF.Normalize();
+        Vector3 camR = cam.transform.right;   camR.y = 0; camR.Normalize();
 
-        float accel = (target.magnitude > 0.01f ? acceleration : deceleration)
-                      * Time.fixedDeltaTime * (isInKnockback ? 0.5f : 1f);
+        Vector3 target = (camR * moveInput.x + camF * moveInput.y) *
+                         speed * knockbackMovementMultiplier;
+
+        float accel = (target.sqrMagnitude > 0.0001f ? acceleration : deceleration) *
+                      Time.fixedDeltaTime * (isInKnockback ? 0.5f : 1f);
 
         horizVel = Vector3.MoveTowards(horizVel, target, accel);
         rb.linearVelocity = new Vector3(horizVel.x, rb.linearVelocity.y, horizVel.z);
     }
 
+    /* ───────── RPCs & helpers ───────── */
     [Command] public void CmdPauseGame()  => GameManager.Instance.PauseGame(netIdentity);
     [Command] public void CmdResumeGame() => GameManager.Instance.ResumeGame(netIdentity);
 
-    public void SetKnockbackState(bool inKnockback, float movementMultiplier)
+    bool GameRunning() => GameManager.Instance && GameManager.Instance.GameActive;
+
+    public void SetKnockbackState(bool active, float multiplier)
     {
-        isInKnockback = inKnockback;
-        knockbackMovementMultiplier = movementMultiplier;
+        isInKnockback = active;
+        knockbackMovementMultiplier = multiplier;
     }
 
-    /*  Called by PlayerAnimator when Emote parameter changes */
-    public void SetEmoteState(bool emoteActive)
+    public void SetEmoteState(bool active)
     {
-        isEmoting = emoteActive;
-        if (isEmoting)
+        isEmoting = active;
+        if (isLocalPlayer && active)
         {
             rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
             horizVel = Vector3.zero;

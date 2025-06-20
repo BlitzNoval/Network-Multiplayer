@@ -15132,8 +15132,8 @@ CanvasRenderer:
 --- !u!1 &1114154506
 GameObject:
   m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 9208260402889094510, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-  m_PrefabInstance: {fileID: 2626288780032735571}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
@@ -20215,116 +20215,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2077339142}
   m_CullTransparentMesh: 1
---- !u!1001 &7372985902334106351
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 1500405514}
-    m_Modifications:
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ShapeModule.radius.value
-      value: 2.2
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: InitialModule.startColor.maxColor.b
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: InitialModule.startColor.maxColor.g
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: InitialModule.startColor.maxColor.r
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ColorModule.gradient.maxGradient.atime1
-      value: 10254
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ColorModule.gradient.maxGradient.atime2
-      value: 16268
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ColorModule.gradient.maxGradient.ctime1
-      value: 16268
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ColorModule.gradient.maxGradient.ctime2
-      value: 55898
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ColorModule.gradient.maxGradient.key0.a
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ColorModule.gradient.maxGradient.key1.a
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ColorModule.gradient.maxGradient.key3.a
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: ColorModule.gradient.maxGradient.key4.a
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: -90
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 9208260402889094510, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-      propertyPath: m_Name
-      value: Banner
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
 --- !u!4 &2626288780032735572
 Transform:
   m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 4478724626913983911, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-  m_PrefabInstance: {fileID: 2626288780032735571}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1114154506}
   serializedVersion: 2
@@ -20339,8 +20234,8 @@ Transform:
 ParticleSystemRenderer:
   serializedVersion: 6
   m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 8818964641564583475, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-  m_PrefabInstance: {fileID: 2626288780032735571}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1114154506}
   m_Enabled: 1
@@ -20415,8 +20310,8 @@ ParticleSystemRenderer:
 --- !u!198 &2626288780032735574
 ParticleSystem:
   m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 1145906463542428620, guid: eb62ddf5ffb308a44b0b67a630b25806, type: 3}
-  m_PrefabInstance: {fileID: 2626288780032735571}
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1114154506}
   serializedVersion: 8
