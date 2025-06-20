@@ -6,19 +6,15 @@ public class SpawnManager : NetworkBehaviour
 {
     public static SpawnManager Instance { get; private set; }
 
-    [Header("Spawn Points")]
     public List<Transform> spawnPoints = new();
 
-    [Header("Respawn Settings")]
     public Transform respawnReference;
     public float respawnOffset = 40f;
     
-    [Header("Map Configuration")]
     public MapCollection mapCollection;
     public Transform currentFloorReference;
     
 
-    [Header("Reuse Cool-down")]
     public float pointCooldown = 1f;
 
     float[] lastUsed;
@@ -121,7 +117,6 @@ public class SpawnManager : NetworkBehaviour
             return;
         }
         
-        // Update the positions of existing spawn point GameObjects
         for (int i = 0; i < spawnPoints.Count && i < mapData.spawnPositions.Length; i++)
         {
             if (spawnPoints[i] != null)
@@ -131,10 +126,8 @@ public class SpawnManager : NetworkBehaviour
             }
         }
         
-        // Update floor reference if provided
         if (mapData.floorReference != null)
         {
-            // Find existing floor reference in scene and update its position/rotation
             GameObject existingFloor = GameObject.FindGameObjectWithTag("Floor");
             if (existingFloor != null)
             {
@@ -155,7 +148,6 @@ public class SpawnManager : NetworkBehaviour
 
     void OnDrawGizmos()
     {        
-        // Draw respawn threshold line
         if (respawnReference != null)
         {
             Vector3 thresholdPos = respawnReference.position - Vector3.up * respawnOffset;

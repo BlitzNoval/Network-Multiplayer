@@ -4,20 +4,16 @@ using DG.Tweening;
 
 public class EmoticonSelectionUI : MonoBehaviour
 {
-    [Header("Emoticon Buttons")]
     [SerializeField] Button emoticonButton1;
     [SerializeField] Button emoticonButton2; 
     [SerializeField] Button emoticonButton3;
     
-    [Header("Button Sprites")]
-    [SerializeField] Sprite[] emoticonSprites = new Sprite[3]; // Assign your 3 emoticon sprites here
+    [SerializeField] Sprite[] emoticonSprites = new Sprite[3];
     
-    [Header("Display Settings")]
-    [SerializeField] Image emoticonDisplay; // The image that shows the selected emoticon
+    [SerializeField] Image emoticonDisplay;
     
-    [Header("Animation Settings")]
-    [SerializeField] float slideDistance = 200f; // How far to slide from the left
-    [SerializeField] float slideDuration = 0.3f; // How long the slide animation takes
+    [SerializeField] float slideDistance = 200f;
+    [SerializeField] float slideDuration = 0.3f;
     [SerializeField] Ease slideEase = Ease.OutBack;
     
     private PlayerMovement playerMovement;
@@ -28,33 +24,25 @@ public class EmoticonSelectionUI : MonoBehaviour
     
     void Awake()
     {
-        // Get RectTransform for positioning
         rectTransform = GetComponent<RectTransform>();
         
-        // Set up positions for slide animation
         shownPosition = rectTransform.localPosition;
         hiddenPosition = new Vector3(shownPosition.x - slideDistance, shownPosition.y, shownPosition.z);
         
-        // Start in hidden position
         rectTransform.localPosition = hiddenPosition;
         
-        // Keep GameObject active but positioned off-screen
         gameObject.SetActive(true);
         
-        // Set up button sprites and click listeners
         SetupButtons();
         
-        // Disable buttons initially
         SetButtonsInteractable(false);
     }
     
     void Start()
     {
-        // Get reference to the player movement component
         playerMovement = GetComponentInParent<PlayerMovement>();
         if (playerMovement == null)
         {
-            // Try to find it in the same GameObject or parent hierarchy
             Transform current = transform;
             while (current != null && playerMovement == null)
             {
@@ -66,7 +54,6 @@ public class EmoticonSelectionUI : MonoBehaviour
     
     void SetupButtons()
     {
-        // Set button sprites and add click listeners
         if (emoticonButton1 != null && emoticonSprites.Length > 0)
         {
             emoticonButton1.image.sprite = emoticonSprites[0];
@@ -93,10 +80,8 @@ public class EmoticonSelectionUI : MonoBehaviour
         Debug.Log("EmoticonSelectionUI showing with slide animation");
         isAnimating = true;
         
-        // Enable buttons
         SetButtonsInteractable(true);
         
-        // Slide in from left
         rectTransform.DOLocalMove(shownPosition, slideDuration)
             .SetEase(slideEase)
             .OnComplete(() => {
@@ -112,10 +97,8 @@ public class EmoticonSelectionUI : MonoBehaviour
         Debug.Log("EmoticonSelectionUI hiding with slide animation");
         isAnimating = true;
         
-        // Disable buttons immediately
         SetButtonsInteractable(false);
         
-        // Slide out to left
         rectTransform.DOLocalMove(hiddenPosition, slideDuration)
             .SetEase(Ease.InBack)
             .OnComplete(() => {
@@ -135,13 +118,10 @@ public class EmoticonSelectionUI : MonoBehaviour
     {
         Debug.Log($"Emoticon button {emoticonIndex} clicked!");
         
-        // Hide the selection UI immediately
         Hide();
         
-        // Show the selected emoticon on the display
         ShowSelectedEmoticon(emoticonIndex);
         
-        // Send network command to show this emoticon to other players
         if (playerMovement != null)
         {
             playerMovement.SelectEmoticon(emoticonIndex);
@@ -159,7 +139,6 @@ public class EmoticonSelectionUI : MonoBehaviour
             emoticonDisplay.sprite = emoticonSprites[emoticonIndex];
             emoticonDisplay.gameObject.SetActive(true);
             
-            // Start the animation (rotate and pulse)
             StartCoroutine(PlayEmoticonAnimation());
         }
     }
@@ -178,26 +157,21 @@ public class EmoticonSelectionUI : MonoBehaviour
             elapsed += Time.deltaTime;
             float progress = elapsed / duration;
             
-            // Pulse effect (scale)
-            float pulseScale = 1f + Mathf.Sin(progress * Mathf.PI * 4) * 0.2f; // 4 pulses over 2 seconds
+            float pulseScale = 1f + Mathf.Sin(progress * Mathf.PI * 4) * 0.2f;
             emoticonDisplay.transform.localScale = originalScale * pulseScale;
             
-            // Taunt rotation (left-right)
-            float rotationAngle = Mathf.Sin(progress * Mathf.PI * 3) * 15f; // 3 rotations over 2 seconds, ±15 degrees
+            float rotationAngle = Mathf.Sin(progress * Mathf.PI * 3) * 15f;
             emoticonDisplay.transform.rotation = Quaternion.Euler(0, 0, originalRotation + rotationAngle);
             
             yield return null;
         }
         
-        // Reset to original state
         emoticonDisplay.transform.localScale = originalScale;
         emoticonDisplay.transform.rotation = Quaternion.Euler(0, 0, originalRotation);
         
-        // Hide the emoticon after animation
         emoticonDisplay.gameObject.SetActive(false);
     }
     
-    // Public method to show emoticon from network (for other players to see)
     public void ShowNetworkEmoticon(int emoticonIndex)
     {
         ShowSelectedEmoticon(emoticonIndex);

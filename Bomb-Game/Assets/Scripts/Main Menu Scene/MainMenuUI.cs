@@ -6,23 +6,19 @@ using System.Collections;
 
 public class MainMenuUI : MonoBehaviour
 {
-    [Header("Inputs")]
     public TMP_InputField playerNameInput; 
     public TMP_InputField roomNameInput;   
     public TMP_InputField portInput;       
     public TMP_InputField ipAddressInput;
 
-    [Header("Buttons")]
     public Button createButton;          
     public Button joinButton;            
 
-    [Header("Invalid Room Panel")]
     public GameObject invalidRoomPanel;  
     public TMP_Text countdownText;       
 
     void Start()
     {
-        // Set default values
         if (playerNameInput != null) playerNameInput.text = "Player" + Random.Range(1000, 9999);
         if (roomNameInput != null) roomNameInput.text = "DefaultRoom";
         if (portInput != null) portInput.text = "7777";
@@ -31,13 +27,11 @@ public class MainMenuUI : MonoBehaviour
         createButton.interactable = false;
         joinButton.interactable = false;
 
-        // Add input validation listeners
         if (playerNameInput != null) playerNameInput.onValueChanged.AddListener(_ => Validate());
         if (roomNameInput != null) roomNameInput.onValueChanged.AddListener(_ => Validate());
         if (portInput != null) portInput.onValueChanged.AddListener(_ => Validate());
         if (ipAddressInput != null) ipAddressInput.onValueChanged.AddListener(_ => Validate());
 
-        // Add button click listeners
         if (createButton != null) createButton.onClick.AddListener(OnCreateRoom);
         if (joinButton != null) joinButton.onClick.AddListener(OnJoinRoom);
 
@@ -65,11 +59,6 @@ public class MainMenuUI : MonoBehaviour
             return;
         }
 
-        // Force reset: stop host if server or client is active
-     //   if (NetworkServer.active || NetworkClient.isConnected)
-     //   {
-      //      NetworkManager.singleton.StopHost();
-      //  }
 
         var rm = MyRoomManager.Singleton;
         if (rm == null)
@@ -114,7 +103,6 @@ public class MainMenuUI : MonoBehaviour
             return;
         }
 
-        // Force reset: stop server and client if active
         if (NetworkServer.active)
         {
             NetworkManager.singleton.StopServer();

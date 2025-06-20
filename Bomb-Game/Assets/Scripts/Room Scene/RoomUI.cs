@@ -109,7 +109,7 @@ public class RoomUI : MonoBehaviour
         {
             if (NetworkServer.active)
                 hostIPText.text = $"Host IP: {GetLocalIPAddress()}";
-            else // Client
+            else
                 hostIPText.text = $"Connected to: {NetworkManager.singleton.networkAddress}";
         }
     }

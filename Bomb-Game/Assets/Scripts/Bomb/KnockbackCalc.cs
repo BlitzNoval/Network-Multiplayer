@@ -5,30 +5,24 @@ using System.Collections.Generic;
 
 public class KnockbackCalculator : MonoBehaviour
 {
-    [Header("Explosion Settings")]
     [SerializeField] private float explosionRadius = 2f;
     [SerializeField] private AnimationCurve sectorFalloffCurve;
     
-    [Header("Damage Sectors")]
     [SerializeField] private float[] sectorRadii = { 0.5f, 1f, 1.5f, 2f };
     [SerializeField] private float[] sectorMultipliers = { 1f, 0.75f, 0.5f, 0.25f };
     
-    [Header("Base Arc Properties")]
     [SerializeField] private float baseKnockbackDistance = 3f;
     [SerializeField] private float baseArcHeight = 1f;
     [SerializeField] private float baseArcDuration = 1f;
     [SerializeField] private float bombHolderBonus = 1.5f;
     
-    [Header("Percentage Scaling (0%, 25%, 50%, 75%, 100%=350%)")]
     [SerializeField] private float[] percentageThresholds = { 0f, 87.5f, 175f, 262.5f, 350f };
     [SerializeField] private float[] distanceMultipliers = { 0f, 0.25f, 0.5f, 0.75f, 1f };
     [SerializeField] private float[] heightMultipliers = { 0f, 0.25f, 0.5f, 0.75f, 1f };
     [SerializeField] private float[] durationMultipliers = { 0f, 0.25f, 0.5f, 0.75f, 1f };
     
-    [Header("Daze Settings")]
-    [SerializeField] private float dazeTime = 0f; // Daze disabled for faster gameplay
+    [SerializeField] private float dazeTime = 0f;
     
-    [Header("Debug Visualization")]
     [SerializeField] private bool showDebugSectors = false;
     [SerializeField] private bool showArcGizmos = true;
     [SerializeField] private int arcResolution = 30;
@@ -37,19 +31,15 @@ public class KnockbackCalculator : MonoBehaviour
     [SerializeField] private float debugDisplayDuration = 2f;
     [SerializeField] private Color[] sectorColors = { Color.red, new Color(1f, 0.5f, 0f), Color.yellow, Color.green };
     
-    [Header("Landing Prediction")]
     [SerializeField] private GameObject landingDotPrefab;
     [SerializeField] private bool showLandingPrediction = true;
 
-    // Global debug toggle
     public static bool GlobalDebugEnabled = false;
     
-    // Landing prediction tracking
     private Dictionary<int, GameObject> playerLandingDots = new Dictionary<int, GameObject>();
 
     private void Awake()
     {
-        // Initialize falloff curve if not set
         if (sectorFalloffCurve == null || sectorFalloffCurve.keys.Length == 0)
         {
             sectorFalloffCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
@@ -60,13 +50,11 @@ public class KnockbackCalculator : MonoBehaviour
     {
         var arcData = new KnockbackArcData();
         
-        // Calculate distance and direction from explosion
         Vector3 targetPos = target.transform.position;
         Vector3 direction = (targetPos - explosionPos);
         float distance = direction.magnitude;
         direction.Normalize();
         
-        // Determine sector and check if affected
         float normalizedDistance = distance / explosionRadius;
         float sectorMultiplier = GetSectorMultiplier(normalizedDistance);
         int sector = GetSectorIndex(normalizedDistance);
@@ -77,25 +65,20 @@ public class KnockbackCalculator : MonoBehaviour
             return arcData;
         }
         
-        // Calculate percentage-based multipliers
         float distanceBonus = GetPercentageMultiplier(percentageKnockback, distanceMultipliers);
         float heightBonus = GetPercentageMultiplier(percentageKnockback, heightMultipliers);
         float durationBonus = GetPercentageMultiplier(percentageKnockback, durationMultipliers);
         
-        // Calculate final arc properties
         float finalDistance = baseKnockbackDistance * (1f + distanceBonus) * sectorMultiplier;
         float finalHeight = baseArcHeight * (1f + heightBonus);
         float finalDuration = baseArcDuration * (1f + durationBonus);
         
-        // Apply bomb holder bonus
         if (isHolder) finalDistance *= bombHolderBonus;
         
-        // Calculate arc points with scaled values
         Vector3 horizontalDir = new Vector3(direction.x, 0, direction.z).normalized;
         Vector3 startPoint = targetPos;
         Vector3 endPoint = startPoint + horizontalDir * finalDistance;
         
-        // Generate arc data with scaled properties
         arcData.affected = true;
         arcData.startPoint = startPoint;
         arcData.endPoint = endPoint;
@@ -105,28 +88,23 @@ public class KnockbackCalculator : MonoBehaviour
         arcData.arcPoints = GenerateArcPoints(startPoint, endPoint, finalHeight);
         arcData.dazeTime = dazeTime;
         
-        // Draw visualization
         if (GlobalDebugEnabled || showArcGizmos)
         {
             DrawPlayerArc(startPoint, endPoint, finalHeight, playerArcColor);
         }
         
-        // Landing dot will be shown separately for all players at once
         
         return arcData;
     }
 
     private float GetSectorMultiplier(float normalizedDistance)
     {
-        // Use smooth falloff curve for better feel
         if (normalizedDistance > 1f) return 0f;
         
-        // Find which sector we're in
         for (int i = 0; i < sectorRadii.Length; i++)
         {
             if (normalizedDistance <= sectorRadii[i])
             {
-                // Smooth interpolation between sectors
                 float sectorStart = i > 0 ? sectorRadii[i - 1] : 0f;
                 float sectorEnd = sectorRadii[i];
                 float t = Mathf.InverseLerp(sectorStart, sectorEnd, normalizedDistance);
@@ -134,7 +112,6 @@ public class KnockbackCalculator : MonoBehaviour
                 float currentMultiplier = sectorMultipliers[i];
                 float nextMultiplier = i < sectorMultipliers.Length - 1 ? sectorMultipliers[i + 1] : 0f;
                 
-                // Use curve for smooth falloff
                 float curveValue = sectorFalloffCurve.Evaluate(t);
                 return Mathf.Lerp(currentMultiplier, nextMultiplier, 1f - curveValue);
             }
@@ -148,9 +125,9 @@ public class KnockbackCalculator : MonoBehaviour
         for (int i = 0; i < sectorRadii.Length; i++)
         {
             if (normalizedDistance <= sectorRadii[i])
-                return i + 1; // 1-indexed for display
+                return i + 1;
         }
-        return 0; // Outside all sectors
+        return 0;
     }
 
     private Vector3[] GenerateArcPoints(Vector3 startPos, Vector3 endPos, float height)
@@ -161,23 +138,18 @@ public class KnockbackCalculator : MonoBehaviour
         {
             float t = (float)i / (arcResolution - 1);
             
-            // Linear interpolation for horizontal movement
             Vector3 horizontalPos = Vector3.Lerp(startPos, endPos, t);
             
-            // Improved parabolic curve with smoother landing
-            // Use a curve that naturally goes to zero at t=1 without sharp drop
             float verticalOffset;
             if (t < 0.9f)
             {
-                // Normal parabolic arc for most of the flight
                 verticalOffset = 4 * height * t * (1 - t);
             }
             else
             {
-                // Smooth landing transition for last 10% of arc
-                float landingT = (t - 0.9f) / 0.1f; // Normalize landing phase
-                float arcHeightAtLanding = 4 * height * 0.9f * (1 - 0.9f); // Height at 90%
-                verticalOffset = Mathf.Lerp(arcHeightAtLanding, 0f, landingT * landingT); // Smooth quadratic landing
+                float landingT = (t - 0.9f) / 0.1f;
+                float arcHeightAtLanding = 4 * height * 0.9f * (1 - 0.9f);
+                verticalOffset = Mathf.Lerp(arcHeightAtLanding, 0f, landingT * landingT);
             }
             
             arcPoints[i] = new Vector3(horizontalPos.x, startPos.y + verticalOffset, horizontalPos.z);
@@ -190,13 +162,11 @@ public class KnockbackCalculator : MonoBehaviour
     {
         Vector3[] arcPoints = GenerateArcPoints(startPos, endPos, height);
         
-        // Draw the arc with debug lines
         for (int i = 0; i < arcPoints.Length - 1; i++)
         {
             Debug.DrawLine(arcPoints[i], arcPoints[i + 1], color, debugDisplayDuration);
         }
         
-        // Draw start and end markers
         Debug.DrawRay(startPos, Vector3.up * 0.5f, Color.green, debugDisplayDuration);
         Debug.DrawRay(endPos, Vector3.up * 0.5f, Color.red, debugDisplayDuration);
     }
@@ -239,7 +209,6 @@ public class KnockbackCalculator : MonoBehaviour
     {
         if (!GlobalDebugEnabled && !showDebugSectors && !showArcGizmos) return;
         
-        // Draw sector circles as gizmos
         Vector3 center = transform.position;
         
         if (GlobalDebugEnabled || showDebugSectors)
@@ -252,12 +221,10 @@ public class KnockbackCalculator : MonoBehaviour
             }
         }
         
-        // Draw sample parabolic arcs from explosion center
         if (showArcGizmos)
         {
             Gizmos.color = arcColor;
             
-            // Draw sample arcs in 8 directions
             for (int dir = 0; dir < 8; dir++)
             {
                 float angle = dir * 45f * Mathf.Deg2Rad;
@@ -291,10 +258,8 @@ public class KnockbackCalculator : MonoBehaviour
         {
             float t = (float)i / arcResolution;
             
-            // Linear interpolation for horizontal movement
             Vector3 horizontalPos = Vector3.Lerp(startPos, endPos, t);
             
-            // Parabolic curve for vertical movement (perfect half circle arc)
             float verticalOffset = 4 * height * t * (1 - t);
             
             Vector3 currentPoint = new Vector3(horizontalPos.x, startPos.y + verticalOffset, horizontalPos.z);
@@ -302,14 +267,12 @@ public class KnockbackCalculator : MonoBehaviour
             prevPoint = currentPoint;
         }
         
-        // Draw markers at start and end
         Gizmos.DrawWireSphere(startPos, 0.1f);
         Gizmos.DrawWireSphere(endPos, 0.1f);
     }
 
     void Update()
     {
-        // Handle F1 debug toggle
         if (Input.GetKeyDown(KeyCode.F1))
         {
             GlobalDebugEnabled = !GlobalDebugEnabled;
@@ -324,7 +287,6 @@ public class KnockbackCalculator : MonoBehaviour
     
     private float GetPercentageMultiplier(float currentPercentage, float[] multipliers)
     {
-        // Find which threshold we're between
         for (int i = 0; i < percentageThresholds.Length - 1; i++)
         {
             if (currentPercentage <= percentageThresholds[i + 1])
@@ -333,14 +295,12 @@ public class KnockbackCalculator : MonoBehaviour
                 return Mathf.Lerp(multipliers[i], multipliers[i + 1], t);
             }
         }
-        // If above max threshold, use max multiplier
         return multipliers[multipliers.Length - 1];
     }
     
     
     public float GetDynamicKnockbackRate(float currentPercentage)
     {
-        // Simple rate calculation for percentage increase over time
         float baseRate = 10f;
         if (currentPercentage >= 300f) return baseRate * 1.6f;
         else if (currentPercentage >= 200f) return baseRate * 1.4f;
@@ -350,13 +310,11 @@ public class KnockbackCalculator : MonoBehaviour
     
     public void ShowLandingDots(LandingDotData[] dotData)
     {
-        // Pass the prefab to the manager if needed
         if (LandingDotManager.Instance != null && landingDotPrefab != null)
         {
             LandingDotManager.Instance.SetLandingDotPrefab(landingDotPrefab);
         }
         
-        // Use the manager to show dots
         LandingDotManager.Instance?.ShowLandingDots(dotData);
     }
     
@@ -364,17 +322,14 @@ public class KnockbackCalculator : MonoBehaviour
     {
         if (landingDotPrefab == null) return;
         
-        // Create new landing dot at predicted position
         GameObject dot = Instantiate(landingDotPrefab, landingPosition, Quaternion.identity);
         
-        // Make it face camera with simple rotation
         if (Camera.main != null)
         {
             dot.transform.LookAt(dot.transform.position + Camera.main.transform.rotation * Vector3.forward,
                                Camera.main.transform.rotation * Vector3.up);
         }
         
-        // Store the dot
         playerLandingDots[playerNumber] = dot;
     }
     

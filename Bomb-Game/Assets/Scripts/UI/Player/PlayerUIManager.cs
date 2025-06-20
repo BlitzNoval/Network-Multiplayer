@@ -6,7 +6,6 @@ public class PlayerUIManager : MonoBehaviour
 {
     public static PlayerUIManager Instance { get; private set; }
 
-    [Tooltip("Assign your 4 PlayerUIPanel objects here in P1–P4 order.")]
     [SerializeField] private PlayerUIPanel[] panels;
 
     readonly Dictionary<int, PlayerUIPanel> activePanels = new Dictionary<int, PlayerUIPanel>();

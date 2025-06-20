@@ -5,7 +5,7 @@ using Mirror;
 public class PlayerNameDisplay : NetworkBehaviour
 {
     [SerializeField] private GameObject namePanel;
-    [SerializeField] private Billboard billboard; // Optional: Reference to Billboard for setup
+    [SerializeField] private Billboard billboard;
 
     public override void OnStartClient()
     {
@@ -17,12 +17,11 @@ public class PlayerNameDisplay : NetworkBehaviour
             SetPlayerTag(playerTag);
             if (isLocalPlayer)
             {
-                namePanel.SetActive(false); // Hide tag for local player
+                namePanel.SetActive(false);
             }
-            // Optional: Assign playerTransform to Billboard
             if (billboard != null)
             {
-                billboard.playerTransform = transform; // Set to the player's transform
+                billboard.playerTransform = transform;
             }
         }
         else

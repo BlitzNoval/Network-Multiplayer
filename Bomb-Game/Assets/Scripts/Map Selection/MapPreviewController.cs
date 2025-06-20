@@ -3,23 +3,19 @@ using System.Collections;
 
 public class MapPreviewController : MonoBehaviour
 {
-    [Header("Map Preview Setup")]
     [SerializeField] private MapCollection mapCollection;
-    [SerializeField] private Transform mapPreviewPosition; // Where to spawn the maps
+    [SerializeField] private Transform mapPreviewPosition;
     [SerializeField] private Camera previewCamera;
     
-    [Header("Camera Rotation Settings")]
-    [SerializeField] private float rotationSpeed = 30f; // Degrees per second
+    [SerializeField] private float rotationSpeed = 30f;
     [SerializeField] private float cameraDistance = 15f;
     [SerializeField] private float cameraHeight = 8f;
-    [SerializeField] private Vector3 lookAtOffset = Vector3.zero; // Offset from map center to look at
+    [SerializeField] private Vector3 lookAtOffset = Vector3.zero;
     
-    [Header("Map Swapping Settings")]
-    [SerializeField] private float mapDisplayTime = 5f; // How long to show each map
-    [SerializeField] private float transitionTime = 1f; // Time to fade between maps
+    [SerializeField] private float mapDisplayTime = 5f;
+    [SerializeField] private float transitionTime = 1f;
     
-    [Header("Selected Map Display")]
-    [SerializeField] private float selectedMapDisplayTime = 3f; // How long to show selected map
+    [SerializeField] private float selectedMapDisplayTime = 3f;
     
     private GameObject[] mapInstances = new GameObject[3];
     private int currentMapIndex = 0;
@@ -28,7 +24,6 @@ public class MapPreviewController : MonoBehaviour
     private Coroutine rotationCoroutine;
     private Coroutine swappingCoroutine;
     
-    // Events
     public System.Action OnPreviewStarted;
     public System.Action OnPreviewFinished;
     
@@ -46,7 +41,6 @@ public class MapPreviewController : MonoBehaviour
             return;
         }
         
-        // Instantiate all maps at the preview position (initially inactive)
         for (int i = 0; i < mapCollection.maps.Length && i < 3; i++)
         {
             var mapData = mapCollection.maps[i];
@@ -55,7 +49,6 @@ public class MapPreviewController : MonoBehaviour
                 mapInstances[i] = Instantiate(mapData.mapPrefab, mapPreviewPosition.position, mapPreviewPosition.rotation);
                 mapInstances[i].SetActive(false);
                 
-                // Remove any NetworkIdentity components since this is just for preview
                 var networkIdentities = mapInstances[i].GetComponentsInChildren<Mirror.NetworkIdentity>();
                 foreach (var netId in networkIdentities)
                 {
@@ -66,7 +59,6 @@ public class MapPreviewController : MonoBehaviour
             }
         }
         
-        // Position camera
         if (previewCamera != null)
         {
             SetupCamera();
@@ -75,7 +67,6 @@ public class MapPreviewController : MonoBehaviour
     
     void SetupCamera()
     {
-        // Position camera at the specified distance and height
         Vector3 mapCenter = mapPreviewPosition.position + lookAtOffset;
         Vector3 cameraPos = mapCenter + Vector3.back * cameraDistance + Vector3.up * cameraHeight;
         
@@ -89,14 +80,11 @@ public class MapPreviewController : MonoBehaviour
         
         OnPreviewStarted?.Invoke();
         
-        // Start with the first map
         ShowMap(0);
         
-        // Start rotation
         if (rotationCoroutine != null) StopCoroutine(rotationCoroutine);
         rotationCoroutine = StartCoroutine(RotateCamera());
         
-        // Start map swapping
         if (swappingCoroutine != null) StopCoroutine(swappingCoroutine);
         swappingCoroutine = StartCoroutine(SwapMaps());
     }
@@ -106,21 +94,17 @@ public class MapPreviewController : MonoBehaviour
         selectedMapName = mapName;
         isShowingSelectedMap = true;
         
-        // Stop swapping and rotation
         if (swappingCoroutine != null) StopCoroutine(swappingCoroutine);
         if (rotationCoroutine != null) StopCoroutine(rotationCoroutine);
         
-        // Find and show the selected map
         for (int i = 0; i < mapCollection.maps.Length; i++)
         {
             if (mapCollection.maps[i].mapName == mapName)
             {
                 ShowMap(i);
                 
-                // Start a slower, more focused rotation on the selected map
                 rotationCoroutine = StartCoroutine(RotateAroundSelectedMap());
                 
-                // Auto-finish after display time
                 StartCoroutine(FinishSelectedMapDisplay());
                 break;
             }
@@ -129,14 +113,12 @@ public class MapPreviewController : MonoBehaviour
     
     void ShowMap(int mapIndex)
     {
-        // Hide all maps
         for (int i = 0; i < mapInstances.Length; i++)
         {
             if (mapInstances[i] != null)
                 mapInstances[i].SetActive(false);
         }
         
-        // Show the selected map
         if (mapIndex >= 0 && mapIndex < mapInstances.Length && mapInstances[mapIndex] != null)
         {
             mapInstances[mapIndex].SetActive(true);
@@ -151,7 +133,6 @@ public class MapPreviewController : MonoBehaviour
     {
         while (!isShowingSelectedMap)
         {
-            // Rotate around the map center
             Vector3 mapCenter = mapPreviewPosition.position + lookAtOffset;
             previewCamera.transform.RotateAround(mapCenter, Vector3.up, rotationSpeed * Time.deltaTime);
             previewCamera.transform.LookAt(mapCenter);
@@ -166,7 +147,6 @@ public class MapPreviewController : MonoBehaviour
         
         while (elapsedTime < selectedMapDisplayTime)
         {
-            // Slower rotation for selected map
             Vector3 mapCenter = mapPreviewPosition.position + lookAtOffset;
             previewCamera.transform.RotateAround(mapCenter, Vector3.up, (rotationSpeed * 0.5f) * Time.deltaTime);
             previewCamera.transform.LookAt(mapCenter);
@@ -184,17 +164,14 @@ public class MapPreviewController : MonoBehaviour
             
             if (isShowingSelectedMap) break;
             
-            // Transition to next map
             yield return StartCoroutine(TransitionToNextMap());
         }
     }
     
     System.Collections.IEnumerator TransitionToNextMap()
     {
-        // Simple transition - could be enhanced with fade effects
         int nextMapIndex = (currentMapIndex + 1) % 3;
         
-        // Quick fade transition (optional - can be enhanced)
         yield return new WaitForSeconds(transitionTime * 0.5f);
         
         ShowMap(nextMapIndex);
@@ -210,11 +187,9 @@ public class MapPreviewController : MonoBehaviour
     
     public void FinishPreview()
     {
-        // Stop all coroutines
         if (rotationCoroutine != null) StopCoroutine(rotationCoroutine);
         if (swappingCoroutine != null) StopCoroutine(swappingCoroutine);
         
-        // Hide all maps
         for (int i = 0; i < mapInstances.Length; i++)
         {
             if (mapInstances[i] != null)
@@ -238,7 +213,6 @@ public class MapPreviewController : MonoBehaviour
     
     void OnDestroy()
     {
-        // Clean up instantiated maps
         for (int i = 0; i < mapInstances.Length; i++)
         {
             if (mapInstances[i] != null)

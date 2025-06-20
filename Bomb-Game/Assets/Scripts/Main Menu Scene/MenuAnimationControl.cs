@@ -17,7 +17,6 @@ public class MenuAnimationControl : MonoBehaviour
     private int yellowRand;
     
     
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         redAnim.SetInteger("chosenAnimation", 0);
@@ -29,7 +28,6 @@ public class MenuAnimationControl : MonoBehaviour
 
     }
 
-    // Update is called once per frame
     void Update()
     {
         

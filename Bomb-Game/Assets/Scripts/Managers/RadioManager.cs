@@ -6,16 +6,13 @@ public class RadioManager : MonoBehaviour
 {
     public static RadioManager Instance { get; private set; }
     
-    [Header("Scene-Specific Music")]
     [SerializeField] private AudioClip mainMenuSong;
     [SerializeField] private AudioClip roomSceneSong;
     
-    [Header("Map-Specific Music")]
     [SerializeField] private AudioClip cityMapSong;
     [SerializeField] private AudioClip islandMapSong;
     [SerializeField] private AudioClip shipMapSong;
     
-    [Header("All Available Songs for Manual Selection")]
     [SerializeField] private AudioClip[] allSongs;
     
     private bool manualOverride = false;
@@ -50,10 +47,8 @@ public class RadioManager : MonoBehaviour
     {
         Debug.Log($"RadioManager: Scene loaded - {scene.name}");
         
-        // Reset manual override on scene change for consistency
         manualOverride = false;
         
-        // Check for music context after a short delay to let objects spawn
         Invoke(nameof(CheckForMusicContext), 0.5f);
     }
     
@@ -64,7 +59,6 @@ public class RadioManager : MonoBehaviour
         string newContext = "";
         AudioClip songToPlay = null;
         
-        // First check for scene markers
         GameObject sceneMarker = GameObject.FindWithTag("MainMenuMarker");
         if (sceneMarker != null)
         {
@@ -83,7 +77,6 @@ public class RadioManager : MonoBehaviour
             }
         }
         
-        // Then check for map markers (these override scene markers)
         GameObject mapMarker = GameObject.FindWithTag("city");
         if (mapMarker != null)
         {
@@ -112,7 +105,6 @@ public class RadioManager : MonoBehaviour
             }
         }
         
-        // Play the song if context changed or if we found a valid song
         if (newContext != currentContext || songToPlay != null)
         {
             currentContext = newContext;
@@ -133,7 +125,7 @@ public class RadioManager : MonoBehaviour
     {
         while (true)
         {
-            yield return new WaitForSeconds(2f); // Check every 2 seconds
+            yield return new WaitForSeconds(2f);
             
             if (!manualOverride)
             {

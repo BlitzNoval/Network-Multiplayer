@@ -6,35 +6,27 @@ using System.Linq;
 
 public class MapVotingUI : MonoBehaviour
 {
-    [Header("UI References")]
     [SerializeField] private Button cityButton;
     [SerializeField] private Button islandButton;
     [SerializeField] private Button shipButton;
     
-    [Header("Winner Panels (Gold Highlighting)")]
     [SerializeField] private GameObject cityPanel;
     [SerializeField] private GameObject islandPanel;
     [SerializeField] private GameObject shipPanel;
     
-    [Header("Player Vote Status Icons")]
-    [SerializeField] private GameObject[] playerVoteIcons = new GameObject[4]; // For up to 4 players
+    [SerializeField] private GameObject[] playerVoteIcons = new GameObject[4];
     
-    [Header("Vote Count Displays")]
     [SerializeField] private TextMeshProUGUI cityVoteText;
     [SerializeField] private TextMeshProUGUI islandVoteText;
     [SerializeField] private TextMeshProUGUI shipVoteText;
     
-    [Header("Status Display")]
     [SerializeField] private TextMeshProUGUI statusText;
     [SerializeField] private GameObject votingPanel;
     
-    [Header("Random Selection UI")]
     [SerializeField] private Transform randomSpinner;
     
-    [Header("Map Preview")]
     [SerializeField] private MapPreviewController mapPreviewController;
     
-    [Header("Customizable Text Messages")]
     [SerializeField] private string initialVoteText = "Vote for a map!";
     [SerializeField] private string playerVotedText = "You voted for {0}! (Press Ready when done)";
     [SerializeField] private string votingEndedText = "Voting has ended!";
@@ -44,7 +36,6 @@ public class MapVotingUI : MonoBehaviour
     [SerializeField] private string mapSelectedText = "Map Selected: {0}! Starting game...";
     [SerializeField] private string selectedWinnerText = "Selected: {0}!";
     
-    [Header("Colors")]
     [SerializeField] private Color normalButtonColor = Color.white;
     [SerializeField] private Color votedButtonColor = Color.green;
     [SerializeField] private Color disabledButtonColor = Color.gray;
@@ -62,7 +53,6 @@ public class MapVotingUI : MonoBehaviour
     
     void InitializeUI()
     {
-        // Set up button listeners
         if (cityButton != null)
             cityButton.onClick.AddListener(() => VoteForMap("City"));
         if (islandButton != null)
@@ -70,25 +60,19 @@ public class MapVotingUI : MonoBehaviour
         if (shipButton != null)
             shipButton.onClick.AddListener(() => VoteForMap("Ship"));
         
-        // Initialize vote count displays
         UpdateVoteDisplay("0", "0", "0");
         
-        // Show voting panel by default
         if (votingPanel != null) votingPanel.SetActive(true);
         
-        // Hide spinner initially
         if (randomSpinner != null) randomSpinner.gameObject.SetActive(false);
         
-        // Set initial status
         if (statusText != null) statusText.text = initialVoteText;
         
-        // Hide all player vote icons initially
         HideAllVoteIcons();
     }
     
     void FindVotingManager()
     {
-        // Try to find existing voting manager
         votingManager = MapVotingManager.Instance;
         
         if (votingManager == null)
@@ -104,7 +88,6 @@ public class MapVotingUI : MonoBehaviour
         
         Debug.Log("Found MapVotingManager - subscribing to events");
         
-        // Subscribe to events
         votingManager.OnVoteCountUpdated += UpdateVoteDisplay;
         votingManager.OnMapSelected += OnMapSelected;
         votingManager.OnTieDetected += OnTieDetected;
@@ -127,7 +110,6 @@ public class MapVotingUI : MonoBehaviour
             return;
         }
         
-        // Allow changing vote - send vote to server
         if (votingManager != null)
         {
             votingManager.CmdVoteForMap(mapName);
@@ -141,12 +123,10 @@ public class MapVotingUI : MonoBehaviour
     
     void UpdateButtonStates()
     {
-        // Update button colors based on voting state
         UpdateButtonColor(cityButton, "City");
         UpdateButtonColor(islandButton, "Island");
         UpdateButtonColor(shipButton, "Ship");
         
-        // Disable all buttons if voting is complete
         if (votingManager != null && votingManager.votingComplete)
         {
             SetButtonsInteractable(false);
@@ -193,24 +173,19 @@ public class MapVotingUI : MonoBehaviour
     
     void OnMapSelected(string selectedMap)
     {
-        // Highlight winner with gold panel
         HighlightWinnerPanel(selectedMap);
         
-        // Update UI to show results
         if (statusText != null) statusText.text = string.Format(mapSelectedText, selectedMap);
         
-        // Hide spinner but keep voting panel visible to show winner
         if (randomSpinner != null) randomSpinner.gameObject.SetActive(false);
         
         SetButtonsInteractable(false);
         
-        // Show the selected map in the preview
         if (mapPreviewController != null)
         {
             mapPreviewController.ShowSelectedMap(selectedMap);
         }
         
-        // The room manager should handle scene transition
         Debug.Log($"Map voting complete. Selected: {selectedMap}");
     }
     
@@ -222,10 +197,8 @@ public class MapVotingUI : MonoBehaviour
     
     void OnRouletteStart()
     {
-        // Keep voting panel visible, just show spinner and update status
         if (statusText != null) statusText.text = breakingTieText;
         
-        // Show and start spinning animation
         if (randomSpinner != null)
         {
             randomSpinner.gameObject.SetActive(true);
@@ -236,7 +209,6 @@ public class MapVotingUI : MonoBehaviour
     void OnRouletteComplete(string winner)
     {
         if (statusText != null) statusText.text = string.Format(selectedWinnerText, winner);
-        // OnMapSelected will be called next to handle the rest
     }
     
     System.Collections.IEnumerator SpinRandom()
@@ -248,7 +220,7 @@ public class MapVotingUI : MonoBehaviour
         {
             if (randomSpinner != null)
             {
-                randomSpinner.Rotate(0, 0, 360f * Time.deltaTime * 3f); // 3 rotations per second
+                randomSpinner.Rotate(0, 0, 360f * Time.deltaTime * 3f);
             }
             elapsedTime += Time.deltaTime;
             yield return null;
@@ -257,10 +229,8 @@ public class MapVotingUI : MonoBehaviour
     
     void HighlightWinnerPanel(string winnerMap)
     {
-        // Reset all panels to normal
         ResetPanelColors();
         
-        // Highlight winner panel with gold
         GameObject winnerPanel = null;
         switch (winnerMap)
         {
@@ -287,7 +257,6 @@ public class MapVotingUI : MonoBehaviour
     
     void ResetPanelColors()
     {
-        // Reset all panels to normal color
         SetPanelColor(cityPanel, normalButtonColor);
         SetPanelColor(islandPanel, normalButtonColor);
         SetPanelColor(shipPanel, normalButtonColor);
@@ -305,7 +274,6 @@ public class MapVotingUI : MonoBehaviour
         }
     }
     
-    // Public method to reset voting (for room restarts)
     public void ResetVoting()
     {
         hasVoted = false;
@@ -314,7 +282,6 @@ public class MapVotingUI : MonoBehaviour
         if (votingPanel != null) votingPanel.SetActive(true);
         if (randomSpinner != null) randomSpinner.gameObject.SetActive(false);
         
-        // Reset panel colors
         ResetPanelColors();
         
         SetButtonsInteractable(true);
@@ -323,7 +290,6 @@ public class MapVotingUI : MonoBehaviour
         
         if (statusText != null) statusText.text = initialVoteText;
         
-        // Hide all vote icons
         HideAllVoteIcons();
     }
     
@@ -346,8 +312,7 @@ public class MapVotingUI : MonoBehaviour
     
     void UpdatePlayerVoteIcons(int totalVotes)
     {
-        // Get connected players count - simpler approach
-        int connectedPlayers = 2; // Default assumption for host + 1 client
+        int connectedPlayers = 2;
         
         if (Mirror.NetworkServer.active)
         {
@@ -355,24 +320,22 @@ public class MapVotingUI : MonoBehaviour
         }
         else if (Mirror.NetworkClient.isConnected)
         {
-            // For clients, we'll estimate based on vote activity or use a reasonable default
-            connectedPlayers = Mathf.Max(2, totalVotes); // At least 2 players, or however many have voted
+            connectedPlayers = Mathf.Max(2, totalVotes);
         }
         
-        // Show vote icons for players who have voted
         for (int i = 0; i < playerVoteIcons.Length; i++)
         {
             if (i < totalVotes)
             {
-                ShowVoteIcon(i, true); // Player i has voted
+                ShowVoteIcon(i, true);
             }
             else if (i < connectedPlayers)
             {
-                ShowVoteIcon(i, false); // Player i connected but hasn't voted yet
+                ShowVoteIcon(i, false);
             }
             else
             {
-                ShowVoteIcon(i, false); // Player slot not used
+                ShowVoteIcon(i, false);
             }
         }
         
@@ -381,7 +344,6 @@ public class MapVotingUI : MonoBehaviour
     
     void OnDestroy()
     {
-        // Unsubscribe from events
         if (votingManager != null)
         {
             votingManager.OnVoteCountUpdated -= UpdateVoteDisplay;

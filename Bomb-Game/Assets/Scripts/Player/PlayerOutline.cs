@@ -3,14 +3,14 @@ using Mirror;
 
 public class PlayerOutline : NetworkBehaviour
 {
-    [SerializeField] private Outline outline; // Reference to the Outline component
+    [SerializeField] private Outline outline;
 
     public override void OnStartLocalPlayer()
     {
         base.OnStartLocalPlayer();
         if (outline != null)
         {
-            outline.enabled = true; // Enable outline only for the local player
+            outline.enabled = true;
         }
         else
         {
@@ -23,7 +23,7 @@ public class PlayerOutline : NetworkBehaviour
         base.OnStartClient();
         if (outline != null && !isLocalPlayer)
         {
-            outline.enabled = false; // Disable outline for non-local players
+            outline.enabled = false;
         }
     }
 }

@@ -53,10 +53,8 @@ public class LandingDotManager : MonoBehaviour
             return;
         }
 
-        // Clear any existing dots first
         ClearAllLandingDots();
 
-        // Create new dots
         foreach (var data in dotData)
         {
             ShowLandingDotForPlayer(data.position, data.playerNumber);
@@ -65,13 +63,10 @@ public class LandingDotManager : MonoBehaviour
 
     private void ShowLandingDotForPlayer(Vector3 landingPosition, int playerNumber)
     {
-        // Remove existing dot for this player if any
         HideLandingDotForPlayer(playerNumber);
 
-        // Create new landing dot
         GameObject dot = Instantiate(landingDotPrefab, landingPosition, Quaternion.identity);
         
-        // Make it face camera
         if (Camera.main != null)
         {
             dot.transform.LookAt(
@@ -80,10 +75,8 @@ public class LandingDotManager : MonoBehaviour
             );
         }
 
-        // Store the dot
         playerLandingDots[playerNumber] = dot;
 
-        // Start timer to auto-remove this specific dot
         if (dotTimers.ContainsKey(playerNumber))
         {
             StopCoroutine(dotTimers[playerNumber]);
@@ -99,14 +92,12 @@ public class LandingDotManager : MonoBehaviour
 
     public void HideLandingDotForPlayer(int playerNumber)
     {
-        // Stop timer if running
         if (dotTimers.TryGetValue(playerNumber, out Coroutine timer))
         {
             if (timer != null) StopCoroutine(timer);
             dotTimers.Remove(playerNumber);
         }
 
-        // Destroy dot
         if (playerLandingDots.TryGetValue(playerNumber, out GameObject dot))
         {
             if (dot != null) Destroy(dot);
@@ -116,14 +107,12 @@ public class LandingDotManager : MonoBehaviour
 
     public void ClearAllLandingDots()
     {
-        // Stop all timers
         foreach (var timer in dotTimers.Values)
         {
             if (timer != null) StopCoroutine(timer);
         }
         dotTimers.Clear();
 
-        // Destroy all dots
         foreach (var dot in playerLandingDots.Values)
         {
             if (dot != null) Destroy(dot);

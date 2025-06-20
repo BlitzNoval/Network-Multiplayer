@@ -3,13 +3,11 @@ using System.Collections;
 
 public class SequentialActivator : MonoBehaviour
 {
-    [Header("Objects to Activate In Order")]
     public GameObject[] objects;
 
-    [Header("Timing Settings")]
-    public float activeDuration = 1f;     // How long each object stays active
-    public float delayBetween = 0.5f;     // Time between one turning off and the next turning on
-    public bool loopForever = true;       // Should the sequence repeat forever?
+    public float activeDuration = 1f;
+    public float delayBetween = 0.5f;
+    public bool loopForever = true;
 
     private Coroutine sequenceCoroutine;
 
@@ -45,7 +43,6 @@ public class SequentialActivator : MonoBehaviour
             sequenceCoroutine = null;
         }
 
-        // Optional: turn everything off when stopped
         foreach (GameObject obj in objects)
         {
             if (obj != null)

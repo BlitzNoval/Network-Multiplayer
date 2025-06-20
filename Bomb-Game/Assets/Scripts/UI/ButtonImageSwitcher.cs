@@ -4,10 +4,8 @@ using UnityEngine.EventSystems;
 
 public class ButtonImageSwitcher : MonoBehaviour
 {
-    [Header("Target Image to Change")]
     public Image sharedImage;
 
-    [Header("Button & Sprite Mapping")]
     public Button joinRoomButton;
     public Sprite joinRoomSprite;
 
@@ -17,7 +15,6 @@ public class ButtonImageSwitcher : MonoBehaviour
     public Button backButton;
     public Sprite backSprite;
 
-    [Header("Optional: Default Sprite")]
     public Sprite defaultSprite;
 
     void Start()
@@ -33,7 +30,6 @@ public class ButtonImageSwitcher : MonoBehaviour
         if (trigger == null)
             trigger = button.gameObject.AddComponent<EventTrigger>();
 
-        // OnPointerEnter
         EventTrigger.Entry enter = new EventTrigger.Entry
         {
             eventID = EventTriggerType.PointerEnter
@@ -41,7 +37,6 @@ public class ButtonImageSwitcher : MonoBehaviour
         enter.callback.AddListener((_) => SetImage(sprite));
         trigger.triggers.Add(enter);
 
-        // OnPointerExit
         EventTrigger.Entry exit = new EventTrigger.Entry
         {
             eventID = EventTriggerType.PointerExit

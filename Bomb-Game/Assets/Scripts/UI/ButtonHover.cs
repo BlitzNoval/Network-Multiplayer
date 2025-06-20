@@ -58,7 +58,6 @@ public class ButtonHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
 
     void Update()
     {
-        // Slide-in movement
         if (slidingIn)
         {
             rectTransform.anchoredPosition = Vector2.MoveTowards(
@@ -74,7 +73,6 @@ public class ButtonHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
             }
         }
 
-        // Smooth scale
         rectTransform.localScale = Vector3.Lerp(rectTransform.localScale, targetScale, Time.deltaTime * scaleSpeed);
     }
 
@@ -109,7 +107,6 @@ public class ButtonHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
         isPressed = false;
         image.color = originalColor;
 
-        // Restore hover or normal state
         if (isHovered)
         {
             image.sprite = hoverSprite;

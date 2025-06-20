@@ -5,7 +5,6 @@ public class TrajectoryDot : MonoBehaviour
 {
     private SpriteRenderer spriteRenderer;
     
-    [Header("Visual Settings")]
     [SerializeField] private Sprite dotSprite;
     [SerializeField] private float baseSize = 0.3f;
     [SerializeField] private bool billboardToCamera = true;
@@ -19,14 +18,12 @@ public class TrajectoryDot : MonoBehaviour
         
         if (dotSprite == null)
         {
-            // Create a simple circle sprite if none assigned
             dotSprite = CreateCircleDotSprite();
         }
         
         spriteRenderer.sprite = dotSprite;
         transform.localScale = Vector3.one * baseSize;
         
-        // Set to UI layer or similar for proper rendering
         spriteRenderer.sortingLayerName = "UI";
         spriteRenderer.sortingOrder = 5;
     }
@@ -35,13 +32,11 @@ public class TrajectoryDot : MonoBehaviour
     {
         if (billboardToCamera)
         {
-            // Cache camera reference
             if (cachedCamera == null)
                 cachedCamera = Camera.main;
                 
             if (cachedCamera != null)
             {
-                // Only update rotation if camera rotation changed significantly
                 if (Quaternion.Angle(lastCameraRotation, cachedCamera.transform.rotation) > 1f)
                 {
                     transform.rotation = cachedCamera.transform.rotation;

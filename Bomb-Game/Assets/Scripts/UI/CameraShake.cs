@@ -35,7 +35,6 @@ public class CameraShake : MonoBehaviour
         transform.position = initialPos;
     }
     
-    // New method to set shake amount
     public void SetShakeAmount(float amount)
     {
         shakeAmount = amount;

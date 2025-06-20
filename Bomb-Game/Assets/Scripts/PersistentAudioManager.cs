@@ -3,14 +3,12 @@ using UnityEngine.SceneManagement;
 
 public class PersistentAudioManager : MonoBehaviour
 {
-    // Singleton instance
     public static PersistentAudioManager Instance { get; private set; }
     
     private AudioSource audioSource;
     
     private void Awake()
     {
-        // Singleton pattern implementation
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -20,7 +18,6 @@ public class PersistentAudioManager : MonoBehaviour
         Instance = this;
         audioSource = GetComponent<AudioSource>();
         
-        // This is the key line that makes the object persist across scene loads
         DontDestroyOnLoad(gameObject);
     }
     

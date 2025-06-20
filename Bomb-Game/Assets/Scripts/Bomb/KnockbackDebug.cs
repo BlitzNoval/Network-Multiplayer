@@ -3,7 +3,6 @@ using UnityEngine.InputSystem;
 
 public class KnockbackDebugController : MonoBehaviour
 {
-    [Header("Debug Settings")]
     [SerializeField] private KeyCode debugToggleKey = KeyCode.F1;
     [SerializeField] private bool debugModeEnabled = false;
     
@@ -11,7 +10,6 @@ public class KnockbackDebugController : MonoBehaviour
     
     void Update()
     {
-        // Toggle debug mode
         if (Input.GetKeyDown(debugToggleKey))
         {
             debugModeEnabled = !debugModeEnabled;
@@ -20,10 +18,9 @@ public class KnockbackDebugController : MonoBehaviour
             Debug.Log($"Knockback Debug Mode: {(debugModeEnabled ? "ENABLED" : "DISABLED")}", this);
         }
         
-        // Find bomb if we don't have reference
         if (currentBomb == null)
         {
-            currentBomb = Object.FindObjectOfType<Bomb>(); // Updated to FindObjectOfType
+            currentBomb = Object.FindObjectOfType<Bomb>();
             if (currentBomb != null && debugModeEnabled)
             {
                 currentBomb.SetKnockbackDebugMode(debugModeEnabled);
@@ -33,15 +30,13 @@ public class KnockbackDebugController : MonoBehaviour
     
     private void UpdateDebugMode()
     {
-        // Update all bombs in scene
-        var bombs = Object.FindObjectsOfType<Bomb>(); // Updated to FindObjectsOfType
+        var bombs = Object.FindObjectsOfType<Bomb>();
         foreach (var bomb in bombs)
         {
             bomb.SetKnockbackDebugMode(debugModeEnabled);
         }
         
-        // Update all knockback calculators
-        var calculators = Object.FindObjectsOfType<KnockbackCalculator>(); // Updated to FindObjectsOfType
+        var calculators = Object.FindObjectsOfType<KnockbackCalculator>();
         foreach (var calc in calculators)
         {
             calc.SetDebugMode(debugModeEnabled);
@@ -52,11 +47,9 @@ public class KnockbackDebugController : MonoBehaviour
     {
         if (!debugModeEnabled) return;
         
-        // Display debug info
         GUI.Label(new Rect(10, 10, 300, 20), "Knockback Debug Mode: ON (Press F1 to toggle)");
         
-        // Display player knockback percentages
-        var players = Object.FindObjectsOfType<PlayerLifeManager>(); // Updated to FindObjectsOfType
+        var players = Object.FindObjectsOfType<PlayerLifeManager>();
         int yOffset = 40;
         
         foreach (var player in players)
@@ -66,7 +59,6 @@ public class KnockbackDebugController : MonoBehaviour
             yOffset += 25;
         }
         
-        // Sector color legend
         yOffset += 20;
         GUI.Label(new Rect(10, yOffset, 200, 20), "Sector Colors:");
         yOffset += 25;

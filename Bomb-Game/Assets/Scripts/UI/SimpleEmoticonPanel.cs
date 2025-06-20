@@ -5,26 +5,20 @@ using System.Collections.Generic;
 
 public class SimpleEmoticonPanel : MonoBehaviour
 {
-    [Header("Emoticon Buttons")]
     [SerializeField] Button button1;
     [SerializeField] Button button2;
     [SerializeField] Button button3;
     
-    [Header("Emoticon Display Images")]
-    [SerializeField] Image[] emoticonImages = new Image[3]; // Assign your 3 emoticon images here
+    [SerializeField] Image[] emoticonImages = new Image[3];
     
-    [Header("Animation Settings")]
     [SerializeField] float wiggleDuration = 1f;
-    [SerializeField] float wiggleAngle = 15f; // How far to rotate left and right
-    [SerializeField] int wiggleCount = 3; // How many back-and-forth wiggles
+    [SerializeField] float wiggleAngle = 15f;
+    [SerializeField] int wiggleCount = 3;
     
-    // Track current animation to prevent overlaps
     private Sequence currentWiggleSequence;
     
-    [Header("Player Assignment")]
-    [SerializeField] int playerNumber = 1; // Set this to 1, 2, 3, or 4 for each panel
+    [SerializeField] int playerNumber = 1;
     
-    // Static registry to track all panels even when inactive
     private static Dictionary<int, SimpleEmoticonPanel> playerPanels = new Dictionary<int, SimpleEmoticonPanel>();
     
     public static SimpleEmoticonPanel GetPanelForPlayer(int playerNum)
@@ -56,7 +50,6 @@ public class SimpleEmoticonPanel : MonoBehaviour
     
     void Awake()
     {
-        // Register this panel in the static registry
         if (playerPanels.ContainsKey(playerNumber))
         {
             Debug.LogWarning($"Player {playerNumber} already has a SimpleEmoticonPanel registered! Overwriting...");
@@ -64,17 +57,14 @@ public class SimpleEmoticonPanel : MonoBehaviour
         playerPanels[playerNumber] = this;
         Debug.Log($"Registered SimpleEmoticonPanel for player {playerNumber}");
         
-        // Hide panel by default
         gameObject.SetActive(false);
         
-        // Make sure all emoticon images are inactive
         for (int i = 0; i < emoticonImages.Length; i++)
         {
             if (emoticonImages[i] != null)
                 emoticonImages[i].gameObject.SetActive(false);
         }
         
-        // Set up button listeners
         SetupButtons();
     }
     
@@ -106,16 +96,13 @@ public class SimpleEmoticonPanel : MonoBehaviour
     {
         Debug.Log($"Emoticon button {emoticonIndex + 1} clicked on Player {playerNumber} panel!");
         
-        // Hide the panel immediately
         HidePanel();
         
-        // Tell the local player that emoticon panel is closed
         PlayerMovement localPlayer = FindLocalPlayer();
         if (localPlayer != null)
         {
             localPlayer.isEmoticonPanelOpen = false;
             
-            // Send network command
             localPlayer.SelectEmoticon(emoticonIndex);
         }
         else
@@ -123,7 +110,6 @@ public class SimpleEmoticonPanel : MonoBehaviour
             Debug.LogError("Could not find local player to send emoticon command!");
         }
         
-        // Show the emoticon animation locally first
         ShowEmoticonAnimation(emoticonIndex);
     }
     
@@ -134,14 +120,12 @@ public class SimpleEmoticonPanel : MonoBehaviour
         
         Debug.Log($"Playing emoticon wiggle animation for index {emoticonIndex}");
         
-        // Stop any existing animation first
         if (currentWiggleSequence != null)
         {
             currentWiggleSequence.Kill();
             Debug.Log("Stopped previous emoticon animation");
         }
         
-        // Hide all emoticon images first
         for (int i = 0; i < emoticonImages.Length; i++)
         {
             if (emoticonImages[i] != null)
@@ -151,40 +135,32 @@ public class SimpleEmoticonPanel : MonoBehaviour
         Image emoticon = emoticonImages[emoticonIndex];
         emoticon.gameObject.SetActive(true);
         
-        // Store original rotation
         Vector3 originalRotation = emoticon.transform.localEulerAngles;
         
-        // Create wiggle sequence
         currentWiggleSequence = DOTween.Sequence();
         
-        // Calculate time per wiggle (each wiggle is left-center-right-center)
         float timePerWiggle = wiggleDuration / wiggleCount;
         float quarterTime = timePerWiggle / 4f;
         
         for (int i = 0; i < wiggleCount; i++)
         {
-            // Wiggle left
             currentWiggleSequence.Append(emoticon.transform.DORotate(
                 new Vector3(originalRotation.x, originalRotation.y, originalRotation.z - wiggleAngle), 
                 quarterTime).SetEase(Ease.InOutSine));
             
-            // Back to center
             currentWiggleSequence.Append(emoticon.transform.DORotate(
                 originalRotation, 
                 quarterTime).SetEase(Ease.InOutSine));
             
-            // Wiggle right
             currentWiggleSequence.Append(emoticon.transform.DORotate(
                 new Vector3(originalRotation.x, originalRotation.y, originalRotation.z + wiggleAngle), 
                 quarterTime).SetEase(Ease.InOutSine));
             
-            // Back to center
             currentWiggleSequence.Append(emoticon.transform.DORotate(
                 originalRotation, 
                 quarterTime).SetEase(Ease.InOutSine));
         }
         
-        // When animation completes, reset and deactivate
         currentWiggleSequence.OnComplete(() => {
             emoticon.transform.localEulerAngles = originalRotation;
             emoticon.gameObject.SetActive(false);
@@ -206,7 +182,6 @@ public class SimpleEmoticonPanel : MonoBehaviour
     
     void OnDestroy()
     {
-        // Unregister this panel when destroyed
         if (playerPanels.ContainsKey(playerNumber) && playerPanels[playerNumber] == this)
         {
             playerPanels.Remove(playerNumber);

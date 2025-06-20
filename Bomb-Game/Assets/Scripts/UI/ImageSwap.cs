@@ -3,14 +3,11 @@ using UnityEngine.UI;
 
 public class ImageSwitcher : MonoBehaviour
 {
-    [Header("Target UI Image")]
     public Image targetImage;
 
-    [Header("Sprites to Switch Between")]
     public Sprite spriteA;
     public Sprite spriteB;
 
-    [Header("Switching Interval (seconds)")]
     public float interval = 1.0f;
 
     private float timer;
@@ -25,7 +22,6 @@ public class ImageSwitcher : MonoBehaviour
             return;
         }
 
-        // Initialize the image
         targetImage.sprite = spriteA;
         timer = interval;
     }
@@ -36,11 +32,9 @@ public class ImageSwitcher : MonoBehaviour
 
         if (timer <= 0f)
         {
-            // Toggle sprite
             showingA = !showingA;
             targetImage.sprite = showingA ? spriteA : spriteB;
 
-            // Reset timer
             timer = interval;
         }
     }

@@ -7,7 +7,6 @@ using UnityEngine.EventSystems;
 [RequireComponent(typeof(Image))]
 public class InputFieldSpriteSwitcher : MonoBehaviour, ISelectHandler, IDeselectHandler
 {
-    [Header("Sprites")]
     public Sprite normalSprite;
     public Sprite activeSprite;
 

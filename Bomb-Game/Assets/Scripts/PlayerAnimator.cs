@@ -7,7 +7,6 @@ using System.Collections;
 [RequireComponent(typeof(PlayerBombHandler))]
 public class PlayerAnimator : NetworkBehaviour
 {
-    /* ─ parameters ─ */
     static readonly int ActiveHandHash = Animator.StringToHash("activeHand");
     static readonly int IsMovingHash   = Animator.StringToHash("isMoving");
     static readonly int ThrowHash      = Animator.StringToHash("Throw");
@@ -16,7 +15,6 @@ public class PlayerAnimator : NetworkBehaviour
     static readonly int DirectionHash  = Animator.StringToHash("Direction");
     static readonly int EmoteHash      = Animator.StringToHash("Emote");
 
-    [Header("Tuning")]
     [SerializeField] float movementThreshold = .1f;
     [SerializeField] float handFreezeTime    = 1.0f;
 
@@ -25,17 +23,14 @@ public class PlayerAnimator : NetworkBehaviour
     PlayerBombHandler bombHandler;
     PlayerMovement    movement;
     Rigidbody         rb;
-    PlayerLifeManager playerLifeManager; // Added reference
+    PlayerLifeManager playerLifeManager;
 
-    /* networking */
     [SyncVar(hook = nameof(OnEmoteChanged))] int emoteParam;
     InputAction emoteAct;
 
-    /* cached-per-frame data */
     Vector3 cachedVelocity;
     float   handFreezeTimer;
 
-    /* ───────── life-cycle ───────── */
     void Awake()
     {
         anim = GetComponent<Animator>();
@@ -56,10 +51,9 @@ public class PlayerAnimator : NetworkBehaviour
 
         var pi = GetComponent<PlayerInput>();
         emoteAct = pi?.actions.FindAction("Emote"); // 0-3 scale
-     //   if (!emoteAct) Debug.LogWarning("Emote action not found!", this);
     }
 
-    void FixedUpdate() => cachedVelocity = rb.linearVelocity;    // Unity 6 API
+    void FixedUpdate() => cachedVelocity = rb.linearVelocity;
 
     public override void OnStartAuthority()
     {
@@ -72,7 +66,6 @@ public class PlayerAnimator : NetworkBehaviour
         enabled = false;
     }
 
-    /* ───────── main loop ───────── */
     void Update()
     {
         if (!isOwned) return;
@@ -82,7 +75,6 @@ public class PlayerAnimator : NetworkBehaviour
         HandleEmoteInput();
     }
 
-    /* ────── hand / move / land ────── */
     void UpdateActiveHand()
     {
         if (handFreezeTimer > 0f) 
@@ -113,16 +105,15 @@ public class PlayerAnimator : NetworkBehaviour
         if (!moving) return;
 
         Vector3 local = transform.InverseTransformDirection(hv.normalized);
-        float a   = Mathf.Atan2(local.x, local.z);          // −π..π
+        float a   = Mathf.Atan2(local.x, local.z);
         int   sec = (Mathf.RoundToInt(a / (Mathf.PI * .5f)) & 3);
         float dir = sec / 3f;
         anim.SetFloat(DirectionHash, dir, 0.15f, Time.deltaTime);
     }
 
-    /* ────── emotes ────── */
     void HandleEmoteInput()
     {
-        if (playerLifeManager != null && playerLifeManager.isInKnockback) return; // Disable emotes during knockback
+        if (playerLifeManager != null && playerLifeManager.isInKnockback) return;
 
         int v = (int)emoteAct.ReadValue<float>();
         if (v == emoteParam) return;
@@ -139,7 +130,6 @@ public class PlayerAnimator : NetworkBehaviour
         movement?.SetEmoteState(v != 0);
     }
 
-    /* ────── throw entry point ────── */
     public System.Action OnThrowAnimationComplete;
     
     public void PlayThrowLocal()
@@ -178,7 +168,7 @@ public class PlayerAnimator : NetworkBehaviour
             Debug.Log("Setting Landing trigger", this);
             anim.SetTrigger(LandingHash);
             netAnim.SetTrigger(LandingHash);
-            SetStunned(false); // End stunned state
+            SetStunned(false);
         }
     }
 
