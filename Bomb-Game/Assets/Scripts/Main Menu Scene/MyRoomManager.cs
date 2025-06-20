@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 
 public class MyRoomManager : NetworkRoomManager
 {
@@ -127,6 +128,9 @@ public class MyRoomManager : NetworkRoomManager
         {
             Debug.LogError("GameManager.Instance is null in OnRoomServerSceneLoadedForPlayer", this);
         }
+
+        // No need to assign EmoticonSelectionUI anymore - using shared SimpleEmoticonPanel
+        Debug.Log($"Player {gamePlayer.name} spawned successfully - using shared emoticon system", this);
 
         return true;
     }

@@ -17,7 +17,7 @@ public class PlayerMovement : NetworkBehaviour
     float knockbackMovementMultiplier = 1f;
 
     [Header("Emoticon System")]
-    [SerializeField] EmoticonSelectionUI emoticonSelectionUI;
+    // No longer need individual EmoticonSelectionUI - using shared SimpleEmoticonPanel
 
     /* ───────── Private ───────── */
     Rigidbody   rb;
@@ -30,6 +30,7 @@ public class PlayerMovement : NetworkBehaviour
 
     string lastControlScheme;     // cached to avoid null on first frame
     bool wasHoldingEmoticon;
+    public bool isEmoticonPanelOpen = false; // Public so bomb handler can check it
 
     public Vector3 CurrentAimDirection { get; private set; } = Vector3.forward; // Default to forward
 
@@ -71,7 +72,22 @@ public class PlayerMovement : NetworkBehaviour
     /* ───────── Update ───────── */
     void Update()
     {
-        if (!isLocalPlayer || !GameRunning() || (playerLifeManager != null && playerLifeManager.isInKnockback)) return;
+        // Debug: Check early return conditions
+        if (!isLocalPlayer)
+        {
+            return; // Not local player
+        }
+        
+        if (!GameRunning())
+        {
+            Debug.LogWarning("GameRunning() returned false - emoticon input will not be processed", this);
+            return; // Game not running
+        }
+        
+        if (playerLifeManager != null && playerLifeManager.isInKnockback)
+        {
+            return; // Player in knockback
+        }
 
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
         {
@@ -88,6 +104,13 @@ public class PlayerMovement : NetworkBehaviour
 
         moveInput = isEmoting ? Vector2.zero : moveAct.ReadValue<Vector2>();
         HandleRotation();
+        
+        // Test: Simple keyboard check for debugging
+        if (UnityEngine.InputSystem.Keyboard.current.digit4Key.wasPressedThisFrame)
+        {
+            Debug.Log("Direct keyboard check: 4 key was pressed this frame!", this);
+        }
+        
         HandleEmoticonInput();
     }
 
@@ -136,80 +159,131 @@ public class PlayerMovement : NetworkBehaviour
 
     void HandleEmoticonInput()
     {
+        // Debug: Check if emoticonAct is null
+        if (emoticonAct == null)
+        {
+            Debug.LogError("emoticonAct is null!");
+            return;
+        }
+
+        // Simple system: Show/Hide shared panel based on key press
         bool isHoldingEmoticon = emoticonAct.IsPressed();
+        
         if (isHoldingEmoticon && !wasHoldingEmoticon)
         {
-            StartEmoticonSelection();
+            Debug.Log("Emoticon key pressed - showing shared panel");
+            isEmoticonPanelOpen = true;
+            ShowEmoticonPanel();
         }
         else if (!isHoldingEmoticon && wasHoldingEmoticon)
         {
-            EndEmoticonSelection();
-        }
-
-        if (isHoldingEmoticon)
-        {
-            UpdateEmoticonSelection();
+            Debug.Log("Emoticon key released - hiding shared panel");
+            isEmoticonPanelOpen = false;
+            HideEmoticonPanel();
         }
 
         wasHoldingEmoticon = isHoldingEmoticon;
     }
 
-    void StartEmoticonSelection()
+    void ShowEmoticonPanel()
     {
-        if (emoticonSelectionUI != null)
-            emoticonSelectionUI.Show();
-    }
-
-    void UpdateEmoticonSelection()
-    {
-        if (emoticonSelectionUI != null)
+        Debug.Log("ShowEmoticonPanel called");
+        
+        int myPlayerNumber = GetMyPlayerNumber();
+        Debug.Log($"My player number is: {myPlayerNumber}");
+        
+        // Debug: Print all registered panels
+        SimpleEmoticonPanel.DebugPrintRegisteredPanels();
+        
+        // Find the correct panel for this player
+        SimpleEmoticonPanel myPanel = GetMyEmoticonPanel();
+        if (myPanel != null)
         {
-            int selected = GetSelectedEmoticon();
-            emoticonSelectionUI.HighlightEmoticon(selected);
+            Debug.Log($"Showing emoticon panel for player {myPlayerNumber}");
+            myPanel.ShowPanel();
+        }
+        else
+        {
+            Debug.LogError($"Could not find SimpleEmoticonPanel for player {myPlayerNumber}! Make sure each PlayerPanel has a SimpleEmoticonPanel with the correct player number.");
         }
     }
 
-    void EndEmoticonSelection()
+    void HideEmoticonPanel()
     {
-        if (emoticonSelectionUI != null)
+        Debug.Log("HideEmoticonPanel called");
+        
+        // Find the correct panel for this player
+        SimpleEmoticonPanel myPanel = GetMyEmoticonPanel();
+        if (myPanel != null)
         {
-            emoticonSelectionUI.Hide();
-            int selected = GetSelectedEmoticon();
-            CmdSelectEmoticon(selected);
+            Debug.Log($"Hiding emoticon panel for player {GetMyPlayerNumber()}");
+            myPanel.HidePanel();
+        }
+        else
+        {
+            Debug.LogError($"Could not find SimpleEmoticonPanel for player {GetMyPlayerNumber()}!");
         }
     }
 
-    int GetSelectedEmoticon()
+    SimpleEmoticonPanel GetMyEmoticonPanel()
     {
-        if (CurrentAimDirection.sqrMagnitude > 0.01f)
+        int myPlayerNumber = GetMyPlayerNumber();
+        return SimpleEmoticonPanel.GetPanelForPlayer(myPlayerNumber);
+    }
+
+    int GetMyPlayerNumber()
+    {
+        PlayerLifeManager lifeManager = GetComponent<PlayerLifeManager>();
+        if (lifeManager != null)
         {
-            float angle = Mathf.Atan2(CurrentAimDirection.x, CurrentAimDirection.z) * Mathf.Rad2Deg;
-            if (angle > -60 && angle < 60) return 0; // Forward
-            else if (angle >= 60) return 1;          // Left
-            else return 2;                           // Right
+            return lifeManager.PlayerNumber;
         }
-        return 0; // Default to first emoticon
+        Debug.LogError("PlayerLifeManager not found on this player!");
+        return 1; // Default fallback
+    }
+
+    // Public method called by EmoticonSelectionUI when a button is clicked
+    public void SelectEmoticon(int emoticonIndex)
+    {
+        Debug.Log($"SelectEmoticon called with index {emoticonIndex}");
+        CmdSelectEmoticon(emoticonIndex);
     }
 
     [Command]
     void CmdSelectEmoticon(int index)
     {
+        Debug.Log($"CmdSelectEmoticon called with index {index}", this);
         RpcShowEmoticon(netIdentity, index);
     }
 
     [ClientRpc]
     void RpcShowEmoticon(NetworkIdentity playerId, int index)
     {
+        Debug.Log($"RpcShowEmoticon called for player {playerId.name} with emoticon index {index}", this);
+        
+        // Find which player sent this emoticon
         GameObject player = playerId.gameObject;
         PlayerLifeManager lifeManager = player.GetComponent<PlayerLifeManager>();
         if (lifeManager != null)
         {
-            int playerNumber = lifeManager.PlayerNumber;
-            PlayerUIPanel panel = PlayerUIManager.Instance.GetPanelForPlayer(playerNumber);
-            if (panel != null)
+            int senderPlayerNumber = lifeManager.PlayerNumber;
+            Debug.Log($"Emoticon sent by player number: {senderPlayerNumber}");
+            
+            // Show the animation on the panel for the player who sent it
+            SimpleEmoticonPanel senderPanel = SimpleEmoticonPanel.GetPanelForPlayer(senderPlayerNumber);
+            if (senderPanel != null)
             {
-                panel.ShowEmoticon(index);
+                Debug.Log($"Showing emoticon {index} animation on Player {senderPlayerNumber} panel", this);
+                senderPanel.ShowEmoticonAnimation(index);
             }
+            else
+            {
+                Debug.LogError($"Could not find SimpleEmoticonPanel for player {senderPlayerNumber}", this);
+            }
+        }
+        else
+        {
+            Debug.LogError($"PlayerLifeManager not found on {player.name}", this);
         }
     }
 

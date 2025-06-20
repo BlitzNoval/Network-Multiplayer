@@ -88,6 +88,7 @@ public class PlayerBombHandler : NetworkBehaviour
     
     private PlayerAnimator playerAnimator;
     private Animator animator;
+    private PlayerMovement playerMovement;
 
     void Awake()
     {
@@ -96,6 +97,7 @@ public class PlayerBombHandler : NetworkBehaviour
         
         playerAnimator = GetComponent<PlayerAnimator>();
         animator = GetComponent<Animator>();
+        playerMovement = GetComponent<PlayerMovement>();
         
         InitializeTrajectoryVisualization();
 
@@ -418,6 +420,10 @@ public class PlayerBombHandler : NetworkBehaviour
     void ToggleThrowTypes(InputAction.CallbackContext context)
     {
         if (!isLocalPlayer || currentBomb == null) return;
+        
+        // Prevent toggling throw types when emoticon panel is open
+        if (playerMovement != null && playerMovement.isEmoticonPanelOpen) return;
+        
         CmdSwapHands();
     }
 
@@ -944,6 +950,9 @@ public class PlayerBombHandler : NetworkBehaviour
     {
         if (!isLocalPlayer || currentBomb == null) return;
         
+        // Prevent aiming when emoticon panel is open
+        if (playerMovement != null && playerMovement.isEmoticonPanelOpen) return;
+        
         if (!currentBomb.IsHeld || currentBomb.Holder != gameObject)
         {
             return;
@@ -971,6 +980,9 @@ public class PlayerBombHandler : NetworkBehaviour
     {
         if (!isLocalPlayer || !isAiming || currentBomb == null) return;
         if (!currentBomb.IsHeld || currentBomb.Holder != gameObject) return;
+        
+        // Prevent throwing when emoticon panel is open
+        if (playerMovement != null && playerMovement.isEmoticonPanelOpen) return;
 
         // Store the throw parameters for when animation completes
         Vector3 throwDirection = aimDirection;
