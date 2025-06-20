@@ -5,7 +5,7 @@ public class Billboard : MonoBehaviour
     [SerializeField] public Transform playerTransform;
     [SerializeField] private Vector3 offset = new Vector3(0, 2, 0);
 
-    private Camera mainCamera;
+    private Camera mainCamera; 
 
     void Start() 
     {
