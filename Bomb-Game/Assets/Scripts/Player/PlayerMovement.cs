@@ -116,6 +116,9 @@ public class PlayerMovement : NetworkBehaviour
 
     void HandleRotation()
     {
+        // Only handle rotation if we have authority (prevents NetworkTransform conflicts)
+        if (!isOwned) return;
+        
         string scheme = pi.currentControlScheme ?? lastControlScheme;
         lastControlScheme = scheme;
 
@@ -152,6 +155,9 @@ public class PlayerMovement : NetworkBehaviour
 
     void SmoothLook(Vector3 dir)
     {
+        // Only apply rotation if we have authority (prevents NetworkTransform conflicts)
+        if (!isOwned) return;
+        
         Quaternion look = Quaternion.LookRotation(dir.normalized);
         transform.rotation = Quaternion.Slerp(
             transform.rotation, look, rotationSpeed * Time.deltaTime);

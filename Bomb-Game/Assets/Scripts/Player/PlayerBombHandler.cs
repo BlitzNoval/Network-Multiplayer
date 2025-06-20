@@ -352,7 +352,7 @@ public class PlayerBombHandler : NetworkBehaviour
             bool timeForUpdate = Time.time - lastTrajectoryUpdate >= (1f / trajectoryUpdateRate);
             
             if (trajectoryNeedsUpdate || aimChanged || throwTypeChanged || timeForUpdate)
-            {
+            {  
                 DrawTrajectory();
                 lastTrajectoryUpdate = Time.time;
                 lastCachedAimDirection = aimDirection;
