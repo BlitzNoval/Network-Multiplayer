@@ -183,10 +183,5 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    public Vector2 GetMoveInput()
-    {
-        return moveInput;
-    }
-        
-    
+    public Vector2 GetMoveInput() => moveInput;
 }

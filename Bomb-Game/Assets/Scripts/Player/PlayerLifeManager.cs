@@ -327,122 +327,83 @@ public class PlayerLifeManager : NetworkBehaviour
     }
 
     IEnumerator FollowKnockbackArc(KnockbackArcData arcData)
+{
+    if (rb == null || arcData.arcPoints == null || arcData.arcPoints.Length == 0)
+        yield break;
+
+    // Disable normal movement while airborne
+    movement?.SetKnockbackState(true, 0f);
+
+    rb.linearVelocity = Vector3.zero;
+    rb.angularVelocity = Vector3.zero;
+
+    float   elapsedTime      = 0f;
+    Vector3 airControlOffset = Vector3.zero;
+
+    // Phase percentages
+    const float stunPhase     = 0.30f;   // 30 %
+    const float recoveryPhase = 0.40f;   // next 40 %
+    const float controlPhase  = 0.30f;   // final 30 %
+
+    Camera cam = Camera.main;            // cache once – cheap & thread-safe :contentReference[oaicite:3]{index=3}
+
+    while (elapsedTime < arcData.duration)
     {
-        if (rb == null || arcData.arcPoints == null || arcData.arcPoints.Length == 0) yield break;
-        
-        // Initially disable player movement completely
-        if (movement != null)
+        elapsedTime += Time.fixedDeltaTime;
+        float t = elapsedTime / arcData.duration;
+
+        /* ---------------- knock-back progress → air-control multiplier ---------------- */
+        float airControlMultiplier;
+        if      (t <= stunPhase)                     airControlMultiplier = 0f;
+        else if (t <= stunPhase + recoveryPhase)     airControlMultiplier =
+            Mathf.Lerp(0f, 0.4f, (t - stunPhase) / recoveryPhase);
+        else                                         airControlMultiplier =
+            Mathf.Lerp(0.4f, 0.8f, (t - stunPhase - recoveryPhase) / controlPhase);
+        /* ----------------------------------------------------------------------------- */
+
+        movement?.SetKnockbackState(true, airControlMultiplier);
+
+        /* ---------------- next point along pre-baked arc ---------------- */
+        int    idx     = Mathf.Clamp(
+                            Mathf.FloorToInt(t * (arcData.arcPoints.Length - 1)),
+                            0, arcData.arcPoints.Length - 1);
+        Vector3 target = arcData.arcPoints[idx];
+
+        if (idx < arcData.arcPoints.Length - 1)
         {
-            movement.SetKnockbackState(true, 0f); // No movement during initial phase
+            float lerpT = (t * (arcData.arcPoints.Length - 1)) - idx;
+            target = Vector3.Lerp(target, arcData.arcPoints[idx + 1], lerpT);
         }
-        
-        // Clear existing velocity
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-        
-        float elapsedTime = 0f;
-        Vector3 originalEndPoint = arcData.endPoint;
-        Vector3 currentEndPoint = originalEndPoint;
-        Vector3 airControlOffset = Vector3.zero;
-        
-        // Recovery timing parameters
-        float stunPhase = 0.3f;       // First 30% - completely stunned, no control
-        float recoveryPhase = 0.4f;   // Next 40% - gradual recovery of air control
-        float controlPhase = 0.3f;    // Final 30% - significant air control
-        
-        while (elapsedTime < arcData.duration)
+        /* ---------------------------------------------------------------- */
+
+        /* ---------------- optional player influence while airborne ---------------- */
+        if (airControlMultiplier > 0f && movement != null && movement.isLocalPlayer)
         {
-            elapsedTime += Time.fixedDeltaTime;
-            float t = elapsedTime / arcData.duration;
-            
-            // Calculate progressive air control based on knockback progress
-            float airControlMultiplier = 0f;
-            if (t <= stunPhase)
+            Vector2 input = movement.GetMoveInput();
+            if (input.sqrMagnitude > 0.01f)
             {
-                // Complete stun phase - no control
-                airControlMultiplier = 0f;
+                Vector3 camF = cam.transform.forward; camF.y = 0; camF.Normalize();
+                Vector3 camR = cam.transform.right;   camR.y = 0; camR.Normalize();
+
+                Vector3 airForce = (camR * input.x + camF * input.y)
+                                   * airControlMultiplier * 2f * Time.fixedDeltaTime;
+
+                airControlOffset += airForce;
+                airControlOffset  = Vector3.ClampMagnitude(airControlOffset, 3f);
             }
-            else if (t <= stunPhase + recoveryPhase)
-            {
-                // Recovery phase - gradual control restoration
-                float recoveryProgress = (t - stunPhase) / recoveryPhase;
-                airControlMultiplier = Mathf.Lerp(0f, 0.4f, recoveryProgress); // Up to 40% control
-            }
-            else
-            {
-                // Control phase - significant air control
-                float controlProgress = (t - stunPhase - recoveryPhase) / controlPhase;
-                airControlMultiplier = Mathf.Lerp(0.4f, 0.8f, controlProgress); // Up to 80% control
-            }
-            
-            // Update movement control based on current phase
-            if (movement != null)
-            {
-                movement.SetKnockbackState(true, airControlMultiplier);
-            }
-            
-            // Calculate which point we should be at
-            int targetPointIndex = Mathf.FloorToInt(t * (arcData.arcPoints.Length - 1));
-            targetPointIndex = Mathf.Clamp(targetPointIndex, 0, arcData.arcPoints.Length - 1);
-            
-            // Smoothly move to the target point
-            Vector3 targetPosition = arcData.arcPoints[targetPointIndex];
-            
-            // If we have a next point, interpolate between current and next
-            if (targetPointIndex < arcData.arcPoints.Length - 1)
-            {
-                float pointT = (t * (arcData.arcPoints.Length - 1)) - targetPointIndex;
-                Vector3 nextPosition = arcData.arcPoints[targetPointIndex + 1];
-                targetPosition = Vector3.Lerp(targetPosition, nextPosition, pointT);
-            }
-            
-            // Apply air control offset if player has some control
-            if (airControlMultiplier > 0f && movement != null)
-            {
-                // Allow horizontal air control that accumulates over time
-                Vector2 playerInput = movement.GetMoveInput();
-                if (playerInput.magnitude > 0.1f)
-                {
-                    Vector3 camF = Camera.main.transform.forward; camF.y = 0; camF.Normalize();
-                    Vector3 camR = Camera.main.transform.right; camR.y = 0; camR.Normalize();
-                    Vector3 airControlForce = (camR * playerInput.x + camF * playerInput.y) * airControlMultiplier * 2f * Time.fixedDeltaTime;
-                    
-                    airControlOffset += airControlForce;
-                    // Limit total air control offset to prevent too much deviation
-                    airControlOffset = Vector3.ClampMagnitude(airControlOffset, 3f);
-                }
-            }
-            
-            // Apply position with air control offset
-            Vector3 finalPosition = targetPosition + airControlOffset;
-            rb.MovePosition(finalPosition);
-            
-            // Debug air control feedback
-            if (airControlMultiplier > 0f)
-            {
-                Debug.Log($"Air Control: {airControlMultiplier:F1}x at {t:F1}% progress, offset: {airControlOffset.magnitude:F1}m", this);
-            }
-            
-            yield return new WaitForFixedUpdate();
         }
-        
-        // Ensure we end near the intended landing area (with air control offset)
-        Vector3 finalLanding = arcData.endPoint + airControlOffset;
-        rb.MovePosition(finalLanding);
-        
-        // Hide landing dot when player lands - use the manager
-        LandingDotManager.Instance?.HideLandingDotForPlayer(PlayerNumber);
-        
-        // Immediately restore full movement (no daze)
-        if (movement != null)
-        {
-            movement.SetKnockbackState(false, 1f);
-        }
-        
-        Debug.Log($"Knockback complete. Final air control offset: {airControlOffset.magnitude:F1}m", this);
-        
-        Debug.Log($"Player {gameObject.name} landed from knockback: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m", this);
+        /* --------------------------------------------------------------------------- */
+
+        rb.MovePosition(target + airControlOffset);
+        yield return new WaitForFixedUpdate();
     }
+
+    /* ---------------- landing ---------------- */
+    rb.MovePosition(arcData.endPoint + airControlOffset);
+    LandingDotManager.Instance?.HideLandingDotForPlayer(PlayerNumber);
+    movement?.SetKnockbackState(false, 1f);
+}
+
     
 
     [Server]
