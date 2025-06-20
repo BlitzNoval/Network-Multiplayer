@@ -1,4 +1,3 @@
-// PlayerAnimator.cs – Unity 6 / Mirror 2025 compatible  ✅
 using Mirror;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -18,41 +17,49 @@ public class PlayerAnimator : NetworkBehaviour
     static readonly int EmoteHash      = Animator.StringToHash("Emote");
 
     [Header("Tuning")]
-    [SerializeField] float movementThreshold     = .1f;
-    [SerializeField] float landingVelocityThresh = -3f;
-    [SerializeField] float handFreezeTime        = 1.0f;
+    [SerializeField] float movementThreshold = .1f;
+    [SerializeField] float handFreezeTime    = 1.0f;
 
-    Animator        anim;
-    NetworkAnimator netAnim;
+    Animator          anim;
+    NetworkAnimator   netAnim;
     PlayerBombHandler bombHandler;
-    PlayerMovement  movement;
-    Rigidbody       rb;
+    PlayerMovement    movement;
+    Rigidbody         rb;
+    PlayerLifeManager playerLifeManager; // Added reference
 
     /* networking */
     [SyncVar(hook = nameof(OnEmoteChanged))] int emoteParam;
     InputAction emoteAct;
 
     /* cached-per-frame data */
-    Vector3 cachedVelocity;      // <-- ADDED
+    Vector3 cachedVelocity;
     float   handFreezeTimer;
-    bool    wasFalling;
 
     /* ───────── life-cycle ───────── */
     void Awake()
     {
-        anim        = GetComponent<Animator>();
-        netAnim     = GetComponent<NetworkAnimator>();
+        anim = GetComponent<Animator>();
+        netAnim = GetComponent<NetworkAnimator>();
         bombHandler = GetComponent<PlayerBombHandler>();
-        movement    = GetComponent<PlayerMovement>();
-        rb          = GetComponent<Rigidbody>();
+        movement = GetComponent<PlayerMovement>();
+        rb = GetComponent<Rigidbody>();
+        playerLifeManager = GetComponent<PlayerLifeManager>();
+
+        if (!anim || !netAnim || !bombHandler || !rb || !playerLifeManager)
+        {
+            Debug.LogError("Missing required component(s) on PlayerAnimator!", this);
+            enabled = false;
+            return;
+        }
 
         if (netAnim.animator == null) netAnim.animator = anim;
 
-        var pi   = GetComponent<PlayerInput>();
-        emoteAct = pi.actions.FindAction("Emote");     // 0-3 scale
+        var pi = GetComponent<PlayerInput>();
+        emoteAct = pi?.actions.FindAction("Emote"); // 0-3 scale
+     //   if (!emoteAct) Debug.LogWarning("Emote action not found!", this);
     }
 
-    void FixedUpdate() => cachedVelocity = rb.linearVelocity;    // Unity 6 API :contentReference[oaicite:1]{index=1}
+    void FixedUpdate() => cachedVelocity = rb.linearVelocity;    // Unity 6 API
 
     public override void OnStartAuthority()
     {
@@ -72,7 +79,6 @@ public class PlayerAnimator : NetworkBehaviour
 
         UpdateActiveHand();
         UpdateMovementState();
-        CheckLanding();
         HandleEmoteInput();
     }
 
@@ -100,7 +106,7 @@ public class PlayerAnimator : NetworkBehaviour
 
     void UpdateMovementState()
     {
-        Vector3 hv = new(cachedVelocity.x, 0f, cachedVelocity.z);   // <-- uses cached velocity
+        Vector3 hv = new(cachedVelocity.x, 0f, cachedVelocity.z);
         bool moving = hv.magnitude > movementThreshold;
         anim.SetBool(IsMovingHash, moving);
 
@@ -113,23 +119,16 @@ public class PlayerAnimator : NetworkBehaviour
         anim.SetFloat(DirectionHash, dir, 0.15f, Time.deltaTime);
     }
 
-    void CheckLanding()
-    {
-        bool ground = Physics.Raycast(transform.position + Vector3.up * .1f,
-                                      Vector3.down, .2f, ~0);
-        if (wasFalling && ground && rb.linearVelocity.y > landingVelocityThresh)
-            netAnim.SetTrigger(LandingHash);
-        wasFalling = !ground;
-    }
-
     /* ────── emotes ────── */
     void HandleEmoteInput()
     {
-        int v = (int)emoteAct.ReadValue<float>();      // InputSystem API :contentReference[oaicite:2]{index=2}
+        if (playerLifeManager != null && playerLifeManager.isInKnockback) return; // Disable emotes during knockback
+
+        int v = (int)emoteAct.ReadValue<float>();
         if (v == emoteParam) return;
 
-        ApplyEmote(v);  // local
-        CmdSetEmote(v); // network
+        ApplyEmote(v);
+        CmdSetEmote(v);
     }
     [Command] void CmdSetEmote(int v) => emoteParam = v;
     void OnEmoteChanged(int _, int v)  => ApplyEmote(v);
@@ -149,22 +148,13 @@ public class PlayerAnimator : NetworkBehaviour
 
         int hand = bombHandler.CurrentBomb.IsOnRight ? 2 : 1;
         
-        // Set activeHand on main animator (NetworkAnimator will sync automatically)
-        anim.SetInteger(ActiveHandHash, hand);  // This will be synced by NetworkAnimator
+        anim.SetInteger(ActiveHandHash, hand);
 
-        /*  ▪ Call both Animators:
-            • anim.SetTrigger  – so **our** client plays instantly
-            • netAnim.SetTrigger – so Mirror replicates to others  */
-        
-        // Debug current animator state before triggering
         AnimatorStateInfo baseLayerState = anim.GetCurrentAnimatorStateInfo(0);
-        AnimatorStateInfo throwLayerState = anim.GetCurrentAnimatorStateInfo(1); // Throw layer
+        AnimatorStateInfo throwLayerState = anim.GetCurrentAnimatorStateInfo(1);
         Debug.Log($"PRE-THROW: Base layer: {baseLayerState.shortNameHash} | Throw layer: {throwLayerState.shortNameHash} | activeHand: {anim.GetInteger(ActiveHandHash)}", this);
         
-        // Use a tiny delay to ensure parameters are processed before trigger
         StartCoroutine(TriggerThrowWithDelay(hand));
-        
-        // Start monitoring for animation completion
         StartCoroutine(MonitorThrowAnimationCompletion());
 
         handFreezeTimer = handFreezeTime;
@@ -174,32 +164,42 @@ public class PlayerAnimator : NetworkBehaviour
 
     public void OnPlayerStunned()
     {
-        if (isOwned) netAnim.SetTrigger(StunnedHash);
+        if (isOwned)
+        {
+            Debug.Log("Setting Stunned trigger", this);
+            netAnim.SetTrigger(StunnedHash);
+        }
     }
 
-    // Called when bomb is actually thrown to ensure proper hand cleanup after animation
+    public void OnPlayerLanded()
+    {
+        if (isOwned)
+        {
+            Debug.Log("Setting Landing trigger", this);
+            anim.SetTrigger(LandingHash);
+            netAnim.SetTrigger(LandingHash);
+            SetStunned(false); // End stunned state
+        }
+    }
+
     public void OnBombThrown()
     {
         if (!isOwned) return;
         
-        // Extend freeze time briefly to ensure animation completes
         handFreezeTimer = Mathf.Max(handFreezeTimer, 0.5f);
         Debug.Log($"OnBombThrown: extending freeze timer to {handFreezeTimer:F2}", this);
     }
     
     IEnumerator TriggerThrowWithDelay(int hand)
     {
-        // Wait one frame to ensure parameters are set
         yield return null;
         
         anim.SetTrigger(ThrowHash);
-        netAnim.SetTrigger(ThrowHash);          // required for sync
+        netAnim.SetTrigger(ThrowHash);
         
-        // Verify the parameters are set correctly
         int currentActiveHand = anim.GetInteger(ActiveHandHash);
         Debug.Log($"POST-THROW: Triggered ThrowHash, hand={hand} | activeHand: {currentActiveHand}", this);
         
-        // Check animator state after a few frames
         StartCoroutine(CheckAnimatorStateDelayed());
     }
 
@@ -212,7 +212,6 @@ public class PlayerAnimator : NetworkBehaviour
         
         Debug.Log($"DELAYED CHECK: Base layer: {baseLayerState.shortNameHash} (normalizedTime: {baseLayerState.normalizedTime:F2}) | Throw layer: {throwLayerState.shortNameHash} (normalizedTime: {throwLayerState.normalizedTime:F2})", this);
         
-        // Check for specific throw animation hashes
         int leftThrowHash = Animator.StringToHash("rig_001_Final_Throw_Left");
         int rightThrowHash = Animator.StringToHash("rig_001_Final_Throw_Right");
         int newStateHash = Animator.StringToHash("New State");
@@ -229,21 +228,6 @@ public class PlayerAnimator : NetworkBehaviour
         {
             int currentActiveHand = anim.GetInteger(ActiveHandHash);
             Debug.LogWarning($"ISSUE: Still in 'New State' - transition didn't occur! activeHand={currentActiveHand}, expected: 1 or 2", this);
-            
-            // Check if we can manually verify the conditions
-            bool hasLeftCondition = (currentActiveHand == 1);
-            bool hasRightCondition = (currentActiveHand == 2);
-            Debug.LogWarning($"Transition conditions - Left hand ready: {hasLeftCondition}, Right hand ready: {hasRightCondition}", this);
-            
-            // Check if there are any transition issues
-            AnimatorTransitionInfo transitionInfo = anim.GetAnimatorTransitionInfo(1);
-            if (transitionInfo.nameHash != 0)
-            {
-                Debug.LogWarning($"Transition in progress: {transitionInfo.nameHash}, normalizedTime: {transitionInfo.normalizedTime:F2}", this);
-            }
-            
-            // Check all current conditions
-            Debug.LogWarning($"Current parameters: activeHand={anim.GetInteger(ActiveHandHash)}, isMoving={anim.GetBool("isMoving")}", this);
         }
         else
         {
@@ -253,7 +237,6 @@ public class PlayerAnimator : NetworkBehaviour
     
     IEnumerator MonitorThrowAnimationCompletion()
     {
-        // Wait a moment for the animation to start
         yield return new WaitForSeconds(0.1f);
         
         int leftThrowHash = Animator.StringToHash("rig_001_Final_Throw_Left");
@@ -261,7 +244,6 @@ public class PlayerAnimator : NetworkBehaviour
         
         bool animationStarted = false;
         
-        // Wait for the throw animation to actually start playing
         while (!animationStarted)
         {
             AnimatorStateInfo throwLayerState = anim.GetCurrentAnimatorStateInfo(1);
@@ -273,28 +255,22 @@ public class PlayerAnimator : NetworkBehaviour
             yield return null;
         }
         
-        // Monitor animation progress until completion
         bool animationCompleted = false;
         while (!animationCompleted)
         {
             AnimatorStateInfo throwLayerState = anim.GetCurrentAnimatorStateInfo(1);
             
-            // Check if we're still in a throw animation
             if (throwLayerState.shortNameHash == leftThrowHash || throwLayerState.shortNameHash == rightThrowHash)
             {
-                // Check if animation reaches the throw climax (around 50-60% through when the throw motion peaks)
                 if (throwLayerState.normalizedTime >= 0.55f)
                 {
                     animationCompleted = true;
                     Debug.Log($"Throw animation completed at normalizedTime: {throwLayerState.normalizedTime:F2}", this);
-                    
-                    // Trigger the callback to actually throw the bomb
                     OnThrowAnimationComplete?.Invoke();
                 }
             }
             else
             {
-                // Animation has transitioned out, consider it complete
                 animationCompleted = true;
                 Debug.Log("Throw animation completed (transitioned out)", this);
                 OnThrowAnimationComplete?.Invoke();
@@ -304,7 +280,6 @@ public class PlayerAnimator : NetworkBehaviour
         }
     }
     
-    // Debug method to manually test throw animations
     [ContextMenu("Test Left Throw")]
     public void TestLeftThrow()
     {
@@ -329,7 +304,7 @@ public class PlayerAnimator : NetworkBehaviour
     public void ForceLeftThrow()
     {
         if (!isOwned) return;
-        anim.Play("rig_001_Final_Throw_Left", 1); // Force play on layer 1 (Throw layer)
+        anim.Play("rig_001_Final_Throw_Left", 1);
         Debug.Log("FORCE: Left throw animation forced", this);
     }
     
@@ -337,7 +312,7 @@ public class PlayerAnimator : NetworkBehaviour
     public void ForceRightThrow()
     {
         if (!isOwned) return;
-        anim.Play("rig_001_Final_Throw_Right", 1); // Force play on layer 1 (Throw layer)
+        anim.Play("rig_001_Final_Throw_Right", 1);
         Debug.Log("FORCE: Right throw animation forced", this);
     }
     
@@ -347,8 +322,12 @@ public class PlayerAnimator : NetworkBehaviour
         Debug.Log($"Throw layer weight: {anim.GetLayerWeight(1)}", this);
         Debug.Log($"Throw layer active: {anim.IsInTransition(1)}", this);
         
-        // Check if the animation is actually playing
         AnimatorStateInfo throwLayerState = anim.GetCurrentAnimatorStateInfo(1);
         Debug.Log($"Current throw state hash: {throwLayerState.shortNameHash}, normalized time: {throwLayerState.normalizedTime:F2}", this);
+    }
+
+    public void SetStunned(bool stunned)
+    {
+        anim.SetBool("IsStunned", stunned);
     }
 }

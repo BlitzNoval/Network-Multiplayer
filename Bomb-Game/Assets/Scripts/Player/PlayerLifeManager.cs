@@ -27,16 +27,14 @@ public class PlayerLifeManager : NetworkBehaviour
     [Header("Knockback Settings")]
     [SyncVar(hook = nameof(OnPercentageKnockbackChanged))] 
     private float percentageKnockback = 0f;
-    [SerializeField] private float maxKnockbackPercentage = 500f; // Max knockback percentage
-    
-    
+    [SerializeField] private float maxKnockbackPercentage = 500f;
+
     [Header("Camera View Elimination")]
-    [SerializeField] private float outOfViewTimeLimit = 5f; // Time out of camera view before elimination
-    [SerializeField] private float cameraCheckInterval = 0.5f; // How often to check camera view
+    [SerializeField] private float outOfViewTimeLimit = 5f;
+    [SerializeField] private float cameraCheckInterval = 0.5f;
     private float timeOutOfView = 0f;
     private float lastCameraCheckTime = 0f;
-    
-    // Properties
+
     public float KnockbackMultiplier => 1f + (percentageKnockback / 100f);
     public float PercentageKnockback => percentageKnockback;
 
@@ -48,11 +46,14 @@ public class PlayerLifeManager : NetworkBehaviour
     Collider          col;
     Rigidbody         rb;
 
-    private bool isRespawning; // Server-side flag to prevent multiple death triggers
-    private float lastRespawnTime; // Time when the last respawn occurred
-    private const float gracePeriod = 0.5f; // Grace period in seconds after respawn
+    private bool isRespawning;
+    private float lastRespawnTime;
+    private const float gracePeriod = 0.5f;
     private bool isHoldingBomb;
     private float lastKnockbackTime;
+
+    public bool isInKnockback = false;
+    private bool hasLanded = false;
 
     void Awake()
     {
@@ -60,7 +61,6 @@ public class PlayerLifeManager : NetworkBehaviour
         movement    = GetComponent<PlayerMovement>();
         col         = GetComponent<Collider>();
         rb          = GetComponent<Rigidbody>();
-        
     }
 
     public override void OnStartServer()
@@ -73,7 +73,7 @@ public class PlayerLifeManager : NetworkBehaviour
         TotalHoldTime       = 0f;
         KnockbackHitCount   = 0;
         isRespawning        = false;
-        lastRespawnTime     = -gracePeriod; // Initialize to allow immediate checks
+        lastRespawnTime     = -gracePeriod;
         timeOutOfView       = 0f;
         lastCameraCheckTime = 0f;
     }
@@ -81,7 +81,7 @@ public class PlayerLifeManager : NetworkBehaviour
     public override void OnStartClient()
     {
         base.OnStartClient();
-        UpdateNameTag(); // Initial tag update
+        UpdateNameTag();
         if (PlayerUIManager.Instance != null)
             PlayerUIManager.Instance.Register(this);
     }
@@ -96,8 +96,7 @@ public class PlayerLifeManager : NetworkBehaviour
     void Update()
     {
         if (!isServer) return;
-        
-        // Update knockback percentage while holding bomb
+
         if (bombHandler != null && bombHandler.CurrentBomb != null)
         {
             if (bombHandler.CurrentBomb.Holder == gameObject)
@@ -106,8 +105,7 @@ public class PlayerLifeManager : NetworkBehaviour
                 {
                     isHoldingBomb = true;
                 }
-                
-                // Get dynamic rate from KnockbackCalc and apply increase
+
                 KnockbackCalculator knockbackCalc = FindAnyObjectByType<KnockbackCalculator>();
                 float rate = knockbackCalc != null ? knockbackCalc.GetDynamicKnockbackRate(percentageKnockback) : 10f;
                 float increase = rate * Time.deltaTime;
@@ -129,15 +127,13 @@ public class PlayerLifeManager : NetworkBehaviour
         if (!isServer || IsDead || IsDisconnected || isRespawning || (GameManager.Instance != null && GameManager.Instance.IsPaused))
             return;
 
-        // Skip threshold check during grace period after respawn
         if (Time.time - lastRespawnTime < gracePeriod)
             return;
 
-        // Check if player is out of camera view
         if (Time.time - lastCameraCheckTime >= cameraCheckInterval)
         {
             lastCameraCheckTime = Time.time;
-            
+
             if (IsPlayerOutOfCameraView())
             {
                 timeOutOfView += cameraCheckInterval;
@@ -149,11 +145,10 @@ public class PlayerLifeManager : NetworkBehaviour
             }
             else
             {
-                timeOutOfView = 0f; // Reset timer when back in view
+                timeOutOfView = 0f;
             }
         }
-        
-        // Keep basic fall-off check as backup
+
         if (SpawnManager.Instance != null && SpawnManager.Instance.respawnReference != null)
         {
             float referenceY = SpawnManager.Instance.respawnReference.position.y;
@@ -165,7 +160,6 @@ public class PlayerLifeManager : NetworkBehaviour
             }
         }
 
-        // Update total hold time (legacy system - kept for compatibility)
         if (bombHandler?.CurrentBomb != null && bombHandler.CurrentBomb.Holder == gameObject)
         {
             TotalHoldTime += Time.fixedDeltaTime;
@@ -238,14 +232,13 @@ public class PlayerLifeManager : NetworkBehaviour
         RpcTeleport(newPosition, spawn.rotation);
         RpcLogToClient($"After teleport on server: position={rb.position}");
 
-        // Reset knockback values on respawn
         percentageKnockback = 0f;
         TotalHoldTime       = 0f;
         KnockbackHitCount   = 0;
         timeOutOfView       = 0f;
         SetAliveState(true, false);
         isRespawning = false;
-        lastRespawnTime = Time.time; // Set the last respawn time for grace period
+        lastRespawnTime = Time.time;
         RpcLogToClient($"RespawnRoutine completed for {gameObject.name}");
     }
 
@@ -291,13 +284,11 @@ public class PlayerLifeManager : NetworkBehaviour
     {
         KnockbackHitCount++;
         lastKnockbackTime = Time.time;
-        // The new percentage-based system handles knockback scaling
     }
-    
+
     [Server]
     public void AddExplosionKnockbackPercentage(int sector)
     {
-        // Add percentage based on sector (S1=40%, S2=30%, S3=20%, S4=10%)
         float percentageToAdd = 0f;
         switch (sector)
         {
@@ -306,7 +297,7 @@ public class PlayerLifeManager : NetworkBehaviour
             case 3: percentageToAdd = 20f; break;
             case 4: percentageToAdd = 10f; break;
         }
-        
+
         if (percentageToAdd > 0)
         {
             SetKnockbackPercentage(Mathf.Min(percentageKnockback + percentageToAdd, maxKnockbackPercentage));
@@ -316,95 +307,113 @@ public class PlayerLifeManager : NetworkBehaviour
     [TargetRpc]
     public void TargetFollowKnockbackArc(NetworkConnectionToClient _, KnockbackArcData arcData)
     {
-        // Client follows the calculated arc
         StartKnockbackArc(arcData);
     }
-    
+
     public void StartKnockbackArc(KnockbackArcData arcData)
     {
-        // Start following the parabolic arc
+        PlayerAnimator animator = GetComponent<PlayerAnimator>();
+        if (animator != null)
+        {
+            animator.OnPlayerStunned();
+            animator.SetStunned(true);
+        }
         StartCoroutine(FollowKnockbackArc(arcData));
     }
 
     IEnumerator FollowKnockbackArc(KnockbackArcData arcData)
-{
-    if (rb == null || arcData.arcPoints == null || arcData.arcPoints.Length == 0)
-        yield break;
-
-    // Disable normal movement while airborne
-    movement?.SetKnockbackState(true, 0f);
-
-    rb.linearVelocity = Vector3.zero;
-    rb.angularVelocity = Vector3.zero;
-
-    float   elapsedTime      = 0f;
-    Vector3 airControlOffset = Vector3.zero;
-
-    // Phase percentages
-    const float stunPhase     = 0.30f;   // 30 %
-    const float recoveryPhase = 0.40f;   // next 40 %
-    const float controlPhase  = 0.30f;   // final 30 %
-
-    Camera cam = Camera.main;            // cache once – cheap & thread-safe :contentReference[oaicite:3]{index=3}
-
-    while (elapsedTime < arcData.duration)
     {
-        elapsedTime += Time.fixedDeltaTime;
-        float t = elapsedTime / arcData.duration;
+        if (rb == null || arcData.arcPoints == null || arcData.arcPoints.Length == 0)
+            yield break;
 
-        /* ---------------- knock-back progress → air-control multiplier ---------------- */
-        float airControlMultiplier;
-        if      (t <= stunPhase)                     airControlMultiplier = 0f;
-        else if (t <= stunPhase + recoveryPhase)     airControlMultiplier =
-            Mathf.Lerp(0f, 0.4f, (t - stunPhase) / recoveryPhase);
-        else                                         airControlMultiplier =
-            Mathf.Lerp(0.4f, 0.8f, (t - stunPhase - recoveryPhase) / controlPhase);
-        /* ----------------------------------------------------------------------------- */
+        movement?.SetKnockbackState(true, 0f);
 
-        movement?.SetKnockbackState(true, airControlMultiplier);
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
 
-        /* ---------------- next point along pre-baked arc ---------------- */
-        int    idx     = Mathf.Clamp(
-                            Mathf.FloorToInt(t * (arcData.arcPoints.Length - 1)),
-                            0, arcData.arcPoints.Length - 1);
-        Vector3 target = arcData.arcPoints[idx];
+        float elapsedTime = 0f;
+        Vector3 airControlOffset = Vector3.zero;
 
-        if (idx < arcData.arcPoints.Length - 1)
+        const float stunPhase = 0.30f;
+        const float recoveryPhase = 0.40f;
+        const float controlPhase = 0.30f;
+
+        Camera cam = Camera.main;
+
+        isInKnockback = true;
+        hasLanded = false;
+        CollisionDetectionMode originalCollisionDetectionMode = rb.collisionDetectionMode;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
+        while (elapsedTime < arcData.duration && !hasLanded)
         {
-            float lerpT = (t * (arcData.arcPoints.Length - 1)) - idx;
-            target = Vector3.Lerp(target, arcData.arcPoints[idx + 1], lerpT);
-        }
-        /* ---------------------------------------------------------------- */
+            elapsedTime += Time.fixedDeltaTime;
+            float t = elapsedTime / arcData.duration;
 
-        /* ---------------- optional player influence while airborne ---------------- */
-        if (airControlMultiplier > 0f && movement != null && movement.isLocalPlayer)
-        {
-            Vector2 input = movement.GetMoveInput();
-            if (input.sqrMagnitude > 0.01f)
+            float airControlMultiplier;
+            if (t <= stunPhase)
+                airControlMultiplier = 0f;
+            else if (t <= stunPhase + recoveryPhase)
+                airControlMultiplier = Mathf.Lerp(0f, 0.4f, (t - stunPhase) / recoveryPhase);
+            else
+                airControlMultiplier = Mathf.Lerp(0.4f, 0.8f, (t - stunPhase - recoveryPhase) / controlPhase);
+
+            movement?.SetKnockbackState(true, airControlMultiplier);
+
+            int idx = Mathf.Clamp(Mathf.FloorToInt(t * (arcData.arcPoints.Length - 1)), 0, arcData.arcPoints.Length - 1);
+            Vector3 target = arcData.arcPoints[idx];
+
+            if (idx < arcData.arcPoints.Length - 1)
             {
-                Vector3 camF = cam.transform.forward; camF.y = 0; camF.Normalize();
-                Vector3 camR = cam.transform.right;   camR.y = 0; camR.Normalize();
-
-                Vector3 airForce = (camR * input.x + camF * input.y)
-                                   * airControlMultiplier * 2f * Time.fixedDeltaTime;
-
-                airControlOffset += airForce;
-                airControlOffset  = Vector3.ClampMagnitude(airControlOffset, 3f);
+                float lerpT = (t * (arcData.arcPoints.Length - 1)) - idx;
+                target = Vector3.Lerp(target, arcData.arcPoints[idx + 1], lerpT);
             }
-        }
-        /* --------------------------------------------------------------------------- */
 
-        rb.MovePosition(target + airControlOffset);
-        yield return new WaitForFixedUpdate();
+            if (airControlMultiplier > 0f && movement != null && movement.isLocalPlayer)
+            {
+                Vector2 input = movement.GetMoveInput();
+                if (input.sqrMagnitude > 0.01f)
+                {
+                    Vector3 camF = cam.transform.forward; camF.y = 0; camF.Normalize();
+                    Vector3 camR = cam.transform.right;   camR.y = 0; camR.Normalize();
+
+                    Vector3 airForce = (camR * input.x + camF * input.y) * airControlMultiplier * 2f * Time.fixedDeltaTime;
+
+                    airControlOffset += airForce;
+                    airControlOffset = Vector3.ClampMagnitude(airControlOffset, 3f);
+                }
+            }
+
+            rb.MovePosition(target + airControlOffset);
+            yield return new WaitForFixedUpdate();
+        }
+
+        rb.MovePosition(arcData.endPoint + airControlOffset);
+        LandingDotManager.Instance?.HideLandingDotForPlayer(PlayerNumber);
+        movement?.SetKnockbackState(false, 1f);
+        isInKnockback = false;
+
+        PlayerAnimator animator = GetComponent<PlayerAnimator>();
+        if (animator != null)
+        {
+            animator.SetStunned(false);
+        }
+
+        rb.collisionDetectionMode = originalCollisionDetectionMode;
     }
 
-    /* ---------------- landing ---------------- */
-    rb.MovePosition(arcData.endPoint + airControlOffset);
-    LandingDotManager.Instance?.HideLandingDotForPlayer(PlayerNumber);
-    movement?.SetKnockbackState(false, 1f);
-}
-
-    
+    void OnCollisionEnter(Collision collision)
+    {
+        if (isInKnockback && collision.gameObject.layer == LayerMask.NameToLayer("Ground"))
+        {
+            hasLanded = true;
+            PlayerAnimator animator = GetComponent<PlayerAnimator>();
+            if (animator != null)
+            {
+                animator.OnPlayerLanded();
+            }
+        }
+    }
 
     [Server]
     void SetAliveState(bool alive, bool triggerMode)
@@ -451,44 +460,36 @@ public class PlayerLifeManager : NetworkBehaviour
     bool IsPlayerOutOfCameraView()
     {
         if (Camera.main == null) return false;
-        
-        // Get the player's position in viewport coordinates
+
         Vector3 viewportPos = Camera.main.WorldToViewportPoint(transform.position);
-        
-        // Generous buffer with grace boundary for players on viewport edge
-        float buffer = 0.25f; // 25% buffer outside screen edges with grace boundary
-        
-        // Check if player is within the camera's viewport with generous buffer
-        // Special grace boundary: if player is near viewport edge, give them more time
+
+        float buffer = 0.25f;
+
         bool inView = viewportPos.x >= -buffer && viewportPos.x <= 1f + buffer &&
                      viewportPos.y >= -buffer && viewportPos.y <= 1f + buffer &&
-                     viewportPos.z > 0; // z > 0 means in front of camera
-                     
-        // Grace boundary check - if player is on the edge, they get extra leeway
+                     viewportPos.z > 0;
+
         bool onGraceBoundary = (viewportPos.x >= -0.1f && viewportPos.x <= 1.1f &&
                                viewportPos.y >= -0.1f && viewportPos.y <= 1.1f &&
                                viewportPos.z > 0);
-                               
+
         if (onGraceBoundary && !inView)
         {
-            // Player is in grace boundary - reset timer to give them chance to return
             timeOutOfView = Mathf.Max(0f, timeOutOfView - (cameraCheckInterval * 0.5f));
-            inView = true; // Treat as in view for this frame
+            inView = true;
         }
-        
-        // Additional check: if player is very close to camera but out of view, don't eliminate
+
         float distanceToCamera = Vector3.Distance(transform.position, Camera.main.transform.position);
-        if (distanceToCamera < 5f) // Within 5 units of camera
+        if (distanceToCamera < 5f)
         {
-            inView = true; // Don't eliminate if very close to camera
+            inView = true;
         }
-        
-        // Debug log when player goes out of view
+
         if (!inView)
         {
             RpcLogToClient($"Player out of view: viewport={viewportPos}, distance={distanceToCamera:F1}, graceBoundary={onGraceBoundary}");
         }
-        
+
         return !inView;
     }
 }
