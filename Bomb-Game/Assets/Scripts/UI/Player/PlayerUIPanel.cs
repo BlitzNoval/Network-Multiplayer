@@ -26,15 +26,15 @@ public class PlayerUIPanel : MonoBehaviour
     [SerializeField] Sprite[] numberSprites; // 0-9 sprites
     
     [Header("Background Panel")]
-    [SerializeField] Image backgroundPanel; // Panel behind numbers for visibility
+    [SerializeField] Image backgroundPanel;
     
     [Header("Visual Feedback Effects")]
     [SerializeField] EffectType feedbackEffect = EffectType.BarFlash;
     
     [Header("Effect Components")]
-    [SerializeField] Image flashOverlay; // For flash effects
-    [SerializeField] ParticleSystem sparksEffect; // For particle effects
-    [SerializeField] Image glowEffect; // For glow effects
+    [SerializeField] Image flashOverlay;
+    [SerializeField] ParticleSystem sparksEffect;
+    [SerializeField] Image glowEffect;
     
     [Header("Number Scale Settings")]
     [SerializeField] float baseScale = 1f;
@@ -43,7 +43,7 @@ public class PlayerUIPanel : MonoBehaviour
     
     [Header("Percentage Sign Settings")]
     [SerializeField] float percentageBaseScale = 0.8f;
-    [SerializeField] float percentageMaxScale = 1.6f; // Half the rate of numbers
+    [SerializeField] float percentageMaxScale = 1.6f;
     
     [Header("Pulse Settings")]
     [SerializeField] float pulseScale = 1.2f;
@@ -56,19 +56,23 @@ public class PlayerUIPanel : MonoBehaviour
     [SerializeField] int particleBurst = 15;
     
     [Header("Shake Intensity Settings")]
-    [SerializeField] float minShakeStrength = 1f;     // Shake strength at 0%
-    [SerializeField] float maxShakeStrength = 8f;     // Shake strength at 350%
-    [SerializeField] int minShakeVibrato = 5;         // Shake speed at 0%
-    [SerializeField] int maxShakeVibrato = 25;        // Shake speed at 350%
+    [SerializeField] float minShakeStrength = 1f;
+    [SerializeField] float maxShakeStrength = 8f;
+    [SerializeField] int minShakeVibrato = 5;
+    [SerializeField] int maxShakeVibrato = 25;
     [SerializeField] AnimationCurve shakeIntensityCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     
     [Header("Background Panel Scaling")]
     [SerializeField] bool scaleBackgroundPanel = true;
-    [SerializeField] float backgroundMaxScale = 1.2f; // How much the background grows
+    [SerializeField] float backgroundMaxScale = 1.2f;
     
     [Header("Elimination Animation")]
     [SerializeField] float eliminationDuration = 0.8f;
     [SerializeField] Ease eliminationEase = Ease.OutQuart;
+
+    [Header("Emoticon Display")]
+    [SerializeField] Sprite[] emoticonSprites; // Array of 3 emoticon sprites
+    [SerializeField] Image emoticonDisplay;
 
     readonly Color[] playerColors = new Color[]
     {
@@ -78,23 +82,15 @@ public class PlayerUIPanel : MonoBehaviour
         new Color(0.965f, 0.580f, 0.098f)  
     };
 
-    // Bar section thresholds (each section is 1/3 of 350)
-    const float BLUE_MAX = 116.67f;   // 0-116 (blue section)
-    const float YELLOW_MAX = 233.33f; // 117-233 (yellow section)
-    const float RED_MAX = 350f;       // 234-350 (red section)
+    const float BLUE_MAX = 116.67f;
+    const float YELLOW_MAX = 233.33f;
+    const float RED_MAX = 350f;
     
-    // Effect types enum
     public enum EffectType
     {
-        BarFlash,           // Flash the bar briefly
-        NumberPop,          // Pop the numbers briefly 
-        BarGlow,            // Glow effect around bar
-        Sparks,             // Particle sparks
-        ColorShift,         // Brief color change
-        Shake               // Shake the UI elements
+        BarFlash, NumberPop, BarGlow, Sparks, ColorShift, Shake
     }
     
-    // Animation state tracking
     private bool isPulsing = false;
     private int lastPercentage = 0;
     private Sequence pulseSequence;
@@ -107,8 +103,9 @@ public class PlayerUIPanel : MonoBehaviour
         else
             colorPanel.color = Color.gray;
             
-        // Initialize UI to default state
         ResetPercentageDisplay();
+        if (emoticonDisplay != null)
+            emoticonDisplay.gameObject.SetActive(false);
     }
 
     public void SetPlayerName(string name)
@@ -125,12 +122,10 @@ public class PlayerUIPanel : MonoBehaviour
         heart2.enabled = newLives >= 2;
         heart3.enabled = newLives >= 3;
         
-        // Handle elimination animation when player runs out of lives
         if (newLives <= 0 && oldLives > 0)
         {
             PlayEliminationAnimation();
         }
-        // Reset percentage display when player dies (loses a life) but not eliminated
         else if (newLives < oldLives)
         {
             ResetPercentageDisplay();
@@ -140,30 +135,22 @@ public class PlayerUIPanel : MonoBehaviour
     public void SetKnockback(float oldPercentage, float newPercentage)
     {
         int percentage = Mathf.Clamp(Mathf.RoundToInt(newPercentage), 0, 350);
-        
-        // Update gradient bars
         UpdateGradientBars(percentage);
-        
-        // Update custom number display
         UpdateNumberDisplay(percentage);
         
-        // Trigger visual feedback when percentage increases
         if (percentage > lastPercentage && percentage > 0)
         {
             PlayFeedbackEffect();
         }
         
-        // Handle pulse animation for high percentages
         HandlePulseAnimation(percentage);
-        
         lastPercentage = percentage;
     }
     
     void UpdateGradientBars(int percentage)
     {
-        float progress = percentage / 350f; // 0-1 progress across entire bar
+        float progress = percentage / 350f;
         
-        // Calculate smooth gradient transitions
         float blueFill = 0f;
         float yellowFill = 0f;
         float redFill = 0f;
@@ -171,41 +158,33 @@ public class PlayerUIPanel : MonoBehaviour
         float yellowAlpha = 0f;
         float redAlpha = 0f;
         
-        if (progress <= 0.333f) // 0-33% (0-116)
+        if (progress <= 0.333f)
         {
-            // Blue section dominates
             blueFill = progress / 0.333f;
             blueAlpha = 1f;
             yellowAlpha = 0f;
             redAlpha = 0f;
         }
-        else if (progress <= 0.666f) // 33-66% (117-233)
+        else if (progress <= 0.666f)
         {
-            // Transition from blue to yellow
             blueFill = 1f;
             yellowFill = (progress - 0.333f) / 0.333f;
-            
-            // Blend colors: blue fades out, yellow fades in
             float transitionProgress = (progress - 0.333f) / 0.333f;
-            blueAlpha = Mathf.Lerp(1f, 0.3f, transitionProgress); // Blue becomes semi-transparent
-            yellowAlpha = Mathf.Lerp(0f, 1f, transitionProgress); // Yellow becomes opaque
+            blueAlpha = Mathf.Lerp(1f, 0.3f, transitionProgress);
+            yellowAlpha = Mathf.Lerp(0f, 1f, transitionProgress);
             redAlpha = 0f;
         }
-        else // 66-100% (234-350)
+        else
         {
-            // Transition from yellow to red
             blueFill = 1f;
             yellowFill = 1f;
             redFill = (progress - 0.666f) / 0.334f;
-            
-            // Blend colors: yellow fades out, red fades in
             float transitionProgress = (progress - 0.666f) / 0.334f;
-            blueAlpha = 0.2f; // Keep blue subtle
-            yellowAlpha = Mathf.Lerp(1f, 0.3f, transitionProgress); // Yellow becomes semi-transparent
-            redAlpha = Mathf.Lerp(0f, 1f, transitionProgress); // Red becomes opaque
+            blueAlpha = 0.2f;
+            yellowAlpha = Mathf.Lerp(1f, 0.3f, transitionProgress);
+            redAlpha = Mathf.Lerp(0f, 1f, transitionProgress);
         }
         
-        // Apply fill amounts
         if (blueBarFill != null) 
         {
             blueBarFill.fillAmount = blueFill;
@@ -235,12 +214,10 @@ public class PlayerUIPanel : MonoBehaviour
     {
         if (numberSprites == null || numberSprites.Length < 10) return;
         
-        // Extract digits (ensure 3-digit format: 000-350)
         int hundreds = percentage / 100;
         int tens = (percentage % 100) / 10;
         int ones = percentage % 10;
         
-        // Set sprites for each digit
         if (hundredsDigit != null && hundreds < numberSprites.Length)
             hundredsDigit.sprite = numberSprites[hundreds];
             
@@ -250,30 +227,25 @@ public class PlayerUIPanel : MonoBehaviour
         if (onesDigit != null && ones < numberSprites.Length)
             onesDigit.sprite = numberSprites[ones];
         
-        // Scale numbers based on percentage (0-350 maps to baseScale-maxScale)
         float scaleProgress = percentage / 350f;
         float currentScale = Mathf.Lerp(baseScale, maxScale, scaleCurve.Evaluate(scaleProgress));
         
-        // Apply scale to all digits
         if (hundredsDigit != null) hundredsDigit.transform.localScale = Vector3.one * currentScale;
         if (tensDigit != null) tensDigit.transform.localScale = Vector3.one * currentScale;
         if (onesDigit != null) onesDigit.transform.localScale = Vector3.one * currentScale;
         
-        // Scale percentage sign at half the rate
         if (percentageSign != null)
         {
             float percentageScale = Mathf.Lerp(percentageBaseScale, percentageMaxScale, scaleCurve.Evaluate(scaleProgress));
             percentageSign.transform.localScale = Vector3.one * percentageScale;
         }
         
-        // Scale background panel with numbers and additional scaling
         if (backgroundPanel != null)
         {
             float backgroundScale = currentScale;
             
             if (scaleBackgroundPanel)
             {
-                // Add extra scaling based on percentage (grows more than numbers)
                 float extraScale = Mathf.Lerp(1f, backgroundMaxScale, scaleProgress);
                 backgroundScale *= extraScale;
             }
@@ -284,15 +256,13 @@ public class PlayerUIPanel : MonoBehaviour
     
     void ResetPercentageDisplay()
     {
-        // Stop any ongoing animations
         StopAllAnimations();
         
-        // Reset bars to empty and reset alpha values
         if (blueBarFill != null) 
         {
             blueBarFill.fillAmount = 0f;
             var color = blueBarFill.color;
-            color.a = 1f; // Reset to full opacity
+            color.a = 1f;
             blueBarFill.color = color;
         }
         
@@ -300,7 +270,7 @@ public class PlayerUIPanel : MonoBehaviour
         {
             yellowBarFill.fillAmount = 0f;
             var color = yellowBarFill.color;
-            color.a = 0f; // Reset to transparent
+            color.a = 0f;
             yellowBarFill.color = color;
         }
         
@@ -308,11 +278,10 @@ public class PlayerUIPanel : MonoBehaviour
         {
             redBarFill.fillAmount = 0f;
             var color = redBarFill.color;
-            color.a = 0f; // Reset to transparent
+            color.a = 0f;
             redBarFill.color = color;
         }
         
-        // Reset numbers to 000 and base scale
         if (numberSprites != null && numberSprites.Length >= 1)
         {
             if (hundredsDigit != null) 
@@ -332,19 +301,16 @@ public class PlayerUIPanel : MonoBehaviour
             }
         }
         
-        // Reset percentage sign
         if (percentageSign != null)
         {
             percentageSign.transform.localScale = Vector3.one * percentageBaseScale;
         }
         
-        // Reset background panel
         if (backgroundPanel != null)
         {
             backgroundPanel.transform.localScale = Vector3.one * baseScale;
         }
         
-        // Reset animation state
         isPulsing = false;
         lastPercentage = 0;
     }
@@ -367,7 +333,6 @@ public class PlayerUIPanel : MonoBehaviour
         
         isPulsing = true;
         
-        // Create pulsing sequence for all number elements
         pulseSequence = DOTween.Sequence();
         
         if (hundredsDigit != null)
@@ -401,13 +366,11 @@ public class PlayerUIPanel : MonoBehaviour
             pulseSequence = null;
         }
         
-        // Reset scales to current percentage-based values
         UpdateNumberDisplay(lastPercentage);
     }
     
     void PlayFeedbackEffect()
     {
-        // Kill any existing effect animation
         if (effectSequence != null)
         {
             effectSequence.Kill();
@@ -491,7 +454,6 @@ public class PlayerUIPanel : MonoBehaviour
     
     void PlayColorShift()
     {
-        // Temporarily shift the bar colors brighter
         effectSequence = DOTween.Sequence();
         
         if (blueBarFill != null)
@@ -523,7 +485,6 @@ public class PlayerUIPanel : MonoBehaviour
     {
         Vector3 originalPos = transform.localPosition;
         
-        // Calculate shake intensity based on current percentage
         float percentageProgress = lastPercentage / 350f;
         float curveValue = shakeIntensityCurve.Evaluate(percentageProgress);
         
@@ -537,7 +498,6 @@ public class PlayerUIPanel : MonoBehaviour
     
     void PlayEliminationAnimation()
     {
-        // Fade out and scale down the entire panel
         transform.DOScale(0f, eliminationDuration).SetEase(eliminationEase);
         
         CanvasGroup canvasGroup = GetComponent<CanvasGroup>();
@@ -572,5 +532,20 @@ public class PlayerUIPanel : MonoBehaviour
     void OnDestroy()
     {
         StopAllAnimations();
+    }
+
+    public void ShowEmoticon(int index)
+    {
+        if (index < 0 || index >= emoticonSprites.Length || emoticonDisplay == null) return;
+        
+        emoticonDisplay.sprite = emoticonSprites[index];
+        emoticonDisplay.gameObject.SetActive(true);
+        emoticonDisplay.transform.localScale = Vector3.zero;
+        
+        Sequence seq = DOTween.Sequence();
+        seq.Append(emoticonDisplay.transform.DOScale(1f, 0.3f).SetEase(Ease.OutBack));
+        seq.AppendInterval(0.7f);
+        seq.Append(emoticonDisplay.transform.DOScale(0f, 0.3f).SetEase(Ease.InBack));
+        seq.OnComplete(() => emoticonDisplay.gameObject.SetActive(false));
     }
 }

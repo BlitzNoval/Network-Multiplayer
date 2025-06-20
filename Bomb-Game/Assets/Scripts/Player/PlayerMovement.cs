@@ -16,36 +16,47 @@ public class PlayerMovement : NetworkBehaviour
     bool  isInKnockback;
     float knockbackMovementMultiplier = 1f;
 
+    [Header("Emoticon System")]
+    [SerializeField] EmoticonSelectionUI emoticonSelectionUI;
+
     /* ───────── Private ───────── */
     Rigidbody   rb;
     PlayerInput pi;
-    InputAction moveAct, aimAct;
+    InputAction moveAct, aimAct, emoticonAct;
     Vector2     moveInput;
     Vector3     horizVel;
     bool        isEmoting;
+    PlayerLifeManager playerLifeManager;
 
     string lastControlScheme;     // cached to avoid null on first frame
+    bool wasHoldingEmoticon;
+
+    public Vector3 CurrentAimDirection { get; private set; } = Vector3.forward; // Default to forward
 
     /* ───────── Lifecycle ───────── */
-    void Awake()                  // run on ALL instances – owner or not
+    void Awake()
     {
         rb = GetComponent<Rigidbody>();
         pi = GetComponent<PlayerInput>();
+        playerLifeManager = GetComponent<PlayerLifeManager>();
     }
 
     public override void OnStartClient()
     {
         base.OnStartClient();
-        if (!isLocalPlayer)            // ghosts don’t need inputs
+        if (!isLocalPlayer)
             pi.enabled = false;
     }
 
-    public override void OnStartAuthority()      // owner only
+    public override void OnStartAuthority()
     {
+        base.OnStartAuthority();
         moveAct = pi.actions["Move"];
         aimAct  = pi.actions["Aim"];
+        emoticonAct = pi.actions["Emoticon"];
         moveAct.Enable();
         aimAct.Enable();
+        emoticonAct.Enable();
         enabled = true;
     }
 
@@ -53,15 +64,15 @@ public class PlayerMovement : NetworkBehaviour
     {
         moveAct?.Disable();
         aimAct?.Disable();
+        emoticonAct?.Disable();
         enabled = false;
     }
 
     /* ───────── Update ───────── */
     void Update()
     {
-        if (!isLocalPlayer || !GameRunning()) return;
+        if (!isLocalPlayer || !GameRunning() || (playerLifeManager != null && playerLifeManager.isInKnockback)) return;
 
-        // in-game pause hotkey
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             if (GameManager.Instance.IsPaused)
@@ -76,13 +87,12 @@ public class PlayerMovement : NetworkBehaviour
         }
 
         moveInput = isEmoting ? Vector2.zero : moveAct.ReadValue<Vector2>();
-
         HandleRotation();
+        HandleEmoticonInput();
     }
 
     void HandleRotation()
     {
-        // cache scheme to survive first-frame null
         string scheme = pi.currentControlScheme ?? lastControlScheme;
         lastControlScheme = scheme;
 
@@ -100,14 +110,20 @@ public class PlayerMovement : NetworkBehaviour
                 Vector3 dir = cam.ScreenPointToRay(mousePos).GetPoint(d) - transform.position;
                 dir.y = 0;
                 if (dir.sqrMagnitude > 0.001f)
-                    SmoothLook(dir);
+                {
+                    CurrentAimDirection = dir.normalized;
+                    SmoothLook(CurrentAimDirection);
+                }
             }
         }
         else if (scheme == "Gamepad")
         {
             Vector2 aim = aimAct.ReadValue<Vector2>();
             if (aim.sqrMagnitude > 0.01f)
-                SmoothLook(new Vector3(aim.x, 0, aim.y));
+            {
+                CurrentAimDirection = new Vector3(aim.x, 0, aim.y).normalized;
+                SmoothLook(CurrentAimDirection);
+            }
         }
     }
 
@@ -116,6 +132,85 @@ public class PlayerMovement : NetworkBehaviour
         Quaternion look = Quaternion.LookRotation(dir.normalized);
         transform.rotation = Quaternion.Slerp(
             transform.rotation, look, rotationSpeed * Time.deltaTime);
+    }
+
+    void HandleEmoticonInput()
+    {
+        bool isHoldingEmoticon = emoticonAct.IsPressed();
+        if (isHoldingEmoticon && !wasHoldingEmoticon)
+        {
+            StartEmoticonSelection();
+        }
+        else if (!isHoldingEmoticon && wasHoldingEmoticon)
+        {
+            EndEmoticonSelection();
+        }
+
+        if (isHoldingEmoticon)
+        {
+            UpdateEmoticonSelection();
+        }
+
+        wasHoldingEmoticon = isHoldingEmoticon;
+    }
+
+    void StartEmoticonSelection()
+    {
+        if (emoticonSelectionUI != null)
+            emoticonSelectionUI.Show();
+    }
+
+    void UpdateEmoticonSelection()
+    {
+        if (emoticonSelectionUI != null)
+        {
+            int selected = GetSelectedEmoticon();
+            emoticonSelectionUI.HighlightEmoticon(selected);
+        }
+    }
+
+    void EndEmoticonSelection()
+    {
+        if (emoticonSelectionUI != null)
+        {
+            emoticonSelectionUI.Hide();
+            int selected = GetSelectedEmoticon();
+            CmdSelectEmoticon(selected);
+        }
+    }
+
+    int GetSelectedEmoticon()
+    {
+        if (CurrentAimDirection.sqrMagnitude > 0.01f)
+        {
+            float angle = Mathf.Atan2(CurrentAimDirection.x, CurrentAimDirection.z) * Mathf.Rad2Deg;
+            if (angle > -60 && angle < 60) return 0; // Forward
+            else if (angle >= 60) return 1;          // Left
+            else return 2;                           // Right
+        }
+        return 0; // Default to first emoticon
+    }
+
+    [Command]
+    void CmdSelectEmoticon(int index)
+    {
+        RpcShowEmoticon(netIdentity, index);
+    }
+
+    [ClientRpc]
+    void RpcShowEmoticon(NetworkIdentity playerId, int index)
+    {
+        GameObject player = playerId.gameObject;
+        PlayerLifeManager lifeManager = player.GetComponent<PlayerLifeManager>();
+        if (lifeManager != null)
+        {
+            int playerNumber = lifeManager.PlayerNumber;
+            PlayerUIPanel panel = PlayerUIManager.Instance.GetPanelForPlayer(playerNumber);
+            if (panel != null)
+            {
+                panel.ShowEmoticon(index);
+            }
+        }
     }
 
     /* ───────── FixedUpdate ───────── */
@@ -131,7 +226,6 @@ public class PlayerMovement : NetworkBehaviour
 
         if (isEmoting)
         {
-            // only the owner freezes itself – prevents NRE on ghosts
             if (isLocalPlayer)
                 rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
             horizVel = Vector3.zero;

@@ -171,6 +171,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Emoticon"",
+                    ""type"": ""Button"",
+                    ""id"": ""831038fd-2288-4f9e-8aa4-1523a30933df"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -459,6 +468,28 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""Emote"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""8259593c-e15f-424a-a827-e47240f7150e"",
+                    ""path"": ""<Keyboard>/4"",
+                    ""interactions"": ""Press"",
+                    ""processors"": """",
+                    ""groups"": "";KeyboardMouse"",
+                    ""action"": ""Emoticon"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""588f0199-aafc-42ab-a883-576ef717592c"",
+                    ""path"": ""<Gamepad>/dpad/down"",
+                    ""interactions"": ""Press"",
+                    ""processors"": """",
+                    ""groups"": "";Gamepad"",
+                    ""action"": ""Emoticon"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -504,6 +535,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Player_Emote2 = m_Player.FindAction("Emote2", throwIfNotFound: true);
         m_Player_Emote3 = m_Player.FindAction("Emote3", throwIfNotFound: true);
         m_Player_Emote = m_Player.FindAction("Emote", throwIfNotFound: true);
+        m_Player_Emoticon = m_Player.FindAction("Emoticon", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -593,6 +625,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Emote2;
     private readonly InputAction m_Player_Emote3;
     private readonly InputAction m_Player_Emote;
+    private readonly InputAction m_Player_Emoticon;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -640,6 +673,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Emote".
         /// </summary>
         public InputAction @Emote => m_Wrapper.m_Player_Emote;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Emoticon".
+        /// </summary>
+        public InputAction @Emoticon => m_Wrapper.m_Player_Emoticon;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -693,6 +730,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Emote.started += instance.OnEmote;
             @Emote.performed += instance.OnEmote;
             @Emote.canceled += instance.OnEmote;
+            @Emoticon.started += instance.OnEmoticon;
+            @Emoticon.performed += instance.OnEmoticon;
+            @Emoticon.canceled += instance.OnEmoticon;
         }
 
         /// <summary>
@@ -731,6 +771,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Emote.started -= instance.OnEmote;
             @Emote.performed -= instance.OnEmote;
             @Emote.canceled -= instance.OnEmote;
+            @Emoticon.started -= instance.OnEmoticon;
+            @Emoticon.performed -= instance.OnEmoticon;
+            @Emoticon.canceled -= instance.OnEmoticon;
         }
 
         /// <summary>
@@ -860,5 +903,12 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnEmote(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Emoticon" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnEmoticon(InputAction.CallbackContext context);
     }
 }

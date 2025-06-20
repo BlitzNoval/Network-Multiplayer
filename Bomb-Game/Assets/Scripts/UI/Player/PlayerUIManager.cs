@@ -88,4 +88,10 @@ public class PlayerUIManager : MonoBehaviour
 
         activePanels.Clear();
     }
+
+    public PlayerUIPanel GetPanelForPlayer(int playerNumber)
+    {
+        activePanels.TryGetValue(playerNumber, out PlayerUIPanel panel);
+        return panel;
+    }
 }
