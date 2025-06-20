@@ -11,7 +11,8 @@ public class PlayerLifeManager : NetworkBehaviour
     [SyncVar] [SerializeField] int   maxLives           = 3;
     [SyncVar] [SerializeField] float respawnDelay      = 2f;
 
-    [SyncVar] public bool IsDisconnected;
+    [SyncVar(hook = nameof(OnIsDisconnectedChanged))]
+    public bool IsDisconnected;
 
     public void SetMaxLives(int v)            => maxLives           = v;
     public void SetRespawnDelay(float v)      => respawnDelay       = v;
@@ -36,8 +37,8 @@ public class PlayerLifeManager : NetworkBehaviour
     private float lastCameraCheckTime = 0f;
 
     [Header("Player Visuals")]
-    [SerializeField] private GameObject materialObject; // The object in the prefab to apply the material to
-    [SerializeField] private Material[] playerMaterials; // Array of 4 materials for P1, P2, P3, P4
+    [SerializeField] private GameObject materialObject;
+    [SerializeField] private Material[] playerMaterials;
 
     public float KnockbackMultiplier => 1f + (percentageKnockback / 100f);
     public float PercentageKnockback => percentageKnockback;
@@ -45,7 +46,7 @@ public class PlayerLifeManager : NetworkBehaviour
     public event Action<int,int>     OnLivesChanged;
     public event Action<float,float> OnKnockbackPercentageChanged;
 
-    PlayerBombHandler bombHandler;
+    public PlayerBombHandler bombHandler;
     PlayerMovement    movement;
     Collider          col;
     Rigidbody         rb;
@@ -196,6 +197,16 @@ public class PlayerLifeManager : NetworkBehaviour
         OnKnockbackPercentageChanged?.Invoke(oldValue, newValue);
     }
 
+    void OnIsDisconnectedChanged(bool oldValue, bool newValue)
+    {
+        if (PlayerUIManager.Instance != null)
+        {
+            var panel = PlayerUIManager.Instance.GetPanelForPlayer(PlayerNumber);
+            if (panel != null)
+                panel.SetGhost(newValue);
+        }
+    }
+
     [Server]
     public void HandleDeath()
     {
@@ -281,6 +292,20 @@ public class PlayerLifeManager : NetworkBehaviour
         }
         GameManager.Instance?.UnregisterPlayer(gameObject);
         NetworkServer.Destroy(gameObject);
+    }
+
+    [Server]
+    public void StartGhostTimeout()
+    {
+        StartCoroutine(GhostTimeoutCoroutine());
+    }
+
+    [Server]
+    IEnumerator GhostTimeoutCoroutine()
+    {
+        yield return new WaitForSeconds(120f);
+        if (IsDisconnected)
+            FinalDeath();
     }
 
     [Server]
@@ -420,7 +445,7 @@ public class PlayerLifeManager : NetworkBehaviour
     }
 
     [Server]
-    void SetAliveState(bool alive, bool triggerMode)
+    public void SetAliveState(bool alive, bool triggerMode)
     {
         IsDead           = !alive;
         movement.enabled = alive;
@@ -466,7 +491,7 @@ public class PlayerLifeManager : NetworkBehaviour
             return;
         }
 
-        int materialIndex = playerNumber - 1; // PlayerNumber is 1-4, array is 0-3
+        int materialIndex = playerNumber - 1;
         if (materialIndex < 0 || materialIndex >= playerMaterials.Length)
         {
             Debug.LogError($"Invalid player number: {playerNumber}", this);
@@ -480,7 +505,6 @@ public class PlayerLifeManager : NetworkBehaviour
             return;
         }
 
-        // Apply the material locally
         Renderer renderer = materialObject.GetComponent<Renderer>();
         if (renderer != null)
         {

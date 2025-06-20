@@ -23,7 +23,7 @@ public class PlayerUIPanel : MonoBehaviour
     [SerializeField] Image tensDigit;
     [SerializeField] Image onesDigit;
     [SerializeField] Image percentageSign;
-    [SerializeField] Sprite[] numberSprites; // 0-9 sprites
+    [SerializeField] Sprite[] numberSprites;
     
     [Header("Background Panel")]
     [SerializeField] Image backgroundPanel;
@@ -71,7 +71,7 @@ public class PlayerUIPanel : MonoBehaviour
     [SerializeField] Ease eliminationEase = Ease.OutQuart;
 
     [Header("Emoticon Display")]
-    [SerializeField] Sprite[] emoticonSprites; // Array of 3 emoticon sprites
+    [SerializeField] Sprite[] emoticonSprites;
     [SerializeField] Image emoticonDisplay;
 
     readonly Color[] playerColors = new Color[]
@@ -145,6 +145,11 @@ public class PlayerUIPanel : MonoBehaviour
         
         HandlePulseAnimation(percentage);
         lastPercentage = percentage;
+    }
+
+    public void SetGhost(bool ghost)
+    {
+        gameObject.SetActive(!ghost);
     }
     
     void UpdateGradientBars(int percentage)

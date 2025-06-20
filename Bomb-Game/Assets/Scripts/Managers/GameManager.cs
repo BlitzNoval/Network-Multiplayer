@@ -394,15 +394,20 @@ IEnumerator LocateUI()
         }
     }
 
-    [Server] public void ResumeGame(NetworkIdentity pauser)
+    [Server]
+public void ResumeGame(NetworkIdentity requester)
+{
+    if (IsPaused)
     {
-        if (IsPaused && (pauser == null || Pauser == pauser))
-        {
-            IsPaused = false;
-            Pauser = null;
-            Debug.Log("ResumeGame: Game resumed", this);
-        }
+        IsPaused = false;
+        Pauser = null;
+        Debug.Log("Game resumed by " + (requester != null ? requester.netId.ToString() : "server"));
     }
+    else
+    {
+        Debug.Log("Resume attempted but game is not paused");
+    }
+}
 
     void OnPauseStateChanged(bool oldValue, bool newValue) =>
         IsPausedChanged?.Invoke(oldValue, newValue);

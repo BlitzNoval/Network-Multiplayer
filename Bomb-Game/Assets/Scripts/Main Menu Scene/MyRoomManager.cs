@@ -1,6 +1,8 @@
 using Mirror;
 using UnityEngine;
 using System.Linq;
+using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 
 public class MyRoomManager : NetworkRoomManager
@@ -16,18 +18,16 @@ public class MyRoomManager : NetworkRoomManager
     [SerializeField] private float gameStartDelay = 2f;
     public static string SelectedMap => Singleton?.selectedMapName ?? "";
 
+    public static readonly Dictionary<string, PlayerLifeManager> ghosts = new();
+
     public override void Awake()
     {
         base.Awake();
         Singleton = this;
         
-        // Only subscribe to voting events if we're in the Room scene
         if (Utils.IsSceneActive(RoomScene))
         {
-            // Subscribe to map voting events - use delayed subscription since MapVotingManager may not be ready yet
             StartCoroutine(SubscribeToVotingEvents());
-            
-            // Also try immediate subscription in case the coroutine fails
             Invoke(nameof(TrySubscribeToVotingEvents), 1f);
         }
         
@@ -42,6 +42,25 @@ public class MyRoomManager : NetworkRoomManager
         Debug.Log("MyRoomManager destroyed", this);
     }
 
+    public override void OnServerDisconnect(NetworkConnectionToClient conn)
+    {
+        if (conn.identity != null && conn.identity.TryGetComponent(out PlayerLifeManager life))
+        {
+            life.IsDisconnected = true;
+            life.SetAliveState(false, true);
+            conn.identity.RemoveClientAuthority();
+            ghosts[life.GetComponent<PlayerInfo>().playerName] = life;
+
+            if (life.bombHandler?.CurrentBomb != null)
+            {
+                life.bombHandler.CurrentBomb.ThrowBomb(Vector3.zero, false);
+            }
+
+            life.StartGhostTimeout();
+        }
+        base.OnServerDisconnect(conn);
+    }
+
     public override void OnServerAddPlayer(NetworkConnectionToClient conn)
     {
         if (!MyAuthenticator.connectionToPlayerName.TryGetValue(conn, out string playerName))
@@ -51,33 +70,19 @@ public class MyRoomManager : NetworkRoomManager
         }
         Debug.Log($"OnServerAddPlayer: PlayerName={playerName}, GameActive={GameManager.Instance?.GameActive}, ConnId={conn.connectionId}", this);
 
-        if (GameManager.Instance != null && GameManager.Instance.GameActive && 
-            GameManager.Instance.playerObjects.TryGetValue(playerName, out GameObject existingPlayer))
+        if (ghosts.TryGetValue(playerName, out PlayerLifeManager ghost) && ghost.IsDisconnected)
         {
-            var lifeManager = existingPlayer.GetComponent<PlayerLifeManager>();
-            var playerInfo = existingPlayer.GetComponent<PlayerInfo>();
-            if (lifeManager != null && lifeManager.IsDisconnected)
-            {
-                if (playerInfo != null && string.IsNullOrEmpty(playerInfo.playerName))
-                {
-                    playerInfo.playerName = playerName;
-                    Debug.Log($"Reconnected player: Set PlayerInfo.playerName={playerName} for {existingPlayer.name}", this);
-                }
-                NetworkServer.AddPlayerForConnection(conn, existingPlayer);
-                lifeManager.IsDisconnected = false;
-                var netId = existingPlayer.GetComponent<NetworkIdentity>();
-                if (netId != null)
-                    netId.AssignClientAuthority(conn);
-                Debug.Log($"Reconnected player {playerName} to {existingPlayer.name}, netId={netId.netId}", this);
-                return;
-            }
+            NetworkServer.AddPlayerForConnection(conn, ghost.gameObject);
+            ghost.IsDisconnected = false;
+            ghost.GetComponent<NetworkIdentity>().AssignClientAuthority(conn);
+            ghosts.Remove(playerName);
+            Debug.Log($"Reconnected player {playerName} to {ghost.gameObject.name}", this);
+            return;
         }
 
         base.OnServerAddPlayer(conn);
         Debug.Log($"OnServerAddPlayer: Added new player {playerName}", this);
     }
-
-    
 
     public override bool OnRoomServerSceneLoadedForPlayer(NetworkConnectionToClient conn,
                                                           GameObject roomPlayer,
@@ -146,16 +151,12 @@ public class MyRoomManager : NetworkRoomManager
     System.Collections.IEnumerator SubscribeToVotingEvents()
     {
         Debug.Log("SubscribeToVotingEvents coroutine started");
-        
-        // Wait a frame for all components to initialize
         yield return null;
-        
         TrySubscribeToVotingEvents();
     }
     
     void TrySubscribeToVotingEvents()
     {
-        // Only try to subscribe if we're in the Room scene
         if (!Utils.IsSceneActive(RoomScene))
         {
             Debug.Log("Not in Room scene, skipping MapVotingManager subscription");
@@ -173,7 +174,6 @@ public class MyRoomManager : NetworkRoomManager
         
         if (votingManager != null)
         {
-            // Check if already subscribed to avoid double subscription
             var existingSubscribers = votingManager.OnMapSelected?.GetInvocationList();
             bool alreadySubscribed = existingSubscribers?.Any(d => d.Target == this) ?? false;
             
@@ -197,7 +197,6 @@ public class MyRoomManager : NetworkRoomManager
     {
         Debug.Log("OnRoomServerPlayersReady called - triggering map vote finalization");
         
-        // When all players are ready, trigger voting finalization
         MapVotingManager votingManager = MapVotingManager.Instance;
         if (votingManager == null)
         {
@@ -207,16 +206,12 @@ public class MyRoomManager : NetworkRoomManager
         if (votingManager != null)
         {
             Debug.Log("Found MapVotingManager - triggering finalization");
-            
-            // Make sure we're subscribed before triggering finalization
             TrySubscribeToVotingEvents();
-            
             votingManager.TriggerVotingFinalization();
         }
         else
         {
             Debug.Log("No MapVotingManager found - starting game with default map");
-            // No voting system active, start game normally
             base.OnRoomServerPlayersReady();
         }
     }
@@ -226,7 +221,6 @@ public class MyRoomManager : NetworkRoomManager
         selectedMapName = mapName;
         Debug.Log($"MyRoomManager.OnMapSelected called with map: {mapName}, NetworkServer.active: {NetworkServer.active}, GameplayScene: {GameplayScene}", this);
         
-        // Start game with delay for better UX
         if (NetworkServer.active)
         {
             Debug.Log($"Starting delayed game transition. Waiting {gameStartDelay} seconds...");
@@ -258,7 +252,6 @@ public class MyRoomManager : NetworkRoomManager
     {
         base.OnRoomServerSceneChanged(sceneName);
         
-        // When room scene loads, try to subscribe to voting events
         if (sceneName == RoomScene)
         {
             Debug.Log("Room scene loaded - attempting to subscribe to voting events");
@@ -269,7 +262,7 @@ public class MyRoomManager : NetworkRoomManager
     public override void OnStopHost()
     {
         base.OnStopHost();
-        selectedMapName = ""; // Reset selected map
+        selectedMapName = "";
         if (GameManager.Instance != null)
             GameManager.Instance.ResetState();
         if (PlayerUIManager.Instance != null)

@@ -62,6 +62,11 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] public Transform leftHandPoint;
     [SerializeField] public Transform rightHandPoint;
     
+    [Header("Performance")]
+    [SerializeField] float trajectoryUpdateRate = 10f;
+    [SerializeField] float aimDirectionThreshold = 0.05f;
+    [SerializeField] float aimSmoothSpeed = 8f;
+    
     Bomb currentBomb;
     public Bomb CurrentBomb => currentBomb;
     Camera playerCamera;
@@ -82,18 +87,14 @@ public class PlayerBombHandler : NetworkBehaviour
     Vector3 targetAimDirection;
     List<Vector3> trajectoryPoints = new();
     float timeStep = 0.01f;
-    [SerializeField] float aimSmoothSpeed = 8f;
     
-    [Header("Performance")]
-    [SerializeField] float trajectoryUpdateRate = 10f;
-    [SerializeField] float aimDirectionThreshold = 0.05f;
     private float lastTrajectoryUpdate = 0f;
     private Vector3 lastCachedAimDirection = Vector3.zero;
     private ThrowType lastCachedThrowType = ThrowType.Underarm;
     private bool trajectoryNeedsUpdate = true;
     
     public enum ThrowType { Underarm, Lob }
-    [SyncVar(hook = nameof(OnThrowTypeChanged))] ThrowType currentThrowType = ThrowType.Underarm;
+    [SyncVar(hook = nameof(OnThrowTypeChanged))] private ThrowType currentThrowType = ThrowType.Underarm;
     
     Vector3 localLandingPosition = Vector3.zero;
     bool showLocalLandingMarker = false;
@@ -119,13 +120,30 @@ public class PlayerBombHandler : NetworkBehaviour
         
         InitializeTrajectoryVisualization();
 
+        // Fallback to find hand points if not set in Inspector
         if (rightHandPoint == null)
         {
-            Debug.Log("RightHandPoint not set in inspector. Using transform.Find.");
+            rightHandPoint = transform.Find("RightHoldPoint");
+            if (rightHandPoint == null)
+            {
+                Debug.LogError("RightHoldPoint not found on " + name);
+            }
+            else
+            {
+                Debug.Log("RightHandPoint assigned via transform.Find on " + name);
+            }
         }
         if (leftHandPoint == null)
         {
-            Debug.Log("LeftHandPoint not set in inspector. Using transform.Find.");
+            leftHandPoint = transform.Find("LeftHoldPoint");
+            if (leftHandPoint == null)
+            {
+                Debug.LogError("LeftHoldPoint not found on " + name);
+            }
+            else
+            {
+                Debug.Log("LeftHandPoint assigned via transform.Find on " + name);
+            }
         }
     }
 
@@ -372,6 +390,17 @@ public class PlayerBombHandler : NetworkBehaviour
         aimDirection = Vector3.Slerp(aimDirection, targetAimDirection, aimSmoothSpeed * Time.deltaTime);
     }
 
+    #region Hand-helpers
+    /// <summary>Server-side: keep SyncVar in step with bomb hand.</summary>
+    private void RefreshThrowTypeFromHand()
+    {
+        if (currentBomb == null) return;
+        ThrowType newType = currentBomb.IsOnRight ? ThrowType.Underarm : ThrowType.Lob;
+        if (isServer) currentThrowType = newType;
+        trajectoryNeedsUpdate = true;
+    }
+    #endregion
+
     public void SetBomb(Bomb b)
     {
         currentBomb = b;
@@ -390,6 +419,7 @@ public class PlayerBombHandler : NetworkBehaviour
             {
                 Debug.LogError("Hand point not set for " + (currentBomb.IsOnRight ? "right" : "left") + " hand");
             }
+            if (isServer) RefreshThrowTypeFromHand();
         }
     }
 
@@ -407,7 +437,6 @@ public class PlayerBombHandler : NetworkBehaviour
             isAiming = false;
         }
     }
-
 
     void ToggleThrowTypes(InputAction.CallbackContext context)
     {
@@ -434,250 +463,252 @@ public class PlayerBombHandler : NetworkBehaviour
         if (currentBomb != null && currentBomb.IsHeld)
         {
             currentBomb.SwapHoldPoint();
+            RefreshThrowTypeFromHand();
             Debug.Log($"CmdSwapHands: Swapped bomb to {(currentBomb.IsOnRight ? "right" : "left")} hand", this);
         }
     }
 
     void DrawTrajectory()
+{
+    trajectoryPoints.Clear();
+    if (currentBomb == null || !isAiming)
     {
-        trajectoryPoints.Clear();
-        if (currentBomb == null || !isAiming)
-        {
-            HideTrajectory();
-            return;
-        }
-
-        Transform origin;
-        if (currentBomb.IsOnRight)
-        {
-            origin = rightHandPoint != null ? rightHandPoint : transform.Find("RightHoldPoint");
-        }
-        else
-        {
-            origin = leftHandPoint != null ? leftHandPoint : transform.Find("LeftHoldPoint");
-        }
-        if (origin == null)
-        {
-            Debug.LogError("Hand point not found for " + (currentBomb.IsOnRight ? "right" : "left") + " hand!");
-            HideTrajectory();
-            return;
-        }
-
-        float speed = currentThrowType == ThrowType.Underarm ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
-        float upward = currentThrowType == ThrowType.Underarm ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
-        
-        int maxPoints = currentThrowType == ThrowType.Underarm ? underarmThrowMaxPoints : lobThrowMaxPoints;
-        float pointSpacing = currentThrowType == ThrowType.Underarm ? underarmThrowPointSpacing : lobThrowPointSpacing;
-        float fadeDistance = currentThrowType == ThrowType.Underarm ? underarmThrowFadeDistance : lobThrowFadeDistance;
-
-        Vector3 startPos = origin.position;
-        
-        Vector3 force = aimDirection.normalized * speed + Vector3.up * upward;
-        float effectiveMass = 1f * currentBomb.FlightMassMultiplier;
-        Vector3 velocity = force / effectiveMass;
-        
-        Vector3 lastPos = startPos;
-        Vector3 landingPos = Vector3.zero;
-        bool foundLanding = false;
-
-        trajectoryPoints.Add(lastPos);
-
-        float t = 0f;
-        Vector3 currentVelocity = velocity;
-        Vector3 currentPos = startPos;
-        List<Vector3> bouncePoints = new List<Vector3>();
-        int maxBounces = 3;
-        int bounceCount = 0;
-        
-        for (int i = 0; i < maxPoints; ++i)
-        {
-            t += timeStep;
-            
-            currentVelocity += Physics.gravity * timeStep;
-            
-            Vector3 next = currentPos + currentVelocity * timeStep;
-            
-            Vector3 rayDirection = (next - lastPos).normalized;
-            float rayDistance = (next - lastPos).magnitude;
-            
-            if (rayDistance > 0.001f)
-            {
-                bool hitSomething = Physics.Raycast(lastPos, rayDirection, out RaycastHit hit, rayDistance + 0.1f, collisionMask);
-                
-                if (!hitSomething && currentVelocity.y < 0)
-                {
-                    Vector3 downwardRay = rayDirection + Vector3.down * 0.3f;
-                    hitSomething = Physics.Raycast(lastPos, downwardRay.normalized, out hit, rayDistance * 1.5f, collisionMask);
-                }
-                
-                if (hitSomething)
-                {
-                    trajectoryPoints.Add(hit.point);
-                    
-                    Vector3 surfaceNormal = hit.normal;
-                    float dotProduct = Vector3.Dot(currentVelocity.normalized, -surfaceNormal);
-                    
-                    if (dotProduct < 0.7f && bounceCount < maxBounces && currentVelocity.magnitude > 5f)
-                    {
-                        bouncePoints.Add(hit.point);
-                        bounceCount++;
-                        
-                        Vector3 bounceVelocity = Vector3.Reflect(currentVelocity, surfaceNormal);
-                        bounceVelocity *= 0.6f;
-                        
-                        currentVelocity = bounceVelocity;
-                        currentPos = hit.point + surfaceNormal * 0.01f;
-                        lastPos = currentPos;
-                        
-                        continue;
-                    }
-                    else
-                    {
-                        landingPos = hit.point;
-                        foundLanding = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (next.y < -10f)
-            {
-                if (Physics.Raycast(new Vector3(next.x, 50f, next.z), Vector3.down, out RaycastHit groundHit, 100f, collisionMask))
-                {
-                    landingPos = groundHit.point;
-                    foundLanding = true;
-                }
-                else
-                {
-                    landingPos = next;
-                    foundLanding = true;
-                }
-                break;
-            }
-            
-            trajectoryPoints.Add(next);
-            lastPos = next;
-            currentPos = next;
-        }
-        
-        UpdateBounceMarkers(bouncePoints);
-
-        if (currentThrowType == ThrowType.Underarm)
-        {
-            UpdateArrowTrajectory();
-            HideDottedTrajectory();
-        }
-        else
-        {
-            UpdateDottedTrajectory();
-            HideArrowTrajectory();
-        }
-        
-        if (isLocalPlayer)
-        {
-            if (foundLanding)
-            {
-                UpdateLocalLandingMarker(landingPos);
-            }
-            else
-            {
-                HideLandingMarkers();
-            }
-        }
+        HideTrajectory();
+        return;
     }
 
-    void UpdateDottedTrajectory()
+    Transform origin;
+    if (currentBomb.IsOnRight)
     {
-        while (trajectoryDots.Count < trajectoryPoints.Count)
-        {
-            GameObject dot;
-            Material dotMaterial = null;
-            
-            if (trajectoryPointPrefab != null)
-            {
-                dot = Instantiate(trajectoryPointPrefab);
-            }
-            else
-            {
-                dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                dot.transform.localScale = Vector3.one * 0.2f;
-                Destroy(dot.GetComponent<Collider>());
-            }
-            
-            Renderer renderer = dot.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                dotMaterial = new Material(renderer.material);
-                dotMaterial.SetFloat("_Mode", 3);
-                dotMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                dotMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                dotMaterial.SetInt("_ZWrite", 0);
-                dotMaterial.DisableKeyword("_ALPHATEST_ON");
-                dotMaterial.EnableKeyword("_ALPHABLEND_ON");
-                dotMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                dotMaterial.renderQueue = 3000;
-                renderer.material = dotMaterial;
-            }
-            
-            dot.SetActive(false);
-            trajectoryDots.Add(dot);
-            trajectoryDotMaterials.Add(dotMaterial);
-        }
+        origin = rightHandPoint != null ? rightHandPoint : transform.Find("RightHoldPoint");
+    }
+    else
+    {
+        origin = leftHandPoint != null ? leftHandPoint : transform.Find("LeftHoldPoint");
+    }
+    if (origin == null)
+    {
+        Debug.LogError("Hand point not found for " + (currentBomb.IsOnRight ? "right" : "left") + " hand!");
+        HideTrajectory();
+        return;
+    }
 
-        activeDotCount = 0;
+    float speed = currentThrowType == ThrowType.Underarm ? currentBomb.NormalThrowSpeed : currentBomb.LobThrowSpeed;
+    float upward = currentThrowType == ThrowType.Underarm ? currentBomb.NormalThrowUpward : currentBomb.LobThrowUpward;
+    
+    int maxPoints = currentThrowType == ThrowType.Underarm ? underarmThrowMaxPoints : lobThrowMaxPoints;
+    float pointSpacing = currentThrowType == ThrowType.Underarm ? underarmThrowPointSpacing : lobThrowPointSpacing;
+    float fadeDistance = currentThrowType == ThrowType.Underarm ? underarmThrowFadeDistance : lobThrowFadeDistance;
+
+    Vector3 startPos = origin.position;
+    
+    Vector3 force = aimDirection.normalized * speed + Vector3.up * upward;
+    float effectiveMass = 1f * currentBomb.FlightMassMultiplier;
+    Vector3 velocity = force / effectiveMass;
+    
+    Vector3 lastPos = startPos;
+    Vector3 landingPos = Vector3.zero;
+    bool foundLanding = false;
+
+    trajectoryPoints.Add(lastPos);
+
+    float t = 0f;
+    Vector3 currentVelocity = velocity;
+    Vector3 currentPos = startPos;
+    List<Vector3> bouncePoints = new List<Vector3>();
+    int maxBounces = 3;
+    int bounceCount = 0;
+    
+    // Enclose the for loop in braces
+    for (int i = 0; i < maxPoints; ++i)
+    {
+        t += timeStep;
+        currentVelocity += Physics.gravity * timeStep;
+        Vector3 next = currentPos + currentVelocity * timeStep;
         
-        if (trajectoryPoints.Count == 0)
+        Vector3 rayDirection = (next - lastPos).normalized;
+        float rayDistance = (next - lastPos).magnitude;
+        
+        if (rayDistance > 0.001f)
         {
-            Debug.LogWarning("No trajectory points to display");
-            return;
-        }
-        
-        float currentPointSpacing = currentThrowType == ThrowType.Underarm ? underarmThrowPointSpacing : lobThrowPointSpacing;
-        float currentFadeDistance = currentThrowType == ThrowType.Underarm ? underarmThrowFadeDistance : lobThrowFadeDistance;
-        Color currentColor = currentThrowType == ThrowType.Underarm ? underarmThrowColor : lobThrowColor;
-        
-        float accumulatedDistance = 0f;
-        Vector3 lastDotPos = trajectoryPoints[0];
-        
-        for (int i = 1; i < trajectoryPoints.Count; i++)
-        {
-            Vector3 currentPoint = trajectoryPoints[i];
-            float segmentDistance = Vector3.Distance(trajectoryPoints[i-1], currentPoint);
-            accumulatedDistance += segmentDistance;
+            bool hitSomething = Physics.Raycast(lastPos, rayDirection, out RaycastHit hit, rayDistance + 0.1f, collisionMask);
             
-            if (accumulatedDistance >= currentPointSpacing)
+            if (!hitSomething && currentVelocity.y < 0)
             {
-                if (activeDotCount < trajectoryDots.Count)
+                Vector3 downwardRay = rayDirection + Vector3.down * 0.3f;
+                hitSomething = Physics.Raycast(lastPos, downwardRay.normalized, out hit, rayDistance * 1.5f, collisionMask);
+            }
+            
+            if (hitSomething)
+            {
+                trajectoryPoints.Add(hit.point);
+                
+                Vector3 surfaceNormal = hit.normal;
+                float dotProduct = Vector3.Dot(currentVelocity.normalized, -surfaceNormal);
+                
+                if (dotProduct < 0.7f && bounceCount < maxBounces && currentVelocity.magnitude > 5f)
                 {
-                    GameObject dot = trajectoryDots[activeDotCount];
-                    dot.SetActive(true);
-                    dot.transform.position = currentPoint;
+                    bouncePoints.Add(hit.point);
+                    bounceCount++;
                     
-                    if (activeDotCount < trajectoryDotMaterials.Count && trajectoryDotMaterials[activeDotCount] != null)
-                    {
-                        Color baseColor = currentColor;
-                        float fadeFactor = 1f - (i / (float)trajectoryPoints.Count) * currentFadeDistance;
-                        baseColor.a *= Mathf.Max(0.2f, fadeFactor);
-                        
-                        trajectoryDotMaterials[activeDotCount].color = baseColor;
-                    }
+                    Vector3 bounceVelocity = Vector3.Reflect(currentVelocity, surfaceNormal);
+                    bounceVelocity *= 0.6f;
                     
-                    activeDotCount++;
-                    accumulatedDistance = 0f;
-                    lastDotPos = currentPoint;
+                    currentVelocity = bounceVelocity;
+                    currentPos = hit.point + surfaceNormal * 0.01f;
+                    lastPos = currentPos;
+                    
+                    continue;
                 }
                 else
                 {
+                    landingPos = hit.point;
+                    foundLanding = true;
                     break;
                 }
             }
         }
         
-        for (int i = activeDotCount; i < trajectoryDots.Count; i++)
+        if (next.y < -10f)
         {
-            trajectoryDots[i].SetActive(false);
+            if (Physics.Raycast(new Vector3(next.x, 50f, next.z), Vector3.down, out RaycastHit groundHit, 100f, collisionMask))
+            {
+                // Removed invalid 'GodMode;' statement
+                landingPos = groundHit.point;
+                foundLanding = true;
+            }
+            else
+            {
+                landingPos = next;
+                foundLanding = true;
+            }
+            break;
+        }
+        
+        trajectoryPoints.Add(next);
+        lastPos = next;
+        currentPos = next;
+    } // Closing brace for the for loop
+
+    UpdateBounceMarkers(bouncePoints);
+
+    if (currentThrowType == ThrowType.Underarm)
+    {
+        UpdateArrowTrajectory();
+        HideDottedTrajectory();
+    }
+    else
+    {
+        UpdateDottedTrajectory();
+        HideArrowTrajectory();
+    }
+    
+    if (isLocalPlayer)
+    {
+        if (foundLanding)
+        {
+            UpdateLocalLandingMarker(landingPos);
+        }
+        else
+        {
+            HideLandingMarkers();
         }
     }
+}
+
+    void UpdateDottedTrajectory()
+{
+    while (trajectoryDots.Count < trajectoryPoints.Count)
+    {
+        GameObject dot;
+        Material dotMaterial = null;
+        
+        if (trajectoryPointPrefab != null)
+        {
+            dot = Instantiate(trajectoryPointPrefab);
+        }
+        else
+        {
+            dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            dot.transform.localScale = Vector3.one * 0.2f;
+            Destroy(dot.GetComponent<Collider>());
+        }
+        
+        Renderer renderer = dot.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            dotMaterial = new Material(renderer.material);
+            dotMaterial.SetFloat("_Mode", 3);
+            dotMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            dotMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            dotMaterial.SetInt("_ZWrite", 0);
+            dotMaterial.DisableKeyword("_ALPHATEST_ON");
+            dotMaterial.EnableKeyword("_ALPHABLEND_ON");
+            dotMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            dotMaterial.renderQueue = 3000;
+            renderer.material = dotMaterial;
+        }
+        
+        dot.SetActive(false);
+        trajectoryDots.Add(dot);
+        trajectoryDotMaterials.Add(dotMaterial);
+    }
+
+    activeDotCount = 0;
+    
+    if (trajectoryPoints.Count == 0)
+    {
+        Debug.LogWarning("No trajectory points to display");
+        return;
+    }
+    
+    float currentPointSpacing = currentThrowType == ThrowType.Underarm ? underarmThrowPointSpacing : lobThrowPointSpacing;
+    float currentFadeDistance = currentThrowType == ThrowType.Underarm ? underarmThrowFadeDistance : lobThrowFadeDistance;
+    Color currentColor = currentThrowType == ThrowType.Underarm ? underarmThrowColor : lobThrowColor;
+    
+    float accumulatedDistance = 0f;
+    Vector3 lastDotPos = trajectoryPoints[0];
+    
+    for (int i = 1; i < trajectoryPoints.Count; i++)
+    {
+        Vector3 currentPoint = trajectoryPoints[i];
+        float segmentDistance = Vector3.Distance(trajectoryPoints[i-1], currentPoint);
+        accumulatedDistance += segmentDistance;
+        
+        if (accumulatedDistance >= currentPointSpacing)
+        {
+            if (activeDotCount < trajectoryDots.Count)
+            {
+                GameObject dot = trajectoryDots[activeDotCount];
+                dot.SetActive(true);
+                dot.transform.position = currentPoint;
+                
+                if (activeDotCount < trajectoryDotMaterials.Count && trajectoryDotMaterials[activeDotCount] != null)
+                {
+                    // Fixed invalid declaration
+                    Color baseColor = currentColor;
+                    float fadeFactor = 1f - (i / (float)trajectoryPoints.Count) * currentFadeDistance;
+                    baseColor.a *= Mathf.Max(0.2f, fadeFactor);
+                    
+                    trajectoryDotMaterials[activeDotCount].color = baseColor;
+                }
+                
+                activeDotCount++;
+                accumulatedDistance = 0f;
+                lastDotPos = currentPoint;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+    
+    for (int i = activeDotCount; i < trajectoryDots.Count; i++)
+    {
+        trajectoryDots[i].SetActive(false);
+    }
+}
 
     void UpdateArrowTrajectory()
     {
@@ -947,6 +978,8 @@ public class PlayerBombHandler : NetworkBehaviour
         {
             return;
         }
+        
+        if (isServer) RefreshThrowTypeFromHand();
         
         isAiming = true;
         isHoldingAim = true;
