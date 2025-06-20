@@ -16102,6 +16102,13 @@ MonoBehaviour:
   maxKnockbackPercentage: 350
   outOfViewTimeLimit: 3
   cameraCheckInterval: 0.5
+  materialObject: {fileID: 7459786305365839683}
+  playerMaterials:
+  - {fileID: 2100000, guid: 715019caf178a574c8b50c913957d529, type: 2}
+  - {fileID: 2100000, guid: ee2568ec664f2104abdad51fc70fbec8, type: 2}
+  - {fileID: 2100000, guid: 6972ef60fa208dd4fa078514c3c0f420, type: 2}
+  - {fileID: 2100000, guid: 0d9e957d1556ecc4984c73f146e9afb0, type: 2}
+  isInKnockback: 0
 --- !u!95 &6115396542742235922
 Animator:
   serializedVersion: 7
@@ -16140,7 +16147,6 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   movementThreshold: 0.1
-  landingVelocityThresh: -3
   handFreezeTime: 1
 --- !u!114 &1739599954661421427
 MonoBehaviour:

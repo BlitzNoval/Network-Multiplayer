@@ -35,6 +35,10 @@ public class PlayerLifeManager : NetworkBehaviour
     private float timeOutOfView = 0f;
     private float lastCameraCheckTime = 0f;
 
+    [Header("Player Visuals")]
+    [SerializeField] private GameObject materialObject; // The object in the prefab to apply the material to
+    [SerializeField] private Material[] playerMaterials; // Array of 4 materials for P1, P2, P3, P4
+
     public float KnockbackMultiplier => 1f + (percentageKnockback / 100f);
     public float PercentageKnockback => percentageKnockback;
 
@@ -445,6 +449,47 @@ public class PlayerLifeManager : NetworkBehaviour
     void OnPlayerNumberChanged(int oldNumber, int newNumber)
     {
         UpdateNameTag();
+        SetPlayerMaterial(newNumber);
+    }
+
+    void SetPlayerMaterial(int playerNumber)
+    {
+        if (playerMaterials == null || playerMaterials.Length < 4)
+        {
+            Debug.LogError("Player materials array not properly set up! Requires 4 materials.", this);
+            return;
+        }
+
+        if (materialObject == null)
+        {
+            Debug.LogError("Material object not assigned in PlayerLifeManager!", this);
+            return;
+        }
+
+        int materialIndex = playerNumber - 1; // PlayerNumber is 1-4, array is 0-3
+        if (materialIndex < 0 || materialIndex >= playerMaterials.Length)
+        {
+            Debug.LogError($"Invalid player number: {playerNumber}", this);
+            return;
+        }
+
+        Material mat = playerMaterials[materialIndex];
+        if (mat == null)
+        {
+            Debug.LogError($"Material for player {playerNumber} is null!", this);
+            return;
+        }
+
+        // Apply the material locally
+        Renderer renderer = materialObject.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material = mat;
+        }
+        else
+        {
+            Debug.LogError("No Renderer found on materialObject!", this);
+        }
     }
 
     void UpdateNameTag()
