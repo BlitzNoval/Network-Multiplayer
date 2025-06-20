@@ -182,4 +182,11 @@ public class PlayerMovement : NetworkBehaviour
             horizVel = Vector3.zero;
         }
     }
+
+    public Vector2 GetMoveInput()
+    {
+        return moveInput;
+    }
+        
+    
 }
