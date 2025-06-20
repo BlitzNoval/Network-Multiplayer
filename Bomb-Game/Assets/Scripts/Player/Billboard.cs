@@ -7,7 +7,7 @@ public class Billboard : MonoBehaviour
 
     private Camera mainCamera;
 
-    void Start()
+    void Start() 
     {
         mainCamera = Camera.main;
         if (playerTransform == null)
