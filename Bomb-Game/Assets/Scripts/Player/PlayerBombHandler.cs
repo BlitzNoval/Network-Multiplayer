@@ -301,7 +301,7 @@ public class PlayerBombHandler : NetworkBehaviour
         base.OnStartLocalPlayer();
         SubscribeToInput();
     }
-
+ 
     void SubscribeToInput()
     {
         if (inputSubscribed) return;
