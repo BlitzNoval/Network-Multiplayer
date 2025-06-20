@@ -575,22 +575,22 @@ MonoBehaviour:
   bombHolderBonus: 0.5
   percentageThresholds:
   - 0
-  - 100
+  - 87.5
   - 175
-  - 235
+  - 262.5
   - 325
   distanceMultipliers:
   - 0
-  - 1
-  - 3
-  - 5
-  - 7
+  - 2
+  - 4
+  - 6
+  - 8
   heightMultipliers:
   - 0
   - 0.5
   - 1
   - 2
-  - 3
+  - 4
   durationMultipliers:
   - 0
   - 0.25
