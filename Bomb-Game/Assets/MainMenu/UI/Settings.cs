@@ -12,6 +12,10 @@ public class SettingsManager : MonoBehaviour
     public Button resetSoundButton;
     public TextMeshProUGUI songNameText;
     
+    [Header("Sensitivity Settings")]
+    public Slider sensitivitySlider;
+    public Button resetSensitivityButton;
+    
     [Header("Video Settings")]
     public Button fullscreenButton;
     public Button windowedButton;
@@ -27,6 +31,7 @@ public class SettingsManager : MonoBehaviour
     public float defaultVolume = 0.5f;
     public bool defaultMuteState = false;
     public int defaultSongIndex = 0;
+    public float defaultSensitivity = 1.0f;
     
     [Header("Playlist Settings")]
     public bool autoAdvanceToNextSong = true; // Set this to true if you want automatic progression
@@ -40,6 +45,7 @@ public class SettingsManager : MonoBehaviour
     private int currentSongIndex = 0;
     private bool isMuted = false;
     private float savedVolume;
+    private float savedSensitivity;
     private string fullSongName = "";
     private bool isScrolling = false;
     private int scrollPosition = 0;
@@ -49,6 +55,7 @@ public class SettingsManager : MonoBehaviour
     private const string VOLUME_KEY = "GameVolume";
     private const string MUTE_KEY = "GameMuted";
     private const string SONG_INDEX_KEY = "CurrentSongIndex";
+    private const string SENSITIVITY_KEY = "ThrowSensitivity";
     
     private void Start()
     {
@@ -79,6 +86,7 @@ public class SettingsManager : MonoBehaviour
             
         currentSongIndex = defaultSongIndex;
         savedVolume = defaultVolume;
+        savedSensitivity = defaultSensitivity;
     }
     
     private void SetupButtonListeners()
@@ -95,6 +103,13 @@ public class SettingsManager : MonoBehaviour
             
         if (resetSoundButton != null)
             resetSoundButton.onClick.AddListener(ResetSound);
+        
+        // Sensitivity button listeners
+        if (sensitivitySlider != null)
+            sensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
+            
+        if (resetSensitivityButton != null)
+            resetSensitivityButton.onClick.AddListener(ResetSensitivity);
         
         // Video button listeners
         if (fullscreenButton != null)
@@ -117,6 +132,9 @@ public class SettingsManager : MonoBehaviour
         isMuted = PlayerPrefs.GetInt(MUTE_KEY, defaultMuteState ? 1 : 0) == 1;
         currentSongIndex = PlayerPrefs.GetInt(SONG_INDEX_KEY, defaultSongIndex);
         
+        // Load sensitivity settings
+        savedSensitivity = PlayerPrefs.GetFloat(SENSITIVITY_KEY, defaultSensitivity);
+        
         // Ensure song index is within bounds
         if (currentSongIndex >= availableSongs.Count)
             currentSongIndex = defaultSongIndex;
@@ -131,6 +149,7 @@ public class SettingsManager : MonoBehaviour
         PlayerPrefs.SetFloat(VOLUME_KEY, savedVolume);
         PlayerPrefs.SetInt(MUTE_KEY, isMuted ? 1 : 0);
         PlayerPrefs.SetInt(SONG_INDEX_KEY, currentSongIndex);
+        PlayerPrefs.SetFloat(SENSITIVITY_KEY, savedSensitivity);
         PlayerPrefs.Save();
     }
     
@@ -140,6 +159,12 @@ public class SettingsManager : MonoBehaviour
         if (volumeSlider != null)
         {
             volumeSlider.value = savedVolume;
+        }
+        
+        // Update sensitivity slider
+        if (sensitivitySlider != null)
+        {
+            sensitivitySlider.value = savedSensitivity;
         }
         
         // Update mute button
@@ -322,6 +347,20 @@ public class SettingsManager : MonoBehaviour
         SaveSettings();
     }
     
+    public void OnSensitivityChanged(float value)
+    {
+        savedSensitivity = value;
+        SaveSettings();
+    }
+    
+    public void ResetSensitivity()
+    {
+        savedSensitivity = defaultSensitivity;
+        if (sensitivitySlider != null)
+            sensitivitySlider.value = savedSensitivity;
+        SaveSettings();
+    }
+
     public void ResetSound()
     {
         // Reset to default values
@@ -401,5 +440,19 @@ public class SettingsManager : MonoBehaviour
         if (availableSongs.Count > 0 && currentSongIndex < availableSongs.Count)
             return availableSongs[currentSongIndex].name;
         return "No Song";
+    }
+    
+    // Sensitivity methods for external access
+    public void SetSensitivity(float sensitivity)
+    {
+        savedSensitivity = Mathf.Clamp(sensitivity, 0.1f, 3.0f);
+        if (sensitivitySlider != null)
+            sensitivitySlider.value = savedSensitivity;
+        SaveSettings();
+    }
+    
+    public float GetSensitivity()
+    {
+        return savedSensitivity;
     }
 }

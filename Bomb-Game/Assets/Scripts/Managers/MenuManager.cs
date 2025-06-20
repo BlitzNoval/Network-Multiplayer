@@ -8,8 +8,10 @@ public class MenuManager : MonoBehaviour
     
     [Header("UI References")]
     public Slider volumeSlider;
+    public Slider sensitivitySlider;
     public Button changeSongButton;
     public Button toggleSoundButton;
+    public Button resetSensitivityButton;
     public TextMeshProUGUI songNameText;
     
     [Header("Mute Button Sprites")]
@@ -24,9 +26,11 @@ public class MenuManager : MonoBehaviour
     [Header("Default Values")]
     public float defaultVolume = 0.5f;
     public bool defaultMuteState = false;
+    public float defaultSensitivity = 1.0f;
     
     private bool isMuted = false;
     private float savedVolume;
+    private float savedSensitivity;
     private string fullSongName = "";
     private bool isScrolling = false;
     private int scrollPosition = 0;
@@ -34,6 +38,7 @@ public class MenuManager : MonoBehaviour
     
     private const string VOLUME_KEY = "GameVolume";
     private const string MUTE_KEY = "GameMuted";
+    private const string SENSITIVITY_KEY = "ThrowSensitivity";
     
     private void Awake()
     {
@@ -61,17 +66,24 @@ public class MenuManager : MonoBehaviour
         if (volumeSlider != null)
             volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
             
+        if (sensitivitySlider != null)
+            sensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
+            
         if (changeSongButton != null)
             changeSongButton.onClick.AddListener(OnChangeSongClicked);
             
         if (toggleSoundButton != null)
             toggleSoundButton.onClick.AddListener(ToggleSound);
+            
+        if (resetSensitivityButton != null)
+            resetSensitivityButton.onClick.AddListener(ResetSensitivity);
     }
     
     private void LoadSettings()
     {
         savedVolume = PlayerPrefs.GetFloat(VOLUME_KEY, defaultVolume);
         isMuted = PlayerPrefs.GetInt(MUTE_KEY, defaultMuteState ? 1 : 0) == 1;
+        savedSensitivity = PlayerPrefs.GetFloat(SENSITIVITY_KEY, defaultSensitivity);
         
         ApplyVolumeSettings();
     }
@@ -80,6 +92,7 @@ public class MenuManager : MonoBehaviour
     {
         PlayerPrefs.SetFloat(VOLUME_KEY, savedVolume);
         PlayerPrefs.SetInt(MUTE_KEY, isMuted ? 1 : 0);
+        PlayerPrefs.SetFloat(SENSITIVITY_KEY, savedSensitivity);
         PlayerPrefs.Save();
     }
     
@@ -88,6 +101,11 @@ public class MenuManager : MonoBehaviour
         if (volumeSlider != null)
         {
             volumeSlider.value = savedVolume;
+        }
+        
+        if (sensitivitySlider != null)
+        {
+            sensitivitySlider.value = savedSensitivity;
         }
         
         UpdateMuteButton();
@@ -242,6 +260,20 @@ public class MenuManager : MonoBehaviour
         }
     }
     
+    public void OnSensitivityChanged(float value)
+    {
+        savedSensitivity = value;
+        SaveSettings();
+    }
+    
+    public void ResetSensitivity()
+    {
+        savedSensitivity = defaultSensitivity;
+        if (sensitivitySlider != null)
+            sensitivitySlider.value = savedSensitivity;
+        SaveSettings();
+    }
+
     public void ResetSound()
     {
         savedVolume = defaultVolume;
@@ -277,5 +309,19 @@ public class MenuManager : MonoBehaviour
         ApplyVolumeSettings();
         UpdateMuteButton();
         SaveSettings();
+    }
+    
+    // Sensitivity methods for external access
+    public void SetSensitivity(float sensitivity)
+    {
+        savedSensitivity = Mathf.Clamp(sensitivity, 0.1f, 3.0f);
+        if (sensitivitySlider != null)
+            sensitivitySlider.value = savedSensitivity;
+        SaveSettings();
+    }
+    
+    public float GetSensitivity()
+    {
+        return savedSensitivity;
     }
 }

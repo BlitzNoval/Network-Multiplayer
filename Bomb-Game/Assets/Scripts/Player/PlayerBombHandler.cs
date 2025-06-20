@@ -37,6 +37,25 @@ public class PlayerBombHandler : NetworkBehaviour
     [SerializeField] float controllerSensitivity = 3f;
     [SerializeField] float aimingRange = 10f;
     
+    private float GetSensitivityMultiplier()
+    {
+        // Try to get sensitivity from MenuManager first (persistent across scenes)
+        if (MenuManager.Instance != null)
+        {
+            return MenuManager.Instance.GetSensitivity();
+        }
+        
+        // Fallback to Settings manager if in main menu
+        SettingsManager settingsManager = FindFirstObjectByType<SettingsManager>();
+        if (settingsManager != null)
+        {
+            return settingsManager.GetSensitivity();
+        }
+        
+        // Final fallback to PlayerPrefs
+        return PlayerPrefs.GetFloat("ThrowSensitivity", 1.0f);
+    }
+    
     [SerializeField] float throwWindUp = 0.10f;
 
     [Header("Hand Points")]
@@ -341,9 +360,11 @@ public class PlayerBombHandler : NetworkBehaviour
         if (aimInput.magnitude > 0.1f)
         {
             Vector3 inputDirection = new Vector3(aimInput.x, 0, aimInput.y);
-            float sensitivity = playerInput.currentControlScheme == "KeyboardMouse" ? 
+            float baseSensitivity = playerInput.currentControlScheme == "KeyboardMouse" ? 
                 mouseSensitivity : controllerSensitivity;
-            inputDirection *= sensitivity * Time.deltaTime;
+            float sensitivityMultiplier = GetSensitivityMultiplier();
+            float finalSensitivity = baseSensitivity * sensitivityMultiplier;
+            inputDirection *= finalSensitivity * Time.deltaTime;
             newTargetDirection = (targetAimDirection + inputDirection).normalized;
         }
         
