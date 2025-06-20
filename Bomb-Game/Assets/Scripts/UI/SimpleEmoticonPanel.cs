@@ -18,6 +18,9 @@ public class SimpleEmoticonPanel : MonoBehaviour
     [SerializeField] float wiggleAngle = 15f; // How far to rotate left and right
     [SerializeField] int wiggleCount = 3; // How many back-and-forth wiggles
     
+    // Track current animation to prevent overlaps
+    private Sequence currentWiggleSequence;
+    
     [Header("Player Assignment")]
     [SerializeField] int playerNumber = 1; // Set this to 1, 2, 3, or 4 for each panel
     
@@ -106,19 +109,22 @@ public class SimpleEmoticonPanel : MonoBehaviour
         // Hide the panel immediately
         HidePanel();
         
-        // Show the emoticon animation locally first
-        ShowEmoticonAnimation(emoticonIndex);
-        
-        // Tell the local player to send network command
+        // Tell the local player that emoticon panel is closed
         PlayerMovement localPlayer = FindLocalPlayer();
         if (localPlayer != null)
         {
+            localPlayer.isEmoticonPanelOpen = false;
+            
+            // Send network command
             localPlayer.SelectEmoticon(emoticonIndex);
         }
         else
         {
             Debug.LogError("Could not find local player to send emoticon command!");
         }
+        
+        // Show the emoticon animation locally first
+        ShowEmoticonAnimation(emoticonIndex);
     }
     
     public void ShowEmoticonAnimation(int emoticonIndex)
@@ -128,6 +134,20 @@ public class SimpleEmoticonPanel : MonoBehaviour
         
         Debug.Log($"Playing emoticon wiggle animation for index {emoticonIndex}");
         
+        // Stop any existing animation first
+        if (currentWiggleSequence != null)
+        {
+            currentWiggleSequence.Kill();
+            Debug.Log("Stopped previous emoticon animation");
+        }
+        
+        // Hide all emoticon images first
+        for (int i = 0; i < emoticonImages.Length; i++)
+        {
+            if (emoticonImages[i] != null)
+                emoticonImages[i].gameObject.SetActive(false);
+        }
+        
         Image emoticon = emoticonImages[emoticonIndex];
         emoticon.gameObject.SetActive(true);
         
@@ -135,7 +155,7 @@ public class SimpleEmoticonPanel : MonoBehaviour
         Vector3 originalRotation = emoticon.transform.localEulerAngles;
         
         // Create wiggle sequence
-        Sequence wiggleSequence = DOTween.Sequence();
+        currentWiggleSequence = DOTween.Sequence();
         
         // Calculate time per wiggle (each wiggle is left-center-right-center)
         float timePerWiggle = wiggleDuration / wiggleCount;
@@ -144,30 +164,31 @@ public class SimpleEmoticonPanel : MonoBehaviour
         for (int i = 0; i < wiggleCount; i++)
         {
             // Wiggle left
-            wiggleSequence.Append(emoticon.transform.DORotate(
+            currentWiggleSequence.Append(emoticon.transform.DORotate(
                 new Vector3(originalRotation.x, originalRotation.y, originalRotation.z - wiggleAngle), 
                 quarterTime).SetEase(Ease.InOutSine));
             
             // Back to center
-            wiggleSequence.Append(emoticon.transform.DORotate(
+            currentWiggleSequence.Append(emoticon.transform.DORotate(
                 originalRotation, 
                 quarterTime).SetEase(Ease.InOutSine));
             
             // Wiggle right
-            wiggleSequence.Append(emoticon.transform.DORotate(
+            currentWiggleSequence.Append(emoticon.transform.DORotate(
                 new Vector3(originalRotation.x, originalRotation.y, originalRotation.z + wiggleAngle), 
                 quarterTime).SetEase(Ease.InOutSine));
             
             // Back to center
-            wiggleSequence.Append(emoticon.transform.DORotate(
+            currentWiggleSequence.Append(emoticon.transform.DORotate(
                 originalRotation, 
                 quarterTime).SetEase(Ease.InOutSine));
         }
         
         // When animation completes, reset and deactivate
-        wiggleSequence.OnComplete(() => {
+        currentWiggleSequence.OnComplete(() => {
             emoticon.transform.localEulerAngles = originalRotation;
             emoticon.gameObject.SetActive(false);
+            currentWiggleSequence = null;
             Debug.Log($"Emoticon wiggle animation complete for index {emoticonIndex}");
         });
     }

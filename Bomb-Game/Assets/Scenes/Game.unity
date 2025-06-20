@@ -3878,7 +3878,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 49.15
+  m_fontSize: 48.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -5162,7 +5162,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 49.15
+  m_fontSize: 48.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -5509,7 +5509,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 49.15
+  m_fontSize: 48.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -7347,8 +7347,8 @@ MonoBehaviour:
   - {fileID: 333617188}
   - {fileID: 240811092}
   wiggleDuration: 3
-  wiggleAngle: 5
-  wiggleCount: 5
+  wiggleAngle: 4
+  wiggleCount: 4
   playerNumber: 1
 --- !u!1 &727516248
 GameObject:
@@ -8092,8 +8092,8 @@ MonoBehaviour:
   - {fileID: 576289352}
   - {fileID: 1602711450}
   wiggleDuration: 3
-  wiggleAngle: 5
-  wiggleCount: 5
+  wiggleAngle: 4
+  wiggleCount: 4
   playerNumber: 2
 --- !u!222 &818736704
 CanvasRenderer:
@@ -10692,8 +10692,8 @@ MonoBehaviour:
   - {fileID: 1861517493}
   - {fileID: 1813191965}
   wiggleDuration: 3
-  wiggleAngle: 5
-  wiggleCount: 5
+  wiggleAngle: 4
+  wiggleCount: 4
   playerNumber: 3
 --- !u!222 &1128280233
 CanvasRenderer:
@@ -15973,8 +15973,8 @@ MonoBehaviour:
   - {fileID: 420122269}
   - {fileID: 213315315}
   wiggleDuration: 3
-  wiggleAngle: 5
-  wiggleCount: 5
+  wiggleAngle: 4
+  wiggleCount: 4
   playerNumber: 4
 --- !u!222 &1624619641
 CanvasRenderer:
@@ -16191,7 +16191,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 49.15
+  m_fontSize: 48.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1

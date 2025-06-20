@@ -30,6 +30,7 @@ public class PlayerMovement : NetworkBehaviour
 
     string lastControlScheme;     // cached to avoid null on first frame
     bool wasHoldingEmoticon;
+    public bool isEmoticonPanelOpen = false; // Public so bomb handler can check it
 
     public Vector3 CurrentAimDirection { get; private set; } = Vector3.forward; // Default to forward
 
@@ -171,11 +172,13 @@ public class PlayerMovement : NetworkBehaviour
         if (isHoldingEmoticon && !wasHoldingEmoticon)
         {
             Debug.Log("Emoticon key pressed - showing shared panel");
+            isEmoticonPanelOpen = true;
             ShowEmoticonPanel();
         }
         else if (!isHoldingEmoticon && wasHoldingEmoticon)
         {
             Debug.Log("Emoticon key released - hiding shared panel");
+            isEmoticonPanelOpen = false;
             HideEmoticonPanel();
         }
 
