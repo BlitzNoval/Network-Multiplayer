@@ -1017,7 +1017,7 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Throw
     m_StateMachine: {fileID: -68806735637755237}
-    m_Mask: {fileID: 31900000, guid: c94559446219a28408c4208bb5bccf1f, type: 2}
+    m_Mask: {fileID: 0}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0

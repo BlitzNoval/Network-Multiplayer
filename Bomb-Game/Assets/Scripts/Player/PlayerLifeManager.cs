@@ -330,7 +330,7 @@ public class PlayerLifeManager : NetworkBehaviour
     {
         if (rb == null || arcData.arcPoints == null || arcData.arcPoints.Length == 0) yield break;
         
-        // Initially disable player movement
+        // Initially disable player movement completely
         if (movement != null)
         {
             movement.SetKnockbackState(true, 0f); // No movement during initial phase
@@ -345,10 +345,41 @@ public class PlayerLifeManager : NetworkBehaviour
         Vector3 currentEndPoint = originalEndPoint;
         Vector3 airControlOffset = Vector3.zero;
         
+        // Recovery timing parameters
+        float stunPhase = 0.3f;       // First 30% - completely stunned, no control
+        float recoveryPhase = 0.4f;   // Next 40% - gradual recovery of air control
+        float controlPhase = 0.3f;    // Final 30% - significant air control
+        
         while (elapsedTime < arcData.duration)
         {
             elapsedTime += Time.fixedDeltaTime;
             float t = elapsedTime / arcData.duration;
+            
+            // Calculate progressive air control based on knockback progress
+            float airControlMultiplier = 0f;
+            if (t <= stunPhase)
+            {
+                // Complete stun phase - no control
+                airControlMultiplier = 0f;
+            }
+            else if (t <= stunPhase + recoveryPhase)
+            {
+                // Recovery phase - gradual control restoration
+                float recoveryProgress = (t - stunPhase) / recoveryPhase;
+                airControlMultiplier = Mathf.Lerp(0f, 0.4f, recoveryProgress); // Up to 40% control
+            }
+            else
+            {
+                // Control phase - significant air control
+                float controlProgress = (t - stunPhase - recoveryPhase) / controlPhase;
+                airControlMultiplier = Mathf.Lerp(0.4f, 0.8f, controlProgress); // Up to 80% control
+            }
+            
+            // Update movement control based on current phase
+            if (movement != null)
+            {
+                movement.SetKnockbackState(true, airControlMultiplier);
+            }
             
             // Calculate which point we should be at
             int targetPointIndex = Mathf.FloorToInt(t * (arcData.arcPoints.Length - 1));
@@ -365,14 +396,39 @@ public class PlayerLifeManager : NetworkBehaviour
                 targetPosition = Vector3.Lerp(targetPosition, nextPosition, pointT);
             }
             
-            // Set position directly for precise arc following
-            rb.MovePosition(targetPosition);
+            // Apply air control offset if player has some control
+            if (airControlMultiplier > 0f && movement != null)
+            {
+                // Allow horizontal air control that accumulates over time
+                Vector2 playerInput = movement.GetMoveInput();
+                if (playerInput.magnitude > 0.1f)
+                {
+                    Vector3 camF = Camera.main.transform.forward; camF.y = 0; camF.Normalize();
+                    Vector3 camR = Camera.main.transform.right; camR.y = 0; camR.Normalize();
+                    Vector3 airControlForce = (camR * playerInput.x + camF * playerInput.y) * airControlMultiplier * 2f * Time.fixedDeltaTime;
+                    
+                    airControlOffset += airControlForce;
+                    // Limit total air control offset to prevent too much deviation
+                    airControlOffset = Vector3.ClampMagnitude(airControlOffset, 3f);
+                }
+            }
+            
+            // Apply position with air control offset
+            Vector3 finalPosition = targetPosition + airControlOffset;
+            rb.MovePosition(finalPosition);
+            
+            // Debug air control feedback
+            if (airControlMultiplier > 0f)
+            {
+                Debug.Log($"Air Control: {airControlMultiplier:F1}x at {t:F1}% progress, offset: {airControlOffset.magnitude:F1}m", this);
+            }
             
             yield return new WaitForFixedUpdate();
         }
         
-        // Ensure we end at the exact end point
-        rb.MovePosition(arcData.endPoint);
+        // Ensure we end near the intended landing area (with air control offset)
+        Vector3 finalLanding = arcData.endPoint + airControlOffset;
+        rb.MovePosition(finalLanding);
         
         // Hide landing dot when player lands - use the manager
         LandingDotManager.Instance?.HideLandingDotForPlayer(PlayerNumber);
@@ -382,6 +438,8 @@ public class PlayerLifeManager : NetworkBehaviour
         {
             movement.SetKnockbackState(false, 1f);
         }
+        
+        Debug.Log($"Knockback complete. Final air control offset: {airControlOffset.magnitude:F1}m", this);
         
         Debug.Log($"Player {gameObject.name} landed from knockback: distance={Vector3.Distance(arcData.startPoint, arcData.endPoint):F1}m", this);
     }

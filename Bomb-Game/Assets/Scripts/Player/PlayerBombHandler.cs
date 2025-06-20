@@ -352,7 +352,7 @@ public class PlayerBombHandler : NetworkBehaviour
     public void SetBomb(Bomb b)
     {
         currentBomb = b;
-        UpdateHandAnimationState();
+        // Note: PlayerAnimator.UpdateActiveHand() handles animation state
         if (currentBomb != null)
         {
             Transform holdPoint = currentBomb.IsOnRight ? rightHandPoint : leftHandPoint;
@@ -377,7 +377,7 @@ public class PlayerBombHandler : NetworkBehaviour
             currentBomb.transform.SetParent(null);
         }
         currentBomb = null;
-        UpdateHandAnimationState();
+        // Note: PlayerAnimator.UpdateActiveHand() handles animation state
         if (isAiming)
         {
             HideTrajectory();
@@ -385,22 +385,11 @@ public class PlayerBombHandler : NetworkBehaviour
         }
     }
 
-    void UpdateHandAnimationState()
-    {
-        if (animator != null && currentBomb != null)
-        {
-            animator.SetInteger("activeHand", 2);
-        }
-        else if (animator != null)
-        {
-            animator.SetInteger("activeHand", 0);
-        }
-    }
 
     void ToggleThrowTypes(InputAction.CallbackContext context)
     {
-        if (!isLocalPlayer) return;
-        CmdToggleThrowTypes();
+        if (!isLocalPlayer || currentBomb == null) return;
+        CmdSwapHands();
     }
 
     void OnThrowTypeChanged(ThrowType oldType, ThrowType newType)
@@ -413,9 +402,13 @@ public class PlayerBombHandler : NetworkBehaviour
     }
 
     [Command]
-    void CmdToggleThrowTypes()
+    void CmdSwapHands()
     {
-        currentThrowType = currentThrowType == ThrowType.Underarm ? ThrowType.Lob : ThrowType.Underarm;
+        if (currentBomb != null && currentBomb.IsHeld)
+        {
+            currentBomb.SwapHoldPoint();
+            Debug.Log($"CmdSwapHands: Swapped bomb to {(currentBomb.IsOnRight ? "right" : "left")} hand", this);
+        }
     }
 
     void DrawTrajectory()
@@ -946,13 +939,25 @@ public class PlayerBombHandler : NetworkBehaviour
         if (!isLocalPlayer || !isAiming || currentBomb == null) return;
         if (!currentBomb.IsHeld || currentBomb.Holder != gameObject) return;
 
-        playerAnimator?.PlayThrowLocal();
+        // Store the throw parameters for when animation completes
+        Vector3 throwDirection = aimDirection;
+        ThrowType throwType = currentThrowType;
+
+        // Subscribe to animation completion callback
+        if (playerAnimator != null)
+        {
+            playerAnimator.OnThrowAnimationComplete = () => {
+                Debug.Log("Animation completed, executing server throw", this);
+                CmdStartServerThrow(throwDirection, throwType);
+                playerAnimator.OnThrowAnimationComplete = null; // Clear callback
+            };
+            
+            playerAnimator.PlayThrowLocal();
+        }
 
         isAiming = false;
         isHoldingAim = false;
         HideTrajectory();
-
-        CmdStartServerThrow(aimDirection, currentThrowType);
     }
 
     [Command]
@@ -966,10 +971,10 @@ public class PlayerBombHandler : NetworkBehaviour
 
     IEnumerator ServerThrowAfterAnim(Vector3 dir, ThrowType tType)
     {
-        yield return new WaitForSeconds(0.1f);
-
+        // No delay needed - animation completion is already timed correctly
         bool underarm = tType == ThrowType.Underarm;
         currentBomb?.ThrowBomb(dir, underarm);
+        yield break;
     }
 
     public ThrowType GetCurrentThrowType()
