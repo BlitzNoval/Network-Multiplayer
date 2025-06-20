@@ -19,6 +19,7 @@ public class Bomb : NetworkBehaviour
     [SyncVar] [SerializeField] float lobThrowUpward = 5f;
     [SyncVar] [SerializeField] float throwCooldown = 0.5f;
     [SyncVar] [SerializeField] float flightMassMultiplier = 1f;
+    [SerializeField] float ignoreThrowerAfterThrowTime = 0.5f; // Time to ignore thrower after throw
 
     [SerializeField] string playerTag = "Player";
 
@@ -37,7 +38,7 @@ public class Bomb : NetworkBehaviour
     BombEffects fx;
 
     [SyncVar(hook = nameof(OnHolderChanged))] GameObject holder;
-    [SyncVar] bool isOnRight = true;
+    [SyncVar] bool isOnRight = false; // Start in left hand to demonstrate hand swapping
     [SyncVar] bool isHeld = true;
     [SyncVar] float currentTimer;
 
@@ -294,7 +295,7 @@ public class Bomb : NetworkBehaviour
                     }
                     else
                     {
-                        Debug.LogError("Hand point not set in PlayerBombHandler for " + (isOnRight ? "right" : "left") + " hand on " + newH.name);
+                        Debug.LogError("Hand point not set for " + (isOnRight ? "right" : "left") + " hand on " + newH.name);
                     }
                 }
                 else
@@ -321,7 +322,9 @@ public class Bomb : NetworkBehaviour
     [Server]
     public void SwapHoldPoint()
     {
+        bool oldHand = isOnRight;
         isOnRight = !isOnRight;
+        Debug.Log($"SwapHoldPoint: {(oldHand ? "right" : "left")} → {(isOnRight ? "right" : "left")}", this);
         RpcRefreshGrip(isOnRight);
     }
 
@@ -420,7 +423,13 @@ public class Bomb : NetworkBehaviour
             return;
         }
 
-        Transform holdPoint = holder.transform.Find("RightHoldPoint");
+        // Use the correct hand point based on bomb position
+        PlayerBombHandler handler = holder.GetComponent<PlayerBombHandler>();
+        Transform holdPoint = null;
+        if (handler != null)
+        {
+            holdPoint = isOnRight ? handler.rightHandPoint : handler.leftHandPoint;
+        }
         Vector3 throwOrigin = holdPoint ? holdPoint.position : transform.position;
 
         lastThrower = holder;
@@ -441,6 +450,14 @@ public class Bomb : NetworkBehaviour
         rb.AddForce(force, ForceMode.Impulse);
 
         lastThrowTime = Time.time;
+        
+        // Notify the thrower's animator about the throw before clearing holder
+        PlayerAnimator throwerAnimator = lastThrower.GetComponent<PlayerAnimator>();
+        if (throwerAnimator != null)
+        {
+            throwerAnimator.OnBombThrown();
+        }
+        
         holder = null;
         
         Debug.Log($"ThrowBomb: SUCCESS - Bomb thrown from {throwOrigin} with force={force}, speed={speed}, upward={upward}, finalMass={rb.mass}");
@@ -459,7 +476,13 @@ public class Bomb : NetworkBehaviour
             return false;
         }
 
-        Transform holdPoint = holder.transform.Find("RightHoldPoint");
+        // Use the correct hand point based on bomb position
+        PlayerBombHandler handlerTry = holder.GetComponent<PlayerBombHandler>();
+        Transform holdPoint = null;
+        if (handlerTry != null)
+        {
+            holdPoint = isOnRight ? handlerTry.rightHandPoint : handlerTry.leftHandPoint;
+        }
         Vector3 throwOrigin = holdPoint ? holdPoint.position : transform.position;
 
         lastThrower = holder;
@@ -480,6 +503,14 @@ public class Bomb : NetworkBehaviour
         rb.AddForce(force, ForceMode.Impulse);
 
         lastThrowTime = Time.time;
+        
+        // Notify the thrower's animator about the throw before clearing holder
+        PlayerAnimator throwerAnimator = lastThrower.GetComponent<PlayerAnimator>();
+        if (throwerAnimator != null)
+        {
+            throwerAnimator.OnBombThrown();
+        }
+        
         holder = null;
         
         Debug.Log($"TryThrowBomb: SUCCESS - Bomb thrown from {throwOrigin} with force={force}, speed={speed}, upward={upward}, finalMass={rb.mass}");
@@ -502,8 +533,13 @@ public class Bomb : NetworkBehaviour
         if (GameManager.Instance != null && GameManager.Instance.IsPaused)
             return;
 
-        if (c.gameObject.CompareTag(playerTag) && c.gameObject != holder)
+        if (c.gameObject.CompareTag(playerTag))
         {
+            if (c.gameObject == lastThrower && Time.time - lastThrowTime < ignoreThrowerAfterThrowTime)
+            {
+                Debug.Log("Ignoring collision with last thrower shortly after throw");
+                return;
+            }
             AssignToPlayer(c.gameObject);
         }
     }

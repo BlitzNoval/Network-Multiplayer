@@ -152,6 +152,11 @@ public class PlayerMovement : NetworkBehaviour
         knockbackMovementMultiplier = movementMultiplier;
     }
 
+    public Vector2 GetMoveInput()
+    {
+        return moveInput;
+    }
+
     /*  Called by PlayerAnimator when Emote parameter changes */
     public void SetEmoteState(bool emoteActive)
     {
