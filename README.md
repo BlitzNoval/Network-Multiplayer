@@ -1,4 +1,3 @@
-
 **NOTE:**
 We are aware of a bug where the issue occurs inconsistently—about half the time. If you encounter this bug, please try plugging in a controller.
 
