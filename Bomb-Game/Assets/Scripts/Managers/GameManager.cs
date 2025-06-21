@@ -1,11 +1,11 @@
 using Mirror;
 using System;
 using System.Collections;
-using System.Collections.Generic;
+using System.Collections.Generic; 
 using UnityEngine;
 using System.Linq;
 
-public class GameManager : NetworkBehaviour
+public class GameManager : NetworkBehaviour 
 {
     public static GameManager Instance { get; private set; }
 

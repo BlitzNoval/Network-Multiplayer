@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections;
 
-public class MapPreviewController : MonoBehaviour
+public class MapPreviewController : MonoBehaviour   
 {
     [SerializeField] private MapCollection mapCollection;
     [SerializeField] private Transform mapPreviewPosition;

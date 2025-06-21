@@ -7,7 +7,7 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip lifeLostSound1;
     [SerializeField] private AudioClip lifeLostSound2;
-    [SerializeField] private AudioClip lifeLostSound3;
+    [SerializeField] private AudioClip lifeLostSound3; 
 
     private void Awake()
     {

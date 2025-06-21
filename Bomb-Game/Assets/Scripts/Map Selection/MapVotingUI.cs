@@ -4,7 +4,7 @@ using TMPro;
 using Mirror;
 using System.Linq;
 
-public class MapVotingUI : MonoBehaviour
+public class MapVotingUI : MonoBehaviour 
 {
     [SerializeField] private Button cityButton;
     [SerializeField] private Button islandButton;

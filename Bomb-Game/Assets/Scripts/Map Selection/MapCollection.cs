@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [System.Serializable]
-public class MapSpawnData
+public class MapSpawnData 
 {
     public string mapName;
     public GameObject mapPrefab;
