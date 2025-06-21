@@ -1,7 +1,7 @@
 ⚠️ Known Issue
 
 NOTE:
-We are aware of a bug where the player sometimes fails to rotate properly—this issue occurs inconsistently, about half the time.
+We are aware of a bug where the player sometimes fails to rotate properly - this issue occurs inconsistently, about half the time.
 
 If you experience this bug, please try plugging in a controller, even if you're using keyboard and mouse.
 
