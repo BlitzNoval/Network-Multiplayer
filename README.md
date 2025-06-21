@@ -1,6 +1,6 @@
 ⚠️ Known Issue
 NOTE:
-We are aware of a bug where the issue occurs inconsistently—about half the time. If you encounter this bug, please try plugging in a controller.
+We are aware of a bug where the issue occurs inconsistently - about half the time. If you encounter this bug, please try plugging in a controller.
 
 We recommend a minimum of 3 players, although 2 players do work. Through playtesting, we identified what appears to be a workaround, but we were unable to implement a proper fix before the submission deadline.
 
